@@ -38,9 +38,20 @@ jobs:
 
       - name: Verificar cobertura mínima
         run: |
-          COBERTURA=$(mvn jacoco:report --no-transfer-progress -q && \
-            grep -A1 'INSTRUCTION' target/site/jacoco/jacoco.csv | \
-            tail -1 | awk -F',' '{printf "%.0f", ($5/($4+$5))*100}')
+          mvn jacoco:report --no-transfer-progress -q
+          # Soma INSTRUCTION_MISSED ($4) e INSTRUCTION_COVERED ($5) de
+          # todas as classes do CSV. Se nada for elegivel (scaffold sem
+          # modulo real, todas excluidas), considera o gate cumprido
+          # trivialmente — o jacoco:check do pom ja governa o threshold
+          # real quando ha classes medidas.
+          COBERTURA=$(awk -F',' '
+            NR > 1 { missed += $4; covered += $5 }
+            END {
+              total = missed + covered
+              if (total == 0) { print "100" }
+              else { printf "%.0f\n", (covered / total) * 100 }
+            }
+          ' target/site/jacoco/jacoco.csv)
           echo "Cobertura: $COBERTURA%"
           if [ "$COBERTURA" -lt 80 ]; then
             echo "Cobertura abaixo do mínimo exigido (80%). Atual: $COBERTURA%"
