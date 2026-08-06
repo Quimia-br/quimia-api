@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Supressoes do OWASP dependency-check. Use para silenciar falsos
+  positivos com justificativa rastreavel. Exemplo:
+
+  <suppress>
+    <notes>Falso positivo: aplica apenas a Jenkins, nao consumido aqui.</notes>
+    <packageUrl regex="true">^pkg:maven/org\.example/exemplo@.*$</packageUrl>
+    <cve>CVE-2023-XXXX</cve>
+  </suppress>
+
+  Toda supressao DEVE conter:
+    - <notes> explicando o motivo + ticket Jira
+    - escopo restrito (packageUrl, gav ou sha1)
+    - CVE especifico
+
+  Supressao generica ou sem justificativa nao passa em code review.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+</suppressions>
