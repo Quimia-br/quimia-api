@@ -25,3 +25,5 @@ application-local.yml
 application-local.properties
 
 .claude
+
+/docs/
