@@ -11,13 +11,13 @@ pipeline {
         stage('Validar toolchain') {
             steps {
                 sh 'java -version'
-                sh 'mvn -version'
+                sh 'sh mvnw -version'
             }
         }
 
         stage('Build e testes') {
             steps {
-                sh 'mvn -B -ntp verify'
+                sh 'sh mvnw -B -ntp verify'
             }
         }
     }
