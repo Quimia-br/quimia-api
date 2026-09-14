@@ -15,9 +15,21 @@ pipeline {
             }
         }
 
-        stage('Build e testes') {
+        stage('Compilar') {
             steps {
-                sh 'sh mvnw -B -ntp verify'
+                sh 'sh mvnw -B -ntp -DskipTests compile'
+            }
+        }
+
+        stage('Testes unitários e automatizados') {
+            steps {
+                sh 'sh mvnw -B -ntp test'
+            }
+        }
+
+        stage('Quality Gate e empacotamento') {
+            steps {
+                sh 'sh mvnw -B -ntp verify -DskipTests'
             }
         }
     }
