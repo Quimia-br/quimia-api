@@ -238,17 +238,31 @@ EOF
                                     git push origin "HEAD:${GITOPS_BRANCH}"
 
                                     cd "$WORKSPACE"
-                                    cat > "$pr_body" <<EOF
+                                    pr_response="$(curl --fail --silent --show-error \
+                                        -G \
+                                        -H 'Accept: application/vnd.github+json' \
+                                        -H 'X-GitHub-Api-Version: 2022-11-28' \
+                                        -H "Authorization: Bearer ${GITOPS_TOKEN}" \
+                                        --data-urlencode "head=Quimia-br:${GITOPS_BRANCH}" \
+                                        --data-urlencode 'base=main' \
+                                        --data-urlencode 'state=open' \
+                                        https://api.github.com/repos/Quimia-br/quimia-gitops/pulls)"
+
+                                    if printf '%s' "$pr_response" | grep -q '"node_id"'; then
+                                        echo "PR existente encontrada para ${GITOPS_BRANCH}; reutilizando-a."
+                                    else
+                                        cat > "$pr_body" <<EOF
 {"title":"ci: promove quimia-api ${RELEASE_TAG}","head":"${GITOPS_BRANCH}","base":"main","body":"Imagem publicada: \\`localhost:5000/quimia-api:${RELEASE_TAG}\\`.\\n\\nAlteração gerada pelo Jenkins após os checks da release."}
 EOF
 
-                                    pr_response="$(curl --fail --silent --show-error \\
-                                        -X POST \\
-                                        -H 'Accept: application/vnd.github+json' \\
-                                        -H 'X-GitHub-Api-Version: 2022-11-28' \\
-                                        -H "Authorization: Bearer ${GITOPS_TOKEN}" \\
-                                        https://api.github.com/repos/Quimia-br/quimia-gitops/pulls \\
-                                        --data-binary "@${pr_body}")"
+                                        pr_response="$(curl --fail --silent --show-error \\
+                                            -X POST \\
+                                            -H 'Accept: application/vnd.github+json' \\
+                                            -H 'X-GitHub-Api-Version: 2022-11-28' \\
+                                            -H "Authorization: Bearer ${GITOPS_TOKEN}" \\
+                                            https://api.github.com/repos/Quimia-br/quimia-gitops/pulls \\
+                                            --data-binary "@${pr_body}")"
+                                    fi
 
                                     pr_node_id="$(printf '%s' "$pr_response" | sed -n 's/.*"node_id":[[:space:]]*"\\([^"]*\\)".*/\\1/p' | head -n 1)"
                                     pr_url="$(printf '%s' "$pr_response" | sed -n 's/.*"html_url":[[:space:]]*"\\([^"]*\\)".*/\\1/p' | head -n 1)"
