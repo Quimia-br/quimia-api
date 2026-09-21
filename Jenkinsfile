@@ -206,7 +206,10 @@ pipeline {
 
                     try {
                         def releaseTag = env.TAG_NAME
-                        def gitOpsBranch = "automation/quimia-api-${releaseTag}"
+                        def gitOpsBranch = env.QUIMIA_GITOPS_BRANCH ?: 'QUI-86e33y130'
+                        if (!(gitOpsBranch ==~ /^QUI-[A-Za-z0-9]+$/)) {
+                            error("Branch GitOps inválida: ${gitOpsBranch}. Use QUI-<id-clickup>.")
+                        }
                         def registryHost = env.QUIMIA_REGISTRY_HOST ?: (isUnix() ? '172.17.0.1:5000' : 'localhost:5000')
                         def imageReference = "${registryHost}/quimia-api:${releaseTag}"
 
