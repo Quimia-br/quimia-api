@@ -133,14 +133,16 @@ pipeline {
                             error("Tag de release inválida: ${imageTag}. Use o formato vMAJOR.MINOR.PATCH.")
                         }
 
-                        def registryHost = env.QUIMIA_REGISTRY_HOST ?: (isUnix() ? '172.17.0.1:5000' : 'localhost:5000')
+                        def registryHost = env.QUIMIA_REGISTRY_HOST ?: (isUnix() ? '237854152841.dkr.ecr.us-east-1.amazonaws.com' : 'localhost:5000')
                         def imageReference = "${registryHost}/quimia-api:${imageTag}"
 
                         def isEcrRegistry = registryHost ==~ /^[0-9]+\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com$/
+                        def awsRegion = env.AWS_REGION ?: (isEcrRegistry ? 'us-east-1' : '')
 
                         withEnv([
                             "IMAGE_REFERENCE=${imageReference}",
-                            "IS_ECR_REGISTRY=${isEcrRegistry}"
+                            "IS_ECR_REGISTRY=${isEcrRegistry}",
+                            "AWS_REGION=${awsRegion}"
                         ]) {
                             sh '''
                                 set +x
@@ -210,7 +212,7 @@ pipeline {
                         if (!(gitOpsBranch ==~ /^QUI-[A-Za-z0-9]+$/)) {
                             error("Branch GitOps inválida: ${gitOpsBranch}. Use QUI-<id-clickup>.")
                         }
-                        def registryHost = env.QUIMIA_REGISTRY_HOST ?: (isUnix() ? '172.17.0.1:5000' : 'localhost:5000')
+                        def registryHost = env.QUIMIA_REGISTRY_HOST ?: (isUnix() ? '237854152841.dkr.ecr.us-east-1.amazonaws.com' : 'localhost:5000')
                         def imageReference = "${registryHost}/quimia-api:${releaseTag}"
 
                         withCredentials([
