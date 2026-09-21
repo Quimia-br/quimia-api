@@ -136,7 +136,39 @@ pipeline {
                         def registryHost = env.QUIMIA_REGISTRY_HOST ?: (isUnix() ? '172.17.0.1:5000' : 'localhost:5000')
                         def imageReference = "${registryHost}/quimia-api:${imageTag}"
 
-                        sh "sh mvnw -B -ntp com.google.cloud.tools:jib-maven-plugin:3.4.6:build -Dimage=${imageReference} -Djib.allowInsecureRegistries=true"
+                        def isEcrRegistry = registryHost ==~ /^[0-9]+\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com$/
+
+                        withEnv([
+                            "IMAGE_REFERENCE=${imageReference}",
+                            "IS_ECR_REGISTRY=${isEcrRegistry}"
+                        ]) {
+                            sh '''
+                                set +x
+                                set -eu
+
+                                if [ "$IS_ECR_REGISTRY" = "true" ]; then
+                                    test -n "${AWS_REGION:-}" || {
+                                        echo 'AWS_REGION é obrigatório para publicar no ECR.' >&2
+                                        exit 1
+                                    }
+
+                                    ecr_password="$(aws ecr get-login-password --region "$AWS_REGION")"
+                                    test -n "$ecr_password"
+
+                                    sh mvnw -B -ntp \
+                                        com.google.cloud.tools:jib-maven-plugin:3.4.6:build \
+                                        "-Dimage=$IMAGE_REFERENCE" \
+                                        '-Djib.to.auth.username=AWS' \
+                                        "-Djib.to.auth.password=$ecr_password" \
+                                        '-Djib.allowInsecureRegistries=false'
+                                else
+                                    sh mvnw -B -ntp \
+                                        com.google.cloud.tools:jib-maven-plugin:3.4.6:build \
+                                        "-Dimage=$IMAGE_REFERENCE" \
+                                        '-Djib.allowInsecureRegistries=true'
+                                fi
+                            '''
+                        }
 
                         publishChecks(
                             name: 'Publicar imagem da release',
