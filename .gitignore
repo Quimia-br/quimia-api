@@ -25,3 +25,7 @@ application-local.yml
 application-local.properties
 
 .claude
+.secrets/
+tmp/
+docs/
+/AGENTS.md

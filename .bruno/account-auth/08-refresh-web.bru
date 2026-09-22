@@ -1,0 +1,54 @@
+meta {
+  name: 08 - Refresh Web
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/refresh
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: quimia_rt={{refreshToken}}; quimia_csrf={{csrfToken}}
+  X-CSRF-Token: {{csrfToken}}
+}
+
+script:pre-request {
+  bru.setVar("previousRefreshToken", bru.getVar("refreshToken"));
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.accessToken) {
+    bru.setVar("accessToken", body.accessToken);
+  }
+
+  const raw = res.getHeader("set-cookie");
+  const headers = Array.isArray(raw) ? raw : [raw];
+  const refreshHeader = headers.find(value => String(value || "").includes("quimia_rt="));
+  const match = String(refreshHeader || "").match(/quimia_rt=([^;]+)/);
+  if (match) {
+    bru.setVar("refreshToken", match[1]);
+  }
+  const csrfHeader = headers.find(value => String(value || "").includes("quimia_csrf="));
+  const csrfMatch = String(csrfHeader || "").match(/quimia_csrf=([^;]+)/);
+  if (csrfMatch) {
+    bru.setVar("csrfToken", csrfMatch[1]);
+  }
+}
+
+tests {
+  test("rotates access and refresh tokens", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().accessToken).to.be.a("string").and.not.be.empty;
+    expect(bru.getVar("refreshToken")).to.not.equal(bru.getVar("previousRefreshToken"));
+    expect(res.getBody()).to.not.have.property("refreshToken");
+  });
+}
+
+docs {
+  Web transport: refresh cookie and matching double-submit CSRF cookie/header.
+}

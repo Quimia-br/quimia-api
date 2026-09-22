@@ -1,0 +1,37 @@
+meta {
+  name: Duplicate Register
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/problem+json
+}
+
+body:json {
+  {
+    "nome": "Conta Duplicada",
+    "email": "{{userEmail}}",
+    "senha": "{{userPassword}}",
+    "dataNasc": "1990-01-01"
+  }
+}
+
+tests {
+  test("reveals a duplicate email through status and detail", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().detail).to.equal("email_in_use");
+  });
+}
+
+docs {
+  Run after 01 Register. This behavior reveals whether an email exists.
+  Changing the public response requires a product decision.
+}

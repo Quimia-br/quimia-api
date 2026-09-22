@@ -1,0 +1,32 @@
+meta {
+  name: 03 - Resend Verification
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/resend-verification
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{userEmail}}"
+  }
+}
+
+tests {
+  test("returns the anti-enumeration response", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+}
+
+docs {
+  Always returns 202 for unknown, verified, or pending accounts. With the
+  current NoOp sender the raw token is not available to Bruno.
+}

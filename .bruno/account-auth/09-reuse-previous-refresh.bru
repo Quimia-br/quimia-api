@@ -1,0 +1,29 @@
+meta {
+  name: 09 - Reuse Previous Refresh
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/refresh
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/problem+json
+  Cookie: quimia_rt={{previousRefreshToken}}; quimia_csrf={{csrfToken}}
+  X-CSRF-Token: {{csrfToken}}
+}
+
+tests {
+  test("rejects reuse and revokes the token family", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().detail).to.equal("invalid_refresh");
+  });
+}
+
+docs {
+  Security scenario. Reusing the token from before rotation revokes the whole
+  refresh family, including the current refresh token.
+}

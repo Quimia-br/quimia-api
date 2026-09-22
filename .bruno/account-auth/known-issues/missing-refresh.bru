@@ -1,0 +1,27 @@
+meta {
+  name: Missing Refresh Must Return 401
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/refresh
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/problem+json
+}
+
+tests {
+  test("returns a controlled invalid-refresh response", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().detail).to.equal("invalid_refresh");
+  });
+}
+
+docs {
+  Regression case. Clear the Bruno cookie jar before running so the request
+  has no refresh credential. Expected result is 401 invalid_refresh.
+}

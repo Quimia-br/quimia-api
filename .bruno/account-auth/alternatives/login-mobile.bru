@@ -1,0 +1,45 @@
+meta {
+  name: Login Mobile - Body Transport
+  type: http
+  seq: 0
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/mobile/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{userEmail}}",
+    "senha": "{{userPassword}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.refreshToken) {
+    bru.setVar("mobileAccessToken", body.accessToken);
+    bru.setVar("mobileRefreshToken", body.refreshToken);
+  }
+}
+
+tests {
+  test("returns both tokens in JSON without refresh cookie", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().accessToken).to.be.a("string").and.not.be.empty;
+    expect(res.getBody().refreshToken).to.be.a("string").and.not.be.empty;
+    expect(String(res.getHeader("set-cookie") || "")).to.not.contain("quimia_rt=");
+  });
+}
+
+docs {
+  Use a verified account. Store refreshToken in the mobile secure storage
+  when integrating the app; this Bruno example uses runtime variables.
+}

@@ -1,0 +1,34 @@
+meta {
+  name: 10 - Logout Web
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/logout
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Cookie: quimia_rt={{refreshToken}}; quimia_csrf={{csrfToken}}
+  X-CSRF-Token: {{csrfToken}}
+}
+
+tests {
+  test("ends the session and clears the cookie", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(String(res.getHeader("set-cookie"))).to.contain("quimia_rt=");
+    expect(String(res.getHeader("set-cookie"))).to.contain("quimia_csrf=");
+    expect(String(res.getHeader("set-cookie"))).to.contain("Max-Age=0");
+  });
+}
+
+docs {
+  Run 05 Login again after 09 Reuse Previous Refresh: reuse revokes that
+  token family. This request then checks logout of a fresh session.
+}

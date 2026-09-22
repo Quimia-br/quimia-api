@@ -1,0 +1,58 @@
+meta {
+  name: 01 - Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "nome": "{{userName}}",
+    "email": "{{userEmail}}",
+    "senha": "{{userPassword}}",
+    "dataNasc": "{{birthDate}}"
+  }
+}
+
+script:pre-request {
+  const email = `bruno.account.${Date.now()}@example.com`;
+  bru.setVar("userEmail", email);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 201 && body && body.id) {
+    bru.setVar("userId", body.id);
+  }
+}
+
+tests {
+  test("returns 201", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("returns the created user without credentials", function () {
+    const body = res.getBody();
+    expect(body).to.have.property("id");
+    expect(body.email).to.equal(bru.getVar("userEmail"));
+    expect(body.nivelAcesso).to.equal("USUARIO");
+    expect(JSON.stringify(body)).to.not.contain(bru.getVar("userPassword"));
+    expect(body).to.not.have.property("senha");
+    expect(body).to.not.have.property("senhaHash");
+  });
+}
+
+docs {
+  Creates an unverified USUARIO account. The pre-request script generates a
+  unique email so the request can be executed repeatedly.
+}

@@ -1,0 +1,33 @@
+meta {
+  name: Invalid Register Payload
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/problem+json
+}
+
+body:json {
+  {
+    "nome": "X",
+    "email": "email-invalido",
+    "senha": "curta",
+    "dataNasc": "2030-01-01"
+  }
+}
+
+tests {
+  test("returns validation errors", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().title).to.equal("Validation failed");
+    expect(res.getBody().errors).to.be.an("array").and.not.be.empty;
+  });
+}

@@ -1,0 +1,32 @@
+meta {
+  name: 04 - Verify Email
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/verify-email
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "token": "{{verificationToken}}"
+  }
+}
+
+tests {
+  test("verifies the email", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Requires verificationToken to be supplied manually from a real sender or a
+  controlled local fixture. A token cannot be recovered from its database hash.
+}

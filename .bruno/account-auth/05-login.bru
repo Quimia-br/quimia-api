@@ -1,0 +1,64 @@
+meta {
+  name: 05 - Login
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{userEmail}}",
+    "senha": "{{userPassword}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.accessToken) {
+    bru.setVar("accessToken", body.accessToken);
+  }
+
+  const raw = res.getHeader("set-cookie");
+  const headers = Array.isArray(raw) ? raw : [raw];
+  const refreshHeader = headers.find(value => String(value || "").includes("quimia_rt="));
+  const match = String(refreshHeader || "").match(/quimia_rt=([^;]+)/);
+  if (match) {
+    bru.setVar("refreshToken", match[1]);
+  }
+  const csrfHeader = headers.find(value => String(value || "").includes("quimia_csrf="));
+  const csrfMatch = String(csrfHeader || "").match(/quimia_csrf=([^;]+)/);
+  if (csrfMatch) {
+    bru.setVar("csrfToken", csrfMatch[1]);
+  }
+}
+
+tests {
+  test("returns an access token", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().tokenType).to.equal("Bearer");
+    expect(res.getBody().expiresIn).to.be.a("number").and.above(0);
+    expect(res.getBody().accessToken).to.be.a("string").and.not.be.empty;
+    expect(res.getBody()).to.not.have.property("refreshToken");
+  });
+
+  test("sets the refresh cookie", function () {
+    const raw = res.getHeader("set-cookie");
+    expect(String(raw)).to.contain("quimia_rt=");
+    expect(String(raw)).to.contain("quimia_csrf=");
+    expect(String(raw)).to.contain("HttpOnly");
+  });
+}
+
+docs {
+  Saves accessToken, refreshToken and the server-issued csrfToken as runtime variables.
+}
