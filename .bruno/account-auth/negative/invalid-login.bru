@@ -1,0 +1,35 @@
+meta {
+  name: Invalid Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/problem+json
+}
+
+body:json {
+  {
+    "email": "{{userEmail}}",
+    "senha": "senha-incorreta-123"
+  }
+}
+
+tests {
+  test("does not reveal credential details", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().detail).to.equal("invalid_credentials");
+  });
+}
+
+docs {
+  Repeating this request five times blocks the account for the configured
+  interval. Use a disposable account.
+}

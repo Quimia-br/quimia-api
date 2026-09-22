@@ -1,0 +1,44 @@
+meta {
+  name: Refresh Mobile - Body Transport
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/mobile/refresh
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "refreshToken": "{{mobileRefreshToken}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.refreshToken) {
+    bru.setVar("mobileAccessToken", body.accessToken);
+    bru.setVar("mobileRefreshToken", body.refreshToken);
+  }
+}
+
+tests {
+  test("rotates a refresh supplied in the body", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().accessToken).to.be.a("string").and.not.be.empty;
+    expect(res.getBody().refreshToken).to.be.a("string").and.not.be.empty;
+    expect(String(res.getHeader("set-cookie") || "")).to.not.contain("quimia_rt=");
+  });
+}
+
+docs {
+  Run after Login Mobile. Clear Bruno cookies before mobile requests;
+  sending a web refresh cookie to this route returns 400 invalid_transport.
+}

@@ -1,0 +1,29 @@
+meta {
+  name: Refresh Family Must Be Revoked
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/refresh
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/problem+json
+  Cookie: quimia_rt={{refreshToken}}; quimia_csrf={{csrfToken}}
+  X-CSRF-Token: {{csrfToken}}
+}
+
+tests {
+  test("rejects the current token after reuse was detected", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().detail).to.equal("invalid_refresh");
+  });
+}
+
+docs {
+  Regression case. Run immediately after 09 Reuse Previous Refresh.
+  The current token must fail because the whole family was revoked.
+}

@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:quimia;MODE=PostgreSQL;DATABASE_TO_UPPER=false
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+quimia:
+  jwt:
+    private-key-path: .secrets/jwt-private.pkcs8.pem
+    public-key-path: .secrets/jwt-public.pem
+app:
+  auth:
+    cookie-secure: false

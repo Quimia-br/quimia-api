@@ -1,0 +1,22 @@
+meta {
+  name: Unauthorized Me
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/usuarios/me
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/problem+json
+}
+
+tests {
+  test("requires an access token", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().title).to.equal("Unauthorized");
+  });
+}

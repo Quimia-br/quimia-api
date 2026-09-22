@@ -1,0 +1,35 @@
+meta {
+  name: 07 - Update Me
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/usuarios/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "nome": "{{updatedName}}",
+    "dataNasc": "{{birthDate}}"
+  }
+}
+
+tests {
+  test("updates only the allowed profile fields", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().nome).to.equal(bru.getVar("updatedName"));
+    expect(res.getBody().nivelAcesso).to.equal("USUARIO");
+  });
+}
