@@ -182,7 +182,7 @@ jobs:
   security:
     name: Security gate (OWASP)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -197,6 +197,20 @@ jobs:
             pom.xml
             .mvn/wrapper/maven-wrapper.properties
 
+      - name: Prepare OWASP cache key
+        id: owasp-cache-key
+        shell: bash
+        run: echo "date=$(date -u +'%Y%m%d')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore OWASP Dependency-Check database
+        id: owasp-db-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.dependency-check/data
+          key: dependency-check-db-v10-${{ runner.os }}-${{ steps.owasp-cache-key.outputs.date }}
+          restore-keys: |
+            dependency-check-db-v10-${{ runner.os }}-
+
       - name: Scan dependencies with OWASP Dependency-Check
         id: dependency-check
         env:
@@ -204,9 +218,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${NVD_API_KEY:-}" ]; then
-            sh ./mvnw -B -ntp -DnvdApiKey="$NVD_API_KEY" dependency-check:check
+            sh ./mvnw -B -ntp -DnvdApiKey="$NVD_API_KEY" -DdataDirectory="$HOME/.dependency-check/data" dependency-check:check
           else
-            sh ./mvnw -B -ntp dependency-check:check
+            sh ./mvnw -B -ntp -DdataDirectory="$HOME/.dependency-check/data" dependency-check:check
           fi
 
       - name: Preserve the OWASP report for diagnosis
@@ -244,6 +258,26 @@ jobs:
               echo 'Não passou. Consulte o log e baixe `dependency-check-report` se o relatório HTML foi produzido; falha de consulta à NVD também bloqueia o gate.'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Confirm OWASP scan produced a report
+        id: owasp-scan-complete
+        if: always()
+        shell: bash
+        env:
+          SCAN_OUTCOME: ${{ steps.dependency-check.outcome }}
+        run: |
+          if [ "$SCAN_OUTCOME" != "cancelled" ] && [ -s target/dependency-check-report.html ]; then
+            echo "complete=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "complete=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Save OWASP Dependency-Check database
+        if: always() && steps.owasp-scan-complete.outputs.complete == 'true' && steps.owasp-db-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.dependency-check/data
+          key: dependency-check-db-v10-${{ runner.os }}-${{ steps.owasp-cache-key.outputs.date }}
 
   artifact:
     name: Discloud artifact
