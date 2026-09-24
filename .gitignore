@@ -27,5 +27,6 @@ application-local.properties
 .claude
 .secrets/
 tmp/
+scripts/discloud-deploy/node_modules/
 docs/
 /AGENTS.md

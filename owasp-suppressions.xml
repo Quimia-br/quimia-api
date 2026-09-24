@@ -4,7 +4,7 @@
   positivos com justificativa rastreavel. Exemplo:
 
   <suppress>
-    <notes>Falso positivo: aplica apenas a Jenkins, nao consumido aqui.</notes>
+    <notes>Falso positivo: justificar com evidência e indicar por que o componente não é consumido pela aplicação.</notes>
     <packageUrl regex="true">^pkg:maven/org\.example/exemplo@.*$</packageUrl>
     <cve>CVE-2023-XXXX</cve>
   </suppress>
