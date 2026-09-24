@@ -258,7 +258,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: discloud
-      url: https://quimia-api.discloud.app
+      url: https://quimia.discloud.app
     steps:
       - name: Checkout the released source
         uses: actions/checkout@v7
@@ -297,7 +297,7 @@ jobs:
         id: smoke-check
         run: |
           set -euo pipefail
-          endpoint='https://quimia-api.discloud.app/api/v1/usuarios/me'
+          endpoint='https://quimia.discloud.app/api/v1/usuarios/me'
           deadline=$((SECONDS + 180))
           last_status='000'
 

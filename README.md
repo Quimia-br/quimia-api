@@ -61,7 +61,7 @@ consulte o ID interno no painel da Discloud ou em `user.apps` na resposta de
 `GET /v2/user` e cadastre-o como secret `DISCLOUD_APP_ID`; Releases seguintes
 atualizam esse app. Se já houver qualquer app na conta e o ID estiver ausente,
 o workflow falha sem criar outro app. Esse ID interno não é o subdomínio
-`quimia-api` configurado no `discloud.config`.
+`quimia` configurado no `discloud.config`.
 
 A primeira Release é o bootstrap do app. Assim que `apps.create` criar a
 aplicação, configure nela as variáveis de runtime listadas abaixo e cadastre
@@ -71,10 +71,10 @@ falho pela aba **Actions**; ele atualizará o app criado, sem criar uma
 duplicata, e repetirá o smoke check. Não publique outra Release só para repetir
 esse bootstrap.
 
-O `discloud.config` já define `ID=quimia-api`. Se o cadastro/reserva do
+O `discloud.config` já define `ID=quimia`. Se o cadastro/reserva do
 subdomínio continuar retornando HTTP 400, a criação inicial também pode ser
 recusada pela Discloud; esse erro da plataforma precisa ser resolvido antes de
-o smoke check em `https://quimia-api.discloud.app` passar.
+o smoke check em `https://quimia.discloud.app` passar.
 
 As variáveis de runtime da API devem ser configuradas na Discloud, separadas
 dos secrets do Actions: `SPRING_DATASOURCE_URL`,
