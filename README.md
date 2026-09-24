@@ -18,7 +18,7 @@ Detalhes de convencao, nomenclatura e fronteiras estao em
 mvn clean verify              # compila + testes (inclui ArchUnit + JaCoCo 80%)
 mvn spring-boot:run           # sobe a aplicacao em http://localhost:8080
 mvn test                      # so testes
-mvn dependency-check:check    # auditoria de vulnerabilidades (lento no 1o run)
+mvn dependency-check:check    # auditoria manual opcional (nao executada no CI)
 ```
 
 ## CI, checks e deploy
@@ -33,8 +33,6 @@ uma falha; o check `CI summary` consolida a execução.
 - **Unit tests** — executa JUnit/Surefire e as regras de arquitetura ArchUnit.
 - **Coverage gate** — executa `mvn verify`; JaCoCo exige cobertura de
   instruções de pelo menos 80%.
-- **Security gate (OWASP)** — bloqueia vulnerabilidades não suprimidas com
-  CVSS ≥ 7.0; o relatório HTML fica nos artefatos da execução.
 - **Discloud artifact** — valida os testes do helper e gera um ZIP com apenas
   `app.jar` e `discloud.config` na raiz.
 - **Deploy to Discloud** — só roda ao publicar uma Release; exige aprovação
@@ -46,13 +44,12 @@ uma falha; o check `CI summary` consolida a execução.
 
 Depois que os novos checks aparecerem no primeiro PR, configure a proteção de
 `main` para exigir `Build`, `Unit tests`, `Coverage gate`,
-`Security gate (OWASP)`, `Discloud artifact`, `CI summary` e `PR title`.
+`Discloud artifact`, `CI summary` e `PR title`.
 Remova da regra os checks antigos de Jenkins; o deploy não é um check exigido
 para PR, pois só roda em Release publicada.
 
-Para acelerar o OWASP Dependency-Check, configure `NVD_API_KEY` como secret
-do repositório. Sem ela o scanner continua executando, mas pode sofrer rate
-limit e demorar mais.
+O Dependency-Check do Maven permanece disponível para auditoria manual pelo
+comando acima, mas não roda nas Actions nem bloqueia PRs ou Releases.
 
 ### Preparar o primeiro deploy
 
