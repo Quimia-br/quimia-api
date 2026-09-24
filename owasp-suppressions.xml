@@ -17,4 +17,9 @@
   Supressao generica ou sem justificativa nao passa em code review.
 -->
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+  <suppress>
+    <notes>Falso positivo de CPE: CVE-2025-7962 descreve SMTP Injection em Jakarta Mail (org.eclipse.angus:smtp), mas o artefato reportado e org.eclipse.angus:angus-activation:2.0.3, implementacao distinta da API Jakarta Activation, sem SMTP. O pom.xml nao inclui starter de email. Supressao limitada ao packageUrl e CVE; reavaliar se SMTP/email for adicionado. Evidencias: GHSA-9342-92gg-6v29 e release Angus Mail 2.0.4. Ticket QUI-86e3cfnxa.</notes>
+    <packageUrl regex="true">^pkg:maven/org\.eclipse\.angus/angus-activation@2\.0\.3$</packageUrl>
+    <cve>CVE-2025-7962</cve>
+  </suppress>
 </suppressions>
