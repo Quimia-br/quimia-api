@@ -201,6 +201,8 @@
                 <version>${dependency-check.version}</version>
                 <configuration>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
+                    <!-- OSS Index rejects the configured credentials (HTTP 401); NVD and KEV remain enabled. -->
+                    <ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
                     <suppressionFiles>
                         <suppressionFile>owasp-suppressions.xml</suppressionFile>
                     </suppressionFiles>

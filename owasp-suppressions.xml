@@ -22,4 +22,9 @@
     <packageUrl regex="true">^pkg:maven/org\.eclipse\.angus/angus-activation@2\.0\.3$</packageUrl>
     <cve>CVE-2025-7962</cve>
   </suppress>
+  <suppress>
+    <notes>Falso positivo confirmado pelo projeto Dependency-Check: CVE-2025-15104 pertence ao Nu Html Checker (nu.validator:validator), mas foi associado por CPE generico a org.hibernate.validator:hibernate-validator:9.1.3.Final. O artefato Hibernate Validator nao contem o Nu Html Checker. Escopo limitado ao packageUrl e CVE; remover se o artefato ou evidencia mudar. Evidencia: issue upstream DependencyCheck #8249. Ticket QUI-86e3cfnxa.</notes>
+    <packageUrl regex="true">^pkg:maven/org\.hibernate\.validator/hibernate-validator@9\.1\.3\.Final$</packageUrl>
+    <cve>CVE-2025-15104</cve>
+  </suppress>
 </suppressions>

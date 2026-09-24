@@ -245,6 +245,8 @@ jobs:
             echo
             echo '**O que valida:** vulnerabilidades conhecidas nas dependências incluídas pelo escopo configurado no Maven.'
             echo
+            echo '**Fontes ativas:** NVD/CVE e CISA KEV. Sonatype OSS Index está desativado enquanto as credenciais retornarem HTTP 401.'
+            echo
             echo '**Critério de aprovação:** nenhuma vulnerabilidade não suprimida com CVSS igual ou superior a 7.0; limiar configurado no `pom.xml`.'
             if [ "${HAS_NVD_API_KEY}" != true ]; then
               echo
