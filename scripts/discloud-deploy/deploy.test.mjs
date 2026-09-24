@@ -51,19 +51,17 @@ for (const [name, overrides] of [
   });
 }
 
-test("creates the first app when the Discloud account has no apps", async () => {
+test("creates the first app after the SDK returns an empty app map", async () => {
   const calls = [];
   const client = {
     async login(token) {
       calls.push(["login", token]);
     },
-    user: {
-      async fetch() {
-        calls.push(["fetch-user"]);
-        return { user: { apps: [] } };
-      },
-    },
     apps: {
+      async fetch(scope) {
+        calls.push(["fetch-apps", scope]);
+        return new Map();
+      },
       async create(options) {
         calls.push(["create", options]);
       },
@@ -75,21 +73,21 @@ test("creates the first app when the Discloud account has no apps", async () => 
   assert.equal(result, "created");
   assert.deepEqual(calls, [
     ["login", validEnv.DISCLOUD_TOKEN],
-    ["fetch-user"],
+    ["fetch-apps", "all"],
     ["create", { file: validEnv.DISCLOUD_ARCHIVE }],
   ]);
 });
 
 test("refuses to create a duplicate when an app exists but its ID is not configured", async () => {
+  const calls = [];
   let createCalls = 0;
   const client = {
     async login() {},
-    user: {
-      async fetch() {
-        return { user: { apps: ["existing-app-id"] } };
-      },
-    },
     apps: {
+      async fetch(scope) {
+        calls.push(["fetch-apps", scope]);
+        return new Map([["existing-app-id", {}]]);
+      },
       async create() {
         createCalls += 1;
       },
@@ -100,26 +98,28 @@ test("refuses to create a duplicate when an app exists but its ID is not configu
     deployWithClient(client, { ...validEnv, DISCLOUD_APP_ID: "" }),
     /DISCLOUD_APP_ID/,
   );
+  assert.deepEqual(calls, [["fetch-apps", "all"]]);
   assert.equal(createCalls, 0);
 });
 
-test("fails closed when the account response does not expose its app list", async () => {
+test("fails closed when the SDK returns an unexpected app list shape", async () => {
   let createCalls = 0;
   const client = {
     async login() {},
-    user: {
-      async fetch() {
-        return { user: {} };
-      },
-    },
     apps: {
+      async fetch() {
+        return { apps: [] };
+      },
       async create() {
         createCalls += 1;
       },
     },
   };
 
-  await assert.rejects(deployWithClient(client, { ...validEnv, DISCLOUD_APP_ID: "" }));
+  await assert.rejects(
+    deployWithClient(client, { ...validEnv, DISCLOUD_APP_ID: "" }),
+    /Could not verify the Discloud app list/,
+  );
   assert.equal(createCalls, 0);
 });
 

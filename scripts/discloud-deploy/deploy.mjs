@@ -32,14 +32,13 @@ export async function deployWithClient(client, env) {
     return "updated";
   }
 
-  const profile = await client.user.fetch();
-  const apps = profile?.user?.apps ?? profile?.apps;
-  if (!Array.isArray(apps)) {
+  const apps = await client.apps.fetch("all");
+  if (!(apps instanceof Map)) {
     throw new SafeDeploymentError(
       "Could not verify the Discloud app list; first-app creation was aborted.",
     );
   }
-  if (apps.length > 0) {
+  if (apps.size > 0) {
     throw new SafeDeploymentError(
       "DISCLOUD_APP_ID is missing, but this Discloud account already has apps. Set it to the Quimia app ID to update without creating a duplicate.",
     );

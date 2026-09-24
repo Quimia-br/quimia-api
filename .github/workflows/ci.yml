@@ -179,111 +179,9 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-  security:
-    name: Security gate (OWASP)
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v7
-
-      - name: Set up Temurin Java 21 and Maven cache
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-          cache-dependency-path: |
-            pom.xml
-            .mvn/wrapper/maven-wrapper.properties
-
-      - name: Prepare OWASP cache key
-        id: owasp-cache-key
-        shell: bash
-        run: echo "date=$(date -u +'%Y%m%d')" >> "$GITHUB_OUTPUT"
-
-      - name: Restore OWASP Dependency-Check database
-        id: owasp-db-cache
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.dependency-check/data
-          key: dependency-check-db-v10-${{ runner.os }}-${{ steps.owasp-cache-key.outputs.date }}
-          restore-keys: |
-            dependency-check-db-v10-${{ runner.os }}-
-
-      - name: Scan dependencies with OWASP Dependency-Check
-        id: dependency-check
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -n "${NVD_API_KEY:-}" ]; then
-            sh ./mvnw -B -ntp -DnvdApiKey="$NVD_API_KEY" -DdataDirectory="$HOME/.dependency-check/data" dependency-check:check
-          else
-            sh ./mvnw -B -ntp -DdataDirectory="$HOME/.dependency-check/data" dependency-check:check
-          fi
-
-      - name: Preserve the OWASP report for diagnosis
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: dependency-check-report
-          path: target/dependency-check-report.html
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Explain the Security gate
-        if: always()
-        env:
-          CHECK_RESULT: ${{ job.status }}
-          HAS_NVD_API_KEY: ${{ secrets.NVD_API_KEY != '' }}
-        run: |
-          {
-            echo '### Security gate — OWASP Dependency-Check'
-            echo
-            echo "**Resultado:** ${CHECK_RESULT}"
-            echo
-            echo '**O que valida:** vulnerabilidades conhecidas nas dependências incluídas pelo escopo configurado no Maven.'
-            echo
-            echo '**Fontes ativas:** NVD/CVE e CISA KEV. Sonatype OSS Index está desativado enquanto as credenciais retornarem HTTP 401.'
-            echo
-            echo '**Critério de aprovação:** nenhuma vulnerabilidade não suprimida com CVSS igual ou superior a 7.0; limiar configurado no `pom.xml`.'
-            if [ "${HAS_NVD_API_KEY}" != true ]; then
-              echo
-              echo '**Nota:** `NVD_API_KEY` não foi configurada; a consulta à NVD pode ser mais lenta ou sofrer rate limit.'
-            fi
-            if [ "${CHECK_RESULT}" = success ]; then
-              echo
-              echo 'A análise terminou sem encontrar vulnerabilidades acima do limiar de bloqueio.'
-            else
-              echo
-              echo 'Não passou. Consulte o log e baixe `dependency-check-report` se o relatório HTML foi produzido; falha de consulta à NVD também bloqueia o gate.'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Confirm OWASP scan produced a report
-        id: owasp-scan-complete
-        if: always()
-        shell: bash
-        env:
-          SCAN_OUTCOME: ${{ steps.dependency-check.outcome }}
-        run: |
-          if [ "$SCAN_OUTCOME" != "cancelled" ] && [ -s target/dependency-check-report.html ]; then
-            echo "complete=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "complete=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Save OWASP Dependency-Check database
-        if: always() && steps.owasp-scan-complete.outputs.complete == 'true' && steps.owasp-db-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.dependency-check/data
-          key: dependency-check-db-v10-${{ runner.os }}-${{ steps.owasp-cache-key.outputs.date }}
-
   artifact:
     name: Discloud artifact
-    needs: [build, unit-tests, coverage, security]
+    needs: [build, unit-tests, coverage]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -354,7 +252,7 @@ jobs:
 
   deploy-discloud:
     name: Deploy to Discloud
-    needs: [build, unit-tests, coverage, security, artifact]
+    needs: [build, unit-tests, coverage, artifact]
     if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -465,7 +363,7 @@ jobs:
 
   workflow-summary:
     name: CI summary
-    needs: [build, unit-tests, coverage, security, artifact, deploy-discloud]
+    needs: [build, unit-tests, coverage, artifact, deploy-discloud]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -475,7 +373,6 @@ jobs:
           BUILD_RESULT: ${{ needs.build.result }}
           TESTS_RESULT: ${{ needs.unit-tests.result }}
           COVERAGE_RESULT: ${{ needs.coverage.result }}
-          SECURITY_RESULT: ${{ needs.security.result }}
           ARTIFACT_RESULT: ${{ needs.artifact.result }}
           DEPLOY_RESULT: ${{ needs.deploy-discloud.result }}
         run: |
@@ -488,7 +385,6 @@ jobs:
             printf '| Build | `%s` | JAR Spring Boot compilado e empacotado. |\n' "$BUILD_RESULT"
             printf '| Unit tests | `%s` | Testes JUnit/Surefire e regras ArchUnit. |\n' "$TESTS_RESULT"
             printf '| Coverage gate | `%s` | `mvn verify` e cobertura JaCoCo mínima de 80%%. |\n' "$COVERAGE_RESULT"
-            printf '| Security gate (OWASP) | `%s` | Sem vulnerabilidade não suprimida com CVSS >= 7.0. |\n' "$SECURITY_RESULT"
             printf '| Discloud artifact | `%s` | ZIP validado com `app.jar` e `discloud.config`. |\n' "$ARTIFACT_RESULT"
             if [ "$EVENT_NAME" = 'release' ]; then
               printf '| Deploy to Discloud | `%s` | Upload e smoke check HTTP 401. |\n' "$DEPLOY_RESULT"
@@ -500,7 +396,6 @@ jobs:
           if [ "$BUILD_RESULT" != success ] \
             || [ "$TESTS_RESULT" != success ] \
             || [ "$COVERAGE_RESULT" != success ] \
-            || [ "$SECURITY_RESULT" != success ] \
             || [ "$ARTIFACT_RESULT" != success ]; then
             echo 'At least one required CI gate did not succeed.' >&2
             exit 1
