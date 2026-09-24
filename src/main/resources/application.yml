@@ -19,6 +19,8 @@ server:
 
 quimia:
   jwt:
+    private-key-base64: ${QUIMIA_JWT_PRIVATE_KEY_BASE64:}
+    public-key-base64: ${QUIMIA_JWT_PUBLIC_KEY_BASE64:}
     private-key-path: ${QUIMIA_JWT_PRIVATE_KEY_PATH:.secrets/jwt-private.pkcs8.pem}
     public-key-path: ${QUIMIA_JWT_PUBLIC_KEY_PATH:.secrets/jwt-public.pem}
     kid: ${QUIMIA_JWT_KID:local-dev-01}
