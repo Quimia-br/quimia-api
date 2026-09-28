@@ -1,8 +1,6 @@
 package com.api.quimia.domain.account.internal.usecase;
 
 import java.security.MessageDigest;
-import java.security.SecureRandom;
-import java.util.Base64;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -25,22 +23,5 @@ public class Sha256TokenHasher implements TokenHasher {
     @Override
     public boolean matches(String raw, String hash) {
         return hash(raw).equals(hash);
-    }
-
-    @Component
-    public static class RandomVerificationTokenGenerator implements VerificationTokenGenerator {
-        private final TokenHasher hasher = new Sha256TokenHasher();
-
-        @Override
-        public String generate() {
-            byte[] bytes = new byte[32];
-            new SecureRandom().nextBytes(bytes);
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        }
-
-        @Override
-        public String hash(String raw) {
-            return hasher.hash(raw);
-        }
     }
 }

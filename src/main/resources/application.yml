@@ -41,5 +41,9 @@ app:
     refresh-inactivity-days: ${APP_AUTH_REFRESH_INACTIVITY_DAYS:7}
     max-failures: ${APP_AUTH_MAX_FAILURES:5}
     block-minutes: ${APP_AUTH_BLOCK_MINUTES:15}
+    recovery-code-pepper: ${APP_AUTH_RECOVERY_CODE_PEPPER:}
   email:
     sender-mode: ${APP_EMAIL_SENDER_MODE:noop}
+    resend:
+      api-key: ${RESEND_API_KEY:}
+      from: ${APP_EMAIL_FROM:}

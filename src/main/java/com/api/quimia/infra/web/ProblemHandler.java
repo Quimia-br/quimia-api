@@ -43,10 +43,10 @@ public class ProblemHandler {
     private static String codeTitle(String code) {
         return switch (code) {
             case "invalid_credentials", "invalid_refresh", "invalid_token" -> "Unauthorized";
-            case "email_not_verified", "blocked" -> "Forbidden";
+            case "blocked" -> "Forbidden";
             case "email_in_use" -> "Conflict";
             case "weak_password", "underage" -> "Unprocessable";
-            case "invalid_transport" -> "Bad Request";
+            case "invalid_transport", "invalid_recovery_code", "invalid_reset_token" -> "Bad Request";
             default -> "Error";
         };
     }

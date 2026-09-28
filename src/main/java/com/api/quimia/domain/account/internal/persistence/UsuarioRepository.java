@@ -21,6 +21,4 @@ public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
     Optional<Usuario> findByEmailForUpdate(@Param("email") String email);
 
     boolean existsByEmail(String email);
-
-    Optional<Usuario> findByVerificationTokenHash(String verificationTokenHash);
 }

@@ -4,7 +4,6 @@ import com.api.quimia.TestJwtKeys;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.api.quimia.domain.account.internal.dto.ResendVerificationRequest;
 import com.api.quimia.domain.account.internal.dto.UpdateProfileRequest;
 import com.api.quimia.domain.account.internal.persistence.UsuarioRepository;
 import java.time.LocalDate;
@@ -27,31 +26,17 @@ class AccountUseCaseTest {
     private PerfilUseCase perfil;
 
     @Autowired
-    private ReenviarVerificacaoUseCase reenviar;
-
-    @Autowired
-    private VerificarEmailUseCase verificar;
-
-    @Autowired
-    private com.api.quimia.domain.account.AccountTestConfig.TokenProbe sender;
-
-    @Autowired
     private RegistrarUseCase registrar;
 
     @Autowired
     private PasswordEncoder passwords;
 
     @Test
-    void resendIsGenericAndProfileValidates() {
+    void profileValidates() {
         users.deleteAll();
-        reenviar.execute(new ResendVerificationRequest("ghost@example.com"));
 
         var created = registrar.execute(new com.api.quimia.domain.account.internal.dto.RegisterRequest(
                 "Case User", "case@example.com", "senha-forte-case", LocalDate.of(1988, 3, 3)));
-        reenviar.execute(new ResendVerificationRequest("case@example.com"));
-        String token = sender.lastToken();
-        assertThat(token).isNotBlank();
-        verificar.execute(token);
 
         var viewed = perfil.current(created.id());
         assertThat(viewed.nome()).isEqualTo("Case User");

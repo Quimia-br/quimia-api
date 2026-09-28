@@ -10,6 +10,7 @@ import com.api.quimia.domain.account.internal.persistence.UsuarioRepository;
 import java.security.SecureRandom;
 import java.time.OffsetDateTime;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -51,7 +52,7 @@ public class AutenticarUseCase {
 
     @Transactional(noRollbackFor = AccountException.class)
     public IssuedSession execute(LoginRequest request) {
-        String email = request.email().trim().toLowerCase();
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
         var found = users.findByEmailForUpdate(email);
         if (found.isEmpty()) {
             audit.record(null, "login_failed");
@@ -75,10 +76,6 @@ public class AutenticarUseCase {
                 throw new AccountException("blocked", 423);
             }
             throw new AccountException("invalid_credentials", 401);
-        }
-        if (user.getEmailVerificadoEm() == null) {
-            audit.record(user.getId(), "login_failed");
-            throw new AccountException("email_not_verified", 403);
         }
         user.setFalhasLogin(0);
         user.setBloqueadoAte(null);

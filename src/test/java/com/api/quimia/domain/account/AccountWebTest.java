@@ -12,7 +12,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.api.quimia.domain.account.internal.dto.RegisterRequest;
 import com.api.quimia.domain.account.internal.persistence.UsuarioRepository;
 import com.api.quimia.domain.account.internal.usecase.RegistrarUseCase;
-import com.api.quimia.domain.account.internal.usecase.VerificarEmailUseCase;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
@@ -45,15 +44,33 @@ class AccountWebTest {
     @Autowired
     private RegistrarUseCase registrar;
 
-    @Autowired
-    private VerificarEmailUseCase verificar;
-
-    @Autowired
-    private AccountTestConfig.TokenProbe sender;
-
     @BeforeEach
     void clean() {
         users.deleteAll();
+    }
+
+    @Test
+    void forgotPasswordDoesNotRevealWhetherEmailExists() throws Exception {
+        String unknownResponse = mvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"unknown@example.com\"}"))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        registrar.execute(new RegisterRequest(
+                "Existing User", "existing-recovery@example.com", "senha-forte-existing-123", LocalDate.of(1990, 1, 1)));
+        String existingResponse = mvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"existing-recovery@example.com\"}"))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(unknownResponse).isEqualTo("{}");
+        assertThat(existingResponse).isEqualTo(unknownResponse);
     }
 
     @Test
@@ -68,13 +85,6 @@ class AccountWebTest {
                 .andExpect(jsonPath("$.user").doesNotExist())
                 .andReturn();
         assertThat(register.getResponse().getContentAsString()).doesNotContain("senha-forte-web");
-
-        mvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"web@example.com\",\"senha\":\"senha-forte-web\"}"))
-                .andExpect(status().isForbidden());
-
-        verificar.execute(sender.lastToken());
 
         MvcResult login = mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -158,7 +168,6 @@ class AccountWebTest {
     void mobileRefreshUsesBody() throws Exception {
         registrar.execute(new RegisterRequest(
                 "Mobile User", "mobile@example.com", "senha-forte-mob", LocalDate.of(1991, 2, 2)));
-        verificar.execute(sender.lastToken());
 
         MvcResult login = mvc.perform(post("/api/v1/auth/mobile/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -196,14 +205,6 @@ class AccountWebTest {
                 .andExpect(cookie().doesNotExist("quimia_rt"))
                 .andExpect(cookie().doesNotExist("quimia_csrf"));
 
-        mvc.perform(post("/api/v1/auth/resend-verification")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"nobody@example.com\"}"))
-                .andExpect(status().isAccepted());
-        mvc.perform(post("/api/v1/auth/verify-email")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"token\":\"invalid\"}"))
-                .andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(new RegisterRequest(

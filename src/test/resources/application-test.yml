@@ -17,3 +17,4 @@ quimia:
 app:
   auth:
     cookie-secure: false
+    recovery-code-pepper: test-only-recovery-code-pepper-32-bytes-minimum

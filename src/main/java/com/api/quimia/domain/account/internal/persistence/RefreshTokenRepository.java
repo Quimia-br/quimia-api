@@ -7,8 +7,10 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
     @Query("select token.userId from RefreshToken token where token.tokenHash = :hash")
@@ -18,4 +20,9 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
     List<RefreshToken> findByFamilyId(UUID familyId);
+
+    @Modifying
+    @Transactional
+    @Query("update RefreshToken token set token.revokedAt = :revokedAt where token.userId = :userId and token.revokedAt is null")
+    int revokeActiveByUserId(@Param("userId") UUID userId, @Param("revokedAt") java.time.OffsetDateTime revokedAt);
 }

@@ -36,15 +36,6 @@ public class Usuario {
     @Column(name = "senha_hash", length = 255)
     private String senhaHash;
 
-    @Column(name = "email_verificado_em")
-    private OffsetDateTime emailVerificadoEm;
-
-    @Column(name = "verification_token_hash", length = 64)
-    private String verificationTokenHash;
-
-    @Column(name = "verification_expira_em")
-    private OffsetDateTime verificationExpiraEm;
-
     @Column(name = "falhas_login", nullable = false)
     private int falhasLogin;
 
@@ -108,30 +99,6 @@ public class Usuario {
 
     public void setSenhaHash(String senhaHash) {
         this.senhaHash = senhaHash;
-    }
-
-    public OffsetDateTime getEmailVerificadoEm() {
-        return emailVerificadoEm;
-    }
-
-    public void setEmailVerificadoEm(OffsetDateTime emailVerificadoEm) {
-        this.emailVerificadoEm = emailVerificadoEm;
-    }
-
-    public String getVerificationTokenHash() {
-        return verificationTokenHash;
-    }
-
-    public void setVerificationTokenHash(String verificationTokenHash) {
-        this.verificationTokenHash = verificationTokenHash;
-    }
-
-    public OffsetDateTime getVerificationExpiraEm() {
-        return verificationExpiraEm;
-    }
-
-    public void setVerificationExpiraEm(OffsetDateTime verificationExpiraEm) {
-        this.verificationExpiraEm = verificationExpiraEm;
     }
 
     public int getFalhasLogin() {

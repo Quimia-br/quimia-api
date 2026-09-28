@@ -15,7 +15,6 @@ import com.api.quimia.domain.account.internal.usecase.AutenticarUseCase;
 import com.api.quimia.domain.account.internal.usecase.IssuedSession;
 import com.api.quimia.domain.account.internal.usecase.RegistrarUseCase;
 import com.api.quimia.domain.account.internal.usecase.RenovarUseCase;
-import com.api.quimia.domain.account.internal.usecase.VerificarEmailUseCase;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -53,16 +52,10 @@ class RefreshTokenConcurrencyTest {
     private RegistrarUseCase registrar;
 
     @Autowired
-    private VerificarEmailUseCase verificar;
-
-    @Autowired
     private AutenticarUseCase autenticar;
 
     @Autowired
     private RenovarUseCase renovar;
-
-    @Autowired
-    private AccountTestConfig.TokenProbe sender;
 
     @BeforeEach
     void clean() {
@@ -128,7 +121,6 @@ class RefreshTokenConcurrencyTest {
     void concurrentRotationProducesOnlyOneSessionAndRevokesItsFamily() throws Exception {
         registrar.execute(new RegisterRequest(
                 "Concurrent Flow", "concurrent-flow@example.com", "senha-forte-concurrent", LocalDate.of(1990, 1, 1)));
-        verificar.execute(sender.lastToken());
         var initial = autenticar.execute(
                 new LoginRequest("concurrent-flow@example.com", "senha-forte-concurrent"));
 
@@ -159,7 +151,6 @@ class RefreshTokenConcurrencyTest {
     void reuseOfAncestorCannotLeaveAConcurrentDescendantActive() throws Exception {
         registrar.execute(new RegisterRequest(
                 "Family Flow", "family-flow@example.com", "senha-forte-family", LocalDate.of(1990, 1, 1)));
-        verificar.execute(sender.lastToken());
         var firstSession = autenticar.execute(
                 new LoginRequest("family-flow@example.com", "senha-forte-family"));
         var currentSession = renovar.execute(firstSession.refreshToken());
