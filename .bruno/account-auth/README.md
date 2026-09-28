@@ -12,15 +12,25 @@ Coleção baseada nos endpoints implementados em `domain/account`.
 
 O cadastro cria um email único e grava `userEmail` como variável de runtime.
 
-## Limite da verificação de email
+## Cadastro e recuperação
 
-O `NoOpEmailVerificationSender` atual descarta o token bruto e registra somente
-o UUID do usuário. O banco armazena apenas o hash, portanto não é possível
-recuperar o token pela API ou pelo PostgreSQL.
+O cadastro não envia confirmação de email e a conta pode entrar imediatamente.
+As rotas de verificação e reenvio foram removidas.
 
-Antes de executar `04 - Verify Email`, preencha `verificationToken` com o token
-recebido por um provedor real ou fornecido por uma fixture local controlada.
-Não exponha o token em commits ou logs de produção.
+A solicitação de recuperação responde `202` com corpo vazio para contas
+existentes e desconhecidas. O modo padrão de email é `noop`, então nenhum
+código chega ao usuário até Resend e um domínio remetente verificado serem
+configurados. O código não é escrito em logs nem retornado pela API.
+
+`APP_AUTH_RECOVERY_CODE_PEPPER` é obrigatório em todos os ambientes e deve ter
+ao menos 32 bytes. Para entrega real, configure `APP_EMAIL_SENDER_MODE=resend`,
+`RESEND_API_KEY` e `APP_EMAIL_FROM`, com domínio remetente verificado. Não
+coloque esses segredos no repositório.
+
+Com Resend ativo, execute `11 Forgot Password`, copie o código recebido para
+`recoveryCode`, depois execute `12 Verify Recovery Code` e `13 Reset Password`.
+O `resetToken` é guardado como variável Bruno e, após o reset, `userPassword`
+passa a usar `recoveryPassword`.
 
 ## Refresh web e mobile
 
@@ -32,7 +42,7 @@ Não exponha o token em commits ou logs de produção.
   invalida o token anterior.
 - O login web emite `quimia_rt` e `quimia_csrf`; o script captura ambos.
   O valor CSRF precisa ser reenviado no cookie e em `X-CSRF-Token`.
-- O login mobile usa `/auth/mobile/login` e devolve `refreshToken` somente
+- O login mobile usa `/api/v1/auth/mobile/login` e devolve `refreshToken` somente
   no JSON. O nome do cookie web padrão pode ser alterado por configuração;
   ajuste os exemplos web caso use outro nome.
 
@@ -40,10 +50,6 @@ Não exponha o token em commits ou logs de produção.
 
 ```text
 01 Register
-02 Login Before Verification
-03 Resend Verification
-[preencher verificationToken]
-04 Verify Email
 05 Login
 06 Get Me
 07 Update Me
@@ -54,16 +60,21 @@ Não exponha o token em commits ou logs de produção.
 10 Logout Web
 ```
 
+Para recuperação, execute `11 Forgot Password` → informe manualmente o código
+recebido em `recoveryCode` → `12 Verify Recovery Code` → `13 Reset Password`.
+Depois, `05 Login` usa a senha redefinida. O cadastro não precisa passar por
+confirmação de email.
+
 Os casos em `negative/` são independentes e podem ser executados separadamente.
 Os arquivos em `known-issues/` foram preservados como regressões dos defeitos
 anteriores e agora devem passar. Execute `missing-refresh` com o cookie jar
 limpo. A pasta manteve o nome antigo para não apagar arquivos existentes.
 
-## Problemas reproduzíveis pela coleção
+## Limitações desta coleção
 
-- A coleção depende de um token de verificação fornecido por sender real ou
-  fixture local controlada. Com o sender `NoOp`, o fluxo completo Bruno fica
-  parcialmente manual.
+- A recuperação pode exercitar a resposta genérica `202`, mas validar o código
+  exige `APP_EMAIL_SENDER_MODE=resend`, secrets configurados e acesso à caixa
+  de email. No modo `noop`, não há código disponível para completar o fluxo.
 - `duplicate-register` continua mostrando `409 email_in_use`. Esse retorno
   enumera emails; a documentação não o classifica como anti-enumeração.
 - Atraso progressivo, `429` e limite de IP ainda não estão implementados.

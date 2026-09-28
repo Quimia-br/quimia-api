@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.api.quimia.domain.account.internal.dto.RegisterRequest;
 import com.api.quimia.domain.account.internal.usecase.RegistrarUseCase;
-import com.api.quimia.domain.account.internal.usecase.VerificarEmailUseCase;
 import jakarta.servlet.http.Cookie;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
@@ -33,17 +32,10 @@ class AccountCookieConfigurationTest {
     @Autowired
     private RegistrarUseCase registrar;
 
-    @Autowired
-    private VerificarEmailUseCase verificar;
-
-    @Autowired
-    private AccountTestConfig.TokenProbe sender;
-
     @Test
     void configuredRefreshCookieNameIsUsedAcrossWebFlow() throws Exception {
         registrar.execute(new RegisterRequest(
                 "Cookie User", "cookie@example.com", "senha-forte-cookie", LocalDate.of(1990, 1, 1)));
-        verificar.execute(sender.lastToken());
 
         MvcResult login = mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

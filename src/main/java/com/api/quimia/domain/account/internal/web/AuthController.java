@@ -8,22 +8,24 @@ import com.api.quimia.domain.account.internal.dto.MobileLoginResponse;
 import com.api.quimia.domain.account.internal.dto.RefreshRequest;
 import com.api.quimia.domain.account.internal.dto.RegisterRequest;
 import com.api.quimia.domain.account.internal.dto.RegisterResponse;
-import com.api.quimia.domain.account.internal.dto.ResendVerificationRequest;
-import com.api.quimia.domain.account.internal.dto.VerifyEmailRequest;
+import com.api.quimia.domain.account.internal.dto.ForgotPasswordRequest;
+import com.api.quimia.domain.account.internal.dto.ResetPasswordRequest;
+import com.api.quimia.domain.account.internal.dto.RecoveryCodeRequest;
+import com.api.quimia.domain.account.internal.dto.RecoveryGrantResponse;
 import com.api.quimia.domain.account.internal.usecase.AutenticarUseCase;
 import com.api.quimia.domain.account.internal.usecase.AccountException;
 import com.api.quimia.domain.account.internal.usecase.IssuedSession;
 import com.api.quimia.domain.account.internal.usecase.EncerrarSessaoUseCase;
-import com.api.quimia.domain.account.internal.usecase.ReenviarVerificacaoUseCase;
+import com.api.quimia.domain.account.internal.usecase.PasswordRecoveryUseCase;
 import com.api.quimia.domain.account.internal.usecase.RegistrarUseCase;
 import com.api.quimia.domain.account.internal.usecase.RenovarUseCase;
-import com.api.quimia.domain.account.internal.usecase.VerificarEmailUseCase;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,8 +43,7 @@ public class AuthController {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final RegistrarUseCase registrar;
-    private final VerificarEmailUseCase verificar;
-    private final ReenviarVerificacaoUseCase reenviar;
+    private final PasswordRecoveryUseCase recovery;
     private final AutenticarUseCase autenticar;
     private final RenovarUseCase renovar;
     private final EncerrarSessaoUseCase encerrar;
@@ -53,8 +54,7 @@ public class AuthController {
 
     public AuthController(
             RegistrarUseCase registrar,
-            VerificarEmailUseCase verificar,
-            ReenviarVerificacaoUseCase reenviar,
+            PasswordRecoveryUseCase recovery,
             AutenticarUseCase autenticar,
             RenovarUseCase renovar,
             EncerrarSessaoUseCase encerrar,
@@ -62,8 +62,7 @@ public class AuthController {
             @Value("${app.auth.cookie-secure:true}") boolean cookieSecure,
             @Value("${app.auth.cookie-samesite:Lax}") String cookieSameSite) {
         this.registrar = registrar;
-        this.verificar = verificar;
-        this.reenviar = reenviar;
+        this.recovery = recovery;
         this.autenticar = autenticar;
         this.renovar = renovar;
         this.encerrar = encerrar;
@@ -79,16 +78,22 @@ public class AuthController {
         return new RegisterResponse(user.id(), user.nome(), user.email(), NivelAcesso.USUARIO);
     }
 
-    @PostMapping("/verify-email")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void verify(@Valid @RequestBody VerifyEmailRequest request) {
-        verificar.execute(request.token());
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, Object> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        recovery.requestCode(request.email());
+        return Map.of();
     }
 
-    @PostMapping("/resend-verification")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    public void resend(@Valid @RequestBody ResendVerificationRequest request) {
-        reenviar.execute(request);
+    @PostMapping("/verify-recovery-code")
+    public RecoveryGrantResponse verifyRecoveryCode(@Valid @RequestBody RecoveryCodeRequest request) {
+        return recovery.verifyCode(request.email(), request.code());
+    }
+
+    @PostMapping("/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        recovery.resetPassword(request.resetToken(), request.novaSenha());
     }
 
     @PostMapping("/login")

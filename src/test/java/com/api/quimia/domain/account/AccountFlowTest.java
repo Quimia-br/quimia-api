@@ -12,23 +12,30 @@ import com.api.quimia.domain.account.internal.persistence.UsuarioRepository;
 import com.api.quimia.domain.account.internal.usecase.AccountException;
 import com.api.quimia.domain.account.internal.usecase.AutenticarUseCase;
 import com.api.quimia.domain.account.internal.usecase.EncerrarSessaoUseCase;
+import com.api.quimia.domain.account.internal.usecase.PasswordRecoveryUseCase;
 import com.api.quimia.domain.account.internal.usecase.PerfilUseCase;
+import com.api.quimia.domain.account.internal.usecase.RecoveryCodeRequestedEvent;
 import com.api.quimia.domain.account.internal.usecase.RegistrarUseCase;
 import com.api.quimia.domain.account.internal.usecase.RenovarUseCase;
 import com.api.quimia.domain.account.internal.usecase.TokenHasher;
-import com.api.quimia.domain.account.internal.usecase.VerificarEmailUseCase;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@RecordApplicationEvents
 @SpringBootTest(classes = {com.api.quimia.Application.class, AccountTestConfig.class})
 @ActiveProfiles("test")
 @ContextConfiguration(initializers = TestJwtKeys.class)
@@ -43,9 +50,6 @@ class AccountFlowTest {
     private RegistrarUseCase registrar;
 
     @Autowired
-    private VerificarEmailUseCase verificar;
-
-    @Autowired
     private AutenticarUseCase autenticar;
 
     @Autowired
@@ -53,6 +57,9 @@ class AccountFlowTest {
 
     @Autowired
     private EncerrarSessaoUseCase encerrar;
+
+    @Autowired
+    private PasswordRecoveryUseCase recovery;
 
     @Autowired
     private PerfilUseCase perfil;
@@ -67,7 +74,10 @@ class AccountFlowTest {
     private JdbcTemplate jdbc;
 
     @Autowired
-    private AccountTestConfig.TokenProbe sender;
+    private DataSource dataSource;
+
+    @Autowired
+    private ApplicationEvents applicationEvents;
 
     @BeforeEach
     void clean() {
@@ -76,19 +86,10 @@ class AccountFlowTest {
     }
 
     @Test
-    void registerVerifyLoginRefreshMeLogout() {
+    void registerLoginRefreshMeLogout() {
         var summary = registrar.execute(new RegisterRequest(
                 "Maria Silva", "maria@example.com", "senha-forte-123", LocalDate.of(1990, 5, 20)));
         assertThat(summary.email()).isEqualTo("maria@example.com");
-        assertThat(sender.lastToken()).isNotBlank();
-
-        assertThatThrownBy(() -> autenticar.execute(new LoginRequest("maria@example.com", "senha-forte-123")))
-                .isInstanceOfSatisfying(
-                        AccountException.class,
-                        error -> assertThat(error.code()).isEqualTo("email_not_verified"));
-
-        verificar.execute(sender.lastToken());
-
         var session =
                 autenticar.execute(new LoginRequest("maria@example.com", "senha-forte-123"));
         assertThat(session.response().accessToken()).isNotBlank();
@@ -114,9 +115,7 @@ class AccountFlowTest {
         encerrar.execute(renewed.refreshToken());
 
         assertThat(auditEvents()).containsSequence(
-                "verification_sent",
-                "login_failed",
-                "verified",
+                "registration_succeeded",
                 "login_success",
                 "refresh",
                 "refresh_reuse",
@@ -125,10 +124,114 @@ class AccountFlowTest {
     }
 
     @Test
+    void recoveryCodeIsConsumedBeforePasswordResetAndRevokesRefreshSessions() {
+        var user = registrar.execute(new RegisterRequest(
+                "Recovery User", "recovery-flow@example.com", "senha-inicial-forte-456", LocalDate.of(1990, 1, 1)));
+        var session = autenticar.execute(new LoginRequest("recovery-flow@example.com", "senha-inicial-forte-456"));
+
+        recovery.requestCode("recovery-flow@example.com");
+        var event = applicationEvents.stream(RecoveryCodeRequestedEvent.class)
+                .filter(candidate -> candidate.userId().equals(user.id()))
+                .findFirst()
+                .orElseThrow();
+
+        var grant = recovery.verifyCode("recovery-flow@example.com", event.code());
+        assertThat(grant.resetToken()).isNotBlank();
+        assertThat(grant.expiresIn()).isEqualTo(600);
+        assertThat(jdbc.queryForObject(
+                        "SELECT codigo_hash FROM recuperacao_senha WHERE id_usuario = ?",
+                        String.class,
+                        user.id()))
+                .isNull();
+        assertThatThrownBy(() -> recovery.verifyCode("recovery-flow@example.com", event.code()))
+                .isInstanceOfSatisfying(
+                        AccountException.class,
+                        error -> assertThat(error.code()).isEqualTo("invalid_recovery_code"));
+
+        recovery.resetPassword(grant.resetToken(), "Senha-nova-forte-2026!");
+
+        assertThatThrownBy(() -> recovery.resetPassword(grant.resetToken(), "Senha-nova-forte-2026!"))
+                .isInstanceOfSatisfying(
+                        AccountException.class,
+                        error -> assertThat(error.code()).isEqualTo("invalid_reset_token"));
+        assertThatThrownBy(() -> renovar.execute(session.refreshToken()))
+                .isInstanceOfSatisfying(
+                        AccountException.class,
+                        error -> assertThat(error.code()).isEqualTo("invalid_refresh"));
+        var newSession = autenticar.execute(
+                new LoginRequest("recovery-flow@example.com", "Senha-nova-forte-2026!"));
+        assertThat(newSession.response().accessToken())
+                .isNotBlank();
+    }
+
+    @Test
+    void recoveryCodesExpireAndLockAfterFiveIncorrectAttempts() {
+        var limitedUser = registrar.execute(new RegisterRequest(
+                "Recovery Limit", "recovery-limit@example.com", "senha-forte-limit-123", LocalDate.of(1990, 1, 1)));
+        recovery.requestCode("recovery-limit@example.com");
+        var limitedEvent = applicationEvents.stream(RecoveryCodeRequestedEvent.class)
+                .filter(candidate -> candidate.userId().equals(limitedUser.id()))
+                .findFirst()
+                .orElseThrow();
+        String wrongCode = "00000000".equals(limitedEvent.code()) ? "00000001" : "00000000";
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThatThrownBy(() -> recovery.verifyCode("recovery-limit@example.com", wrongCode))
+                    .isInstanceOfSatisfying(
+                            AccountException.class,
+                            error -> assertThat(error.code()).isEqualTo("invalid_recovery_code"));
+        }
+        assertThatThrownBy(() -> recovery.verifyCode("recovery-limit@example.com", limitedEvent.code()))
+                .isInstanceOfSatisfying(
+                        AccountException.class,
+                        error -> assertThat(error.code()).isEqualTo("invalid_recovery_code"));
+        assertThat(jdbc.queryForObject(
+                        "SELECT tentativas FROM recuperacao_senha WHERE id_usuario = ?",
+                        Integer.class,
+                        limitedUser.id()))
+                .isEqualTo(5);
+
+        var expiredUser = registrar.execute(new RegisterRequest(
+                "Recovery Expired", "recovery-expired@example.com", "senha-forte-expired-123", LocalDate.of(1990, 1, 1)));
+        recovery.requestCode("recovery-expired@example.com");
+        var expiredEvent = applicationEvents.stream(RecoveryCodeRequestedEvent.class)
+                .filter(candidate -> candidate.userId().equals(expiredUser.id()))
+                .findFirst()
+                .orElseThrow();
+        jdbc.update(
+                "UPDATE recuperacao_senha SET expira_em = ? WHERE id_usuario = ?",
+                OffsetDateTime.now().minusSeconds(1),
+                expiredUser.id());
+
+        assertThatThrownBy(() -> recovery.verifyCode("recovery-expired@example.com", expiredEvent.code()))
+                .isInstanceOfSatisfying(
+                        AccountException.class,
+                        error -> assertThat(error.code()).isEqualTo("invalid_recovery_code"));
+    }
+
+    @Test
+    void authRepairMigrationRestoresMissingBlockColumnAndPreservesExistingFailures() throws Exception {
+        var user = registrar.execute(new RegisterRequest(
+                "Migration User", "migration-repair@example.com", "senha-forte-migration", LocalDate.of(1990, 1, 1)));
+        jdbc.update("UPDATE usuario SET falhas_login = 3 WHERE id = ?", user.id());
+        jdbc.execute("ALTER TABLE usuario DROP COLUMN bloqueado_ate");
+
+        new ResourceDatabasePopulator(
+                        new ClassPathResource("db/migration/V5__repair_usuario_auth_columns.sql"))
+                .execute(dataSource);
+
+        try (var connection = dataSource.getConnection();
+                var columns = connection.getMetaData().getColumns(null, "PUBLIC", "usuario", "bloqueado_ate")) {
+            assertThat(columns.next()).isTrue();
+        }
+        assertThat(jdbc.queryForObject("SELECT falhas_login FROM usuario WHERE id = ?", Integer.class, user.id()))
+                .isEqualTo(3);
+    }
+
+    @Test
     void failedLoginsBlockAccount() {
         var created = registrar.execute(new RegisterRequest(
                 "Joao Souza", "joao-block@example.com", "senha-forte-456", LocalDate.of(1992, 1, 10)));
-        verificar.execute(sender.lastToken());
         for (int i = 0; i < 4; i++) {
             assertThatThrownBy(() -> autenticar.execute(new LoginRequest("joao-block@example.com", "errada-123456")))
                     .isInstanceOfSatisfying(
@@ -151,7 +254,6 @@ class AccountFlowTest {
     void blockedAccountCannotRenewAnExistingRefreshToken() {
         registrar.execute(new RegisterRequest(
                 "Blocked Refresh", "blocked-refresh@example.com", "senha-forte-refresh", LocalDate.of(1990, 1, 1)));
-        verificar.execute(sender.lastToken());
         var session = autenticar.execute(new LoginRequest("blocked-refresh@example.com", "senha-forte-refresh"));
 
         var user = users.findByEmail("blocked-refresh@example.com").orElseThrow();
@@ -181,7 +283,6 @@ class AccountFlowTest {
     void issuedAndRotatedRefreshTokensTrackActivityAndExpireByInactivity() {
         registrar.execute(new RegisterRequest(
                 "Inactive User", "inactive@example.com", "senha-forte-789", LocalDate.of(1990, 1, 1)));
-        verificar.execute(sender.lastToken());
 
         var session = autenticar.execute(new LoginRequest("inactive@example.com", "senha-forte-789"));
         var initial = findRefresh(session.refreshToken());
@@ -204,7 +305,6 @@ class AccountFlowTest {
     void refreshExpiresAtItsAbsoluteDeadline() {
         registrar.execute(new RegisterRequest(
                 "Expired User", "expired@example.com", "senha-forte-expired", LocalDate.of(1990, 1, 1)));
-        verificar.execute(sender.lastToken());
 
         var session = autenticar.execute(new LoginRequest("expired@example.com", "senha-forte-expired"));
         var refresh = findRefresh(session.refreshToken());
