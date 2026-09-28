@@ -13,6 +13,41 @@ import org.junit.jupiter.api.Test;
 
 class LegacyUserSchemaMigrationTest {
     @Test
+    void versionSevenMigrationRestoresMissingBlockedUntilColumnAfterVersionSix() throws Exception {
+        JdbcDataSource dataSource = new JdbcDataSource();
+        dataSource.setURL(
+                "jdbc:h2:mem:missing_blocked_until_migration;MODE=PostgreSQL;DATABASE_TO_UPPER=false;DB_CLOSE_DELAY=-1");
+        dataSource.setUser("sa");
+
+        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE usuario (id UUID PRIMARY KEY, falhas_login INTEGER NOT NULL DEFAULT 0)");
+            statement.execute(
+                    "INSERT INTO usuario (id, falhas_login) VALUES ('00000000-0000-0000-0000-000000000001', 3)");
+        }
+
+        Flyway.configure()
+                .dataSource(dataSource)
+                .locations("classpath:db/migration")
+                .baselineOnMigrate(true)
+                .baselineVersion("6")
+                .load()
+                .migrate();
+
+        try (Connection connection = dataSource.getConnection();
+                ResultSet columns = connection.getMetaData().getColumns(null, "PUBLIC", "usuario", "bloqueado_ate")) {
+            assertTrue(columns.next());
+        }
+
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery(
+                        "SELECT falhas_login FROM usuario WHERE id = '00000000-0000-0000-0000-000000000001'")) {
+            assertTrue(result.next());
+            assertEquals(3, result.getInt("falhas_login"));
+        }
+    }
+
+    @Test
     void migrationAllowsRegistrationWithoutOverwritingLegacyPasswordValues() throws Exception {
         JdbcDataSource dataSource = new JdbcDataSource();
         dataSource.setURL("jdbc:h2:mem:legacy_user_migration;MODE=PostgreSQL;DATABASE_TO_UPPER=false;DB_CLOSE_DELAY=-1");
