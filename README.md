@@ -81,8 +81,11 @@ dos secrets do Actions: `SPRING_DATASOURCE_URL`,
 `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`,
 `QUIMIA_JWT_KID`, `QUIMIA_JWT_PRIVATE_KEY_BASE64`,
 `QUIMIA_JWT_PUBLIC_KEY_BASE64` e `SERVER_PORT=8080`. Não coloque os valores
-no repositório ou no pacote. O Flyway roda no startup; não conecte um banco
-externo até revisar e autorizar a aplicação das migrations.
+no repositório ou no pacote. O PostgreSQL administra o schema: a API não roda
+migrations nem DDL e mantém `ddl-auto: validate`. Antes de publicar, confira
+colunas, tipos, constraints e índices em consultas somente leitura conforme
+[`account-database-contract.md`](docs/context/account-database-contract.md);
+schema ausente impede a inicialização e o smoke check.
 
 O ícone dos checks padrão do GitHub Actions não é configurável por workflow.
 Uma identidade visual própria pode ser considerada depois usando uma GitHub

@@ -20,14 +20,11 @@ import com.api.quimia.domain.account.internal.usecase.RenovarUseCase;
 import com.api.quimia.domain.account.internal.usecase.TokenHasher;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.event.ApplicationEvents;
@@ -72,9 +69,6 @@ class AccountFlowTest {
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @Autowired
-    private DataSource dataSource;
 
     @Autowired
     private ApplicationEvents applicationEvents;
@@ -207,25 +201,6 @@ class AccountFlowTest {
                 .isInstanceOfSatisfying(
                         AccountException.class,
                         error -> assertThat(error.code()).isEqualTo("invalid_recovery_code"));
-    }
-
-    @Test
-    void authRepairMigrationRestoresMissingBlockColumnAndPreservesExistingFailures() throws Exception {
-        var user = registrar.execute(new RegisterRequest(
-                "Migration User", "migration-repair@example.com", "senha-forte-migration", LocalDate.of(1990, 1, 1)));
-        jdbc.update("UPDATE usuario SET falhas_login = 3 WHERE id = ?", user.id());
-        jdbc.execute("ALTER TABLE usuario DROP COLUMN bloqueado_ate");
-
-        new ResourceDatabasePopulator(
-                        new ClassPathResource("db/migration/V5__repair_usuario_auth_columns.sql"))
-                .execute(dataSource);
-
-        try (var connection = dataSource.getConnection();
-                var columns = connection.getMetaData().getColumns(null, "PUBLIC", "usuario", "bloqueado_ate")) {
-            assertThat(columns.next()).isTrue();
-        }
-        assertThat(jdbc.queryForObject("SELECT falhas_login FROM usuario WHERE id = ?", Integer.class, user.id()))
-                .isEqualTo(3);
     }
 
     @Test
