@@ -4,8 +4,9 @@ Coleção baseada nos endpoints implementados em `domain/account`.
 
 ## Pré-requisitos
 
-1. Subir a API em `http://localhost:8080` com PostgreSQL, migrations e chaves
-   JWT configuradas.
+1. Subir a API em `http://localhost:8080` com PostgreSQL previamente
+   provisionado conforme `docs/context/account-database-contract.md` e chaves
+   JWT configuradas. A API valida o schema e não cria nem altera tabelas.
 2. Abrir esta pasta como coleção no Bruno.
 3. Selecionar o ambiente `local`.
 4. Executar as requisições na ordem numérica.
