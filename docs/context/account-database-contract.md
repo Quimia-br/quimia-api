@@ -20,6 +20,8 @@ Tipos PostgreSQL esperados:
 
 `id` é chave primária em todas as tabelas. `usuario.email` deve ser único e
 obrigatório; `nome`, `nivel_acesso` e `falhas_login` são obrigatórios.
+`usuario.nivel_acesso` armazena `usuario`, `empresa` ou `admin` em minúsculas;
+a API continua expondo os nomes do enum em maiúsculas.
 `refresh_token.token_hash` deve ser único; seus campos de identidade, hash,
 família, expiração e criação são obrigatórios. `recuperacao_senha.tentativas`
 deve aceitar somente valores de 0 a 5; os pares código consumido/hash e token

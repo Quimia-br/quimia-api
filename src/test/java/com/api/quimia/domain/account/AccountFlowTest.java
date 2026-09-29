@@ -118,6 +118,32 @@ class AccountFlowTest {
     }
 
     @Test
+    void persistsLowercaseNivelAcessoAndReadsItAsTheApiEnum() {
+        var user = registrar.execute(new RegisterRequest(
+                "Enum Mapping User", "enum-mapping@example.com", "senha-forte-enum-123", LocalDate.of(1990, 5, 20)));
+
+        String storedRole = jdbc.queryForObject(
+                "SELECT nivel_acesso FROM usuario WHERE id = ?", String.class, user.id());
+
+        assertThat(storedRole).isEqualTo("usuario");
+        assertThat(users.findById(user.id()).orElseThrow().getNivelAcesso()).isEqualTo(NivelAcesso.USUARIO);
+    }
+
+    @Test
+    void readsExistingLowercaseNivelAcessoFromPostgres() {
+        var userId = java.util.UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO usuario (id, nome, email, nivel_acesso, falhas_login) VALUES (?, ?, ?, ?, ?)",
+                userId,
+                "Legacy Role User",
+                "legacy-role@example.com",
+                "usuario",
+                0);
+
+        assertThat(users.findById(userId).orElseThrow().getNivelAcesso()).isEqualTo(NivelAcesso.USUARIO);
+    }
+
+    @Test
     void recoveryCodeIsConsumedBeforePasswordResetAndRevokesRefreshSessions() {
         var user = registrar.execute(new RegisterRequest(
                 "Recovery User", "recovery-flow@example.com", "senha-inicial-forte-456", LocalDate.of(1990, 1, 1)));

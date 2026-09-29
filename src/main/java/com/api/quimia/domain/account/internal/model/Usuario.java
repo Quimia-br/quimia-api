@@ -2,9 +2,8 @@ package com.api.quimia.domain.account.internal.model;
 
 import com.api.quimia.domain.account.NivelAcesso;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
@@ -26,7 +25,7 @@ public class Usuario {
     @Column(name = "data_nasc")
     private LocalDate dataNasc;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = NivelAcessoConverter.class)
     @Column(name = "nivel_acesso", nullable = false, length = 50)
     private NivelAcesso nivelAcesso = NivelAcesso.USUARIO;
 
