@@ -4,6 +4,7 @@ import com.api.quimia.domain.account.AccountPrincipal;
 import com.api.quimia.domain.account.internal.model.Empresa;
 import com.api.quimia.domain.account.internal.persistence.EmpresaRepository;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -25,6 +26,7 @@ public class EmpresaPasswordRecoveryUseCase {
     private final AccountThrottle throttle;
     private final ApplicationEventPublisher events;
     private final AuthenticationAuditRecorder audit;
+    private final EmailTemplates templates;
     private final String resetUrl;
 
     public EmpresaPasswordRecoveryUseCase(
@@ -34,6 +36,7 @@ public class EmpresaPasswordRecoveryUseCase {
             AccountThrottle throttle,
             ApplicationEventPublisher events,
             AuthenticationAuditRecorder audit,
+            EmailTemplates templates,
             @Value("${app.auth.empresa-reset-url}") String resetUrl) {
         this.empresas = empresas;
         this.passwords = passwords;
@@ -41,6 +44,7 @@ public class EmpresaPasswordRecoveryUseCase {
         this.throttle = throttle;
         this.events = events;
         this.audit = audit;
+        this.templates = templates;
         this.resetUrl = resetUrl;
     }
 
@@ -60,7 +64,13 @@ public class EmpresaPasswordRecoveryUseCase {
         }
         String token = resetTokens.issue(principal, empresa.getSenha(), LINK_TTL);
         audit.record("password_recovery_requested", principal);
-        events.publishEvent(new AccountEmailRequestedEvent(principal, empresa.getEmail(), EMAIL_SUBJECT, emailText(token)));
+        String link = resetUrl + "?token=" + token;
+        events.publishEvent(new AccountEmailRequestedEvent(
+                principal,
+                empresa.getEmail(),
+                EMAIL_SUBJECT,
+                emailText(link),
+                templates.render(EmailTemplates.RECOVERY_LINK, Map.of("link", link))));
     }
 
     @Transactional
@@ -74,10 +84,10 @@ public class EmpresaPasswordRecoveryUseCase {
         audit.record("password_recovery_completed", grant.principal());
     }
 
-    private String emailText(String token) {
+    private static String emailText(String link) {
         return "Olá!\n\nRecebemos uma solicitação para redefinir a senha da sua conta no Quimia. "
                 + "Se foi você quem pediu, acesse o link abaixo para criar uma nova senha:\n\n"
-                + resetUrl + "?token=" + token + "\n\n"
+                + link + "\n\n"
                 + "Este link é válido por apenas 24 horas. Se não foi você quem solicitou essa alteração, "
                 + "pode ignorar este e-mail tranquilamente.\n\nAtenciosamente,\nEquipe Quimia";
     }

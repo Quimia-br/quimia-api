@@ -16,7 +16,7 @@ Ordem: `U01 Register` → `U02 Mobile Login` → `U03`…`U07`.
 
 - **Recuperação:** `U08 Forgot Password` guarda `challengeToken`. Preencha
   `recoveryCode` com o código de 4 dígitos recebido por email (exige
-  `APP_EMAIL_SENDER_MODE=resend`) e rode `U09` e `U10`. Depois disso,
+  `APP_EMAIL_SENDER_MODE=smtp` ou `resend`) e rode `U09` e `U10`. Depois disso,
   `U02` usa a nova senha.
 - **Firebase:** `U11` precisa de um `firebaseIdToken` real emitido pelo app e de
   `FIREBASE_PROJECT_ID` na API.
