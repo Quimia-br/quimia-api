@@ -45,6 +45,7 @@ public class PasswordRecoveryUseCase {
     private final AccountThrottle throttle;
     private final ApplicationEventPublisher events;
     private final AuthenticationAuditRecorder audit;
+    private final EmailTemplates templates;
 
     public PasswordRecoveryUseCase(
             UsuarioRepository users,
@@ -55,7 +56,8 @@ public class PasswordRecoveryUseCase {
             PasswordResetTokens resetTokens,
             AccountThrottle throttle,
             ApplicationEventPublisher events,
-            AuthenticationAuditRecorder audit) {
+            AuthenticationAuditRecorder audit,
+            EmailTemplates templates) {
         this.users = users;
         this.passwords = passwords;
         this.codec = codec;
@@ -65,6 +67,7 @@ public class PasswordRecoveryUseCase {
         this.throttle = throttle;
         this.events = events;
         this.audit = audit;
+        this.templates = templates;
     }
 
     /** Sempre devolve um desafio com o mesmo formato, exista ou não a conta (anti-enumeração). */
@@ -80,7 +83,12 @@ public class PasswordRecoveryUseCase {
             String code = String.format(Locale.ROOT, "%0" + CODE_DIGITS + "d", RANDOM.nextInt(CODE_BOUND));
             digest = challengeDigest(challengeId, email, code, fingerprints.of(principal, user.getSenha()));
             audit.record("password_recovery_requested", principal);
-            events.publishEvent(new AccountEmailRequestedEvent(principal, user.getEmail(), EMAIL_SUBJECT, emailText(code)));
+            events.publishEvent(new AccountEmailRequestedEvent(
+                    principal,
+                    user.getEmail(),
+                    EMAIL_SUBJECT,
+                    emailText(code),
+                    templates.render(EmailTemplates.RECOVERY_CODE, Map.of("code", code))));
         } else {
             digest = hasher.hmac("recovery-decoy", challengeId);
             found.ifPresentOrElse(
@@ -142,8 +150,13 @@ public class PasswordRecoveryUseCase {
     }
 
     private static String emailText(String code) {
-        return "Seu código de recuperação do Quimia é " + code
-                + ". Ele expira em 15 minutos. Se você não solicitou a recuperação, ignore esta mensagem.";
+        return "Olá!\n\nRecebemos uma solicitação para redefinir a senha da sua conta no Quimia. "
+                + "Se foi você quem pediu, digite o código abaixo no aplicativo para criar uma nova senha:\n\n"
+                + code + "\n\n"
+                + "Este código é válido por apenas 15 minutos e só pode ser usado uma vez. "
+                + "Não compartilhe este código com ninguém: a equipe Quimia nunca pede o seu código.\n\n"
+                + "Se não foi você quem solicitou essa alteração, pode ignorar este e-mail tranquilamente. "
+                + "Sua senha continua a mesma.\n\nAtenciosamente,\nEquipe Quimia";
     }
 
     private static String requestKey(String email) {

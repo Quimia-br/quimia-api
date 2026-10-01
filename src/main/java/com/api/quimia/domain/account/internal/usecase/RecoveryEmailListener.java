@@ -23,7 +23,7 @@ public class RecoveryEmailListener {
     @Async("recoveryEmailExecutor")
     public void send(AccountEmailRequestedEvent event) {
         try {
-            boolean delivered = mailer.send(event.to(), event.subject(), event.text());
+            boolean delivered = mailer.send(event.to(), event.subject(), event.text(), event.html());
             audit.record(
                     delivered ? "password_recovery_email_sent" : "password_recovery_email_disabled",
                     event.principal());
