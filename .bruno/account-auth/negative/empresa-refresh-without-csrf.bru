@@ -1,22 +1,22 @@
 meta {
-  name: Refresh Cookie Without CSRF
+  name: Empresa Refresh Without CSRF
   type: http
-  seq: 4
+  seq: 6
 }
 
 post {
-  url: {{baseUrl}}/api/v1/auth/refresh
+  url: {{baseUrl}}/api/v1/empresas/auth/refresh
   body: none
   auth: none
 }
 
 headers {
-  Cookie: quimia_rt={{refreshToken}}
   Accept: application/problem+json
+  Cookie: quimia_rt={{empresaRefreshToken}}
 }
 
 tests {
-  test("rejects a cookie refresh without double-submit CSRF", function () {
+  test("403 csrf_required", function () {
     expect(res.getStatus()).to.equal(403);
     expect(res.getBody().detail).to.equal("csrf_required");
   });

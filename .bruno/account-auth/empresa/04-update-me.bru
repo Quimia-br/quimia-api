@@ -1,0 +1,28 @@
+meta {
+  name: E04 - Update Empresa Me
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/empresas/me
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:json {
+  {
+    "nome": "{{empresaNome}} Atualizada",
+    "fotoUrl": "https://cdn.example.com/logo.png"
+  }
+}
+
+tests {
+  test("atualiza o perfil", function () { expect(res.getStatus()).to.equal(200); });
+}

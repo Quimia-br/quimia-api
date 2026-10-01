@@ -1,0 +1,34 @@
+meta {
+  name: E05 - Refresh Empresa
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/refresh
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: quimia_rt={{empresaRefreshToken}}; quimia_csrf={{csrfToken}}
+  X-CSRF-Token: {{csrfToken}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.accessToken) {
+    bru.setVar("empresaAccessToken", body.accessToken);
+  }
+  const raw = res.getHeader("set-cookie");
+  const headers = Array.isArray(raw) ? raw : [raw];
+  const refresh = String(headers.find(v => String(v || "").includes("quimia_rt=")) || "").match(/quimia_rt=([^;]+)/);
+  const csrf = String(headers.find(v => String(v || "").includes("quimia_csrf=")) || "").match(/quimia_csrf=([^;]+)/);
+  if (refresh) { bru.setVar("empresaRefreshToken", refresh[1]); }
+  if (csrf) { bru.setVar("csrfToken", csrf[1]); }
+}
+
+tests {
+  test("renova pelo cookie com CSRF", function () { expect(res.getStatus()).to.equal(200); });
+}

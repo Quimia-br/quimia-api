@@ -1,0 +1,54 @@
+meta {
+  name: U01 - Register (com endereço)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "nome": "{{userName}}",
+    "email": "{{userEmail}}",
+    "senha": "{{userPassword}}",
+    "dataNasc": "{{birthDate}}",
+    "localizacao": {
+      "cep": "06000-000",
+      "estado": "SP",
+      "bairro": "Centro",
+      "rua": "Rua Exemplo",
+      "numero": 100,
+      "complemento": "Apto 12"
+    }
+  }
+}
+
+script:pre-request {
+  bru.setVar("userEmail", `bruno.usuario.${Date.now()}@example.com`);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 201 && body && body.id) { bru.setVar("userId", body.id); }
+}
+
+tests {
+  test("cria USUARIO sem expor credenciais", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().nivelAcesso).to.equal("USUARIO");
+    expect(JSON.stringify(res.getBody())).to.not.contain(bru.getVar("userPassword"));
+  });
+}
+
+docs {
+  Passos 1 e 2 do cadastro do app em uma chamada. `localizacao` é opcional; o schema não tem cidade.
+}

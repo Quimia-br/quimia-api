@@ -1,0 +1,24 @@
+meta {
+  name: U03 - Get Me
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/usuarios/me
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("retorna o perfil", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().email).to.equal(bru.getVar("userEmail"));
+    expect(res.getBody()).to.have.property("fotoUrl");
+  });
+}

@@ -1,0 +1,32 @@
+meta {
+  name: Invalid CNPJ
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/problem+json
+}
+
+body:json {
+  {
+    "nome": "X",
+    "cnpj": "4i84329",
+    "email": "cnpj.{{empresaEmail}}",
+    "senha": "{{empresaPassword}}"
+  }
+}
+
+tests {
+  test("422 invalid_cnpj", function () {
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().detail).to.equal("invalid_cnpj");
+  });
+}

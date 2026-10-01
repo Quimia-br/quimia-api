@@ -1,7 +1,7 @@
 meta {
   name: Duplicate Register
   type: http
-  seq: 4
+  seq: 1
 }
 
 post {
@@ -17,21 +17,15 @@ headers {
 
 body:json {
   {
-    "nome": "Conta Duplicada",
+    "nome": "{{userName}}",
     "email": "{{userEmail}}",
-    "senha": "{{userPassword}}",
-    "dataNasc": "1990-01-01"
+    "senha": "{{userPassword}}"
   }
 }
 
 tests {
-  test("reveals a duplicate email through status and detail", function () {
+  test("revela duplicidade (409, lacuna conhecida)", function () {
     expect(res.getStatus()).to.equal(409);
     expect(res.getBody().detail).to.equal("email_in_use");
   });
-}
-
-docs {
-  Run after 01 Register. This behavior reveals whether an email exists.
-  Changing the public response requires a product decision.
 }

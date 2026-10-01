@@ -1,0 +1,38 @@
+meta {
+  name: U11 - Firebase Login (Google/Microsoft)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/firebase
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "idToken": "{{firebaseIdToken}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.refreshToken) {
+    bru.setVar("accessToken", body.accessToken);
+    bru.setVar("refreshToken", body.refreshToken);
+  }
+}
+
+tests {
+  test("autentica via Firebase", function () { expect(res.getStatus()).to.equal(200); });
+}
+
+docs {
+  Use um ID token real do Firebase Auth do app. Exige `FIREBASE_PROJECT_ID` (caso contrário responde 503) e email verificado.
+}

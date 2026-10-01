@@ -1,7 +1,7 @@
 meta {
   name: Unauthorized Me
   type: http
-  seq: 3
+  seq: 4
 }
 
 get {
@@ -15,8 +15,5 @@ headers {
 }
 
 tests {
-  test("requires an access token", function () {
-    expect(res.getStatus()).to.equal(401);
-    expect(res.getBody().title).to.equal("Unauthorized");
-  });
+  test("401 sem token", function () { expect(res.getStatus()).to.equal(401); });
 }

@@ -1,0 +1,24 @@
+meta {
+  name: E08 - Logout Empresa
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/logout
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: quimia_rt={{empresaRefreshToken}}; quimia_csrf={{csrfToken}}
+  X-CSRF-Token: {{csrfToken}}
+}
+
+tests {
+  test("limpa os cookies", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(String(res.getHeader("set-cookie"))).to.contain("Max-Age=0");
+  });
+}

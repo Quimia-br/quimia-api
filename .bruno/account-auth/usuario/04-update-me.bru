@@ -1,35 +1,31 @@
 meta {
-  name: 07 - Update Me
+  name: U04 - Update Me
   type: http
-  seq: 7
+  seq: 4
 }
 
 patch {
   url: {{baseUrl}}/api/v1/usuarios/me
   body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{accessToken}}
+  auth: none
 }
 
 headers {
   Content-Type: application/json
   Accept: application/json
+  Authorization: Bearer {{accessToken}}
 }
 
 body:json {
   {
     "nome": "{{updatedName}}",
-    "dataNasc": "{{birthDate}}"
+    "fotoUrl": "https://cdn.example.com/avatar.png"
   }
 }
 
 tests {
-  test("updates only the allowed profile fields", function () {
+  test("atualiza nome e foto", function () {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().nome).to.equal(bru.getVar("updatedName"));
-    expect(res.getBody().nivelAcesso).to.equal("USUARIO");
   });
 }

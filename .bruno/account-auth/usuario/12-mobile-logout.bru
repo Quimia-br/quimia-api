@@ -1,0 +1,23 @@
+meta {
+  name: U12 - Mobile Logout
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/mobile/logout
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("responde 204", function () { expect(res.getStatus()).to.equal(204); });
+}
+
+docs {
+  Nada é revogado no servidor: o app descarta access e refresh.
+}
