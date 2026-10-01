@@ -1,0 +1,40 @@
+meta {
+  name: E01 - Register Empresa
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "nome": "{{empresaNome}}",
+    "cnpj": "{{empresaCnpj}}",
+    "email": "{{empresaEmail}}",
+    "senha": "{{empresaPassword}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar("empresaEmail", `bruno.empresa.${Date.now()}@example.com`);
+}
+
+tests {
+  test("cria a empresa", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().email).to.equal(bru.getVar("empresaEmail"));
+  });
+}
+
+docs {
+  `nome` é obrigatório no schema. O CNPJ precisa ser válido e único; troque `empresaCnpj` ao repetir o fluxo no mesmo banco.
+}

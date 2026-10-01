@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -17,8 +19,9 @@ class JwtServiceKeyMaterialTest {
                 encoded(pair.getPublic().getEncoded()), "", "");
         UUID subject = UUID.randomUUID();
 
-        assertThat(service.verify(service.issue(subject, "USUARIO")).getSubject())
-                .isEqualTo(subject.toString());
+        String token = service.sign("access", subject.toString(), Map.of(), Instant.now().plusSeconds(60));
+
+        assertThat(service.verify(token).getSubject()).isEqualTo(subject.toString());
     }
 
     @Test
@@ -64,6 +67,6 @@ class JwtServiceKeyMaterialTest {
     private static JwtService newService(String privateBase64, String publicBase64,
             String privatePath, String publicPath) {
         return new JwtService(privateBase64, publicBase64, privatePath, publicPath,
-                "test-kid", "quimia-auth", "quimia-api", 15);
+                "test-kid", "quimia-auth", "quimia-api");
     }
 }

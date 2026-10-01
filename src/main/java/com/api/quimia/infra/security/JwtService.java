@@ -16,18 +16,19 @@ import java.security.spec.X509EncodedKeySpec;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
-import java.util.UUID;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class JwtService {
+    static final String TOKEN_USE_CLAIM = "token_use";
+
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
     private final String kid;
     private final String issuer;
     private final String audience;
-    private final long accessTtlMinutes;
 
     public JwtService(
             @Value("${quimia.jwt.private-key-base64:}") String privateKeyBase64,
@@ -36,8 +37,7 @@ public class JwtService {
             @Value("${quimia.jwt.public-key-path:}") String publicKeyPath,
             @Value("${quimia.jwt.kid:local-dev-01}") String kid,
             @Value("${quimia.jwt.issuer:quimia-auth}") String issuer,
-            @Value("${quimia.jwt.audience:quimia-api}") String audience,
-            @Value("${quimia.jwt.access-ttl-minutes:15}") long accessTtlMinutes) {
+            @Value("${quimia.jwt.audience:quimia-api}") String audience) {
         try {
             boolean hasPrivateBase64 = privateKeyBase64 != null && !privateKeyBase64.isBlank();
             boolean hasPublicBase64 = publicKeyBase64 != null && !publicKeyBase64.isBlank();
@@ -63,21 +63,29 @@ public class JwtService {
         this.kid = kid;
         this.issuer = issuer;
         this.audience = audience;
-        this.accessTtlMinutes = accessTtlMinutes;
     }
 
-    public String issue(UUID subject, String role) {
-        Instant now = Instant.now();
+    /** `token_use` separa access, refresh e tokens de recuperação assinados com a mesma chave. */
+    public String sign(String tokenUse, String subject, Map<String, Object> claims, Instant expiresAt) {
         return Jwts.builder()
                 .header().keyId(kid).and()
-                .subject(subject.toString())
+                .claims(claims)
+                .claim(TOKEN_USE_CLAIM, tokenUse)
+                .subject(subject)
                 .issuer(issuer)
                 .audience().add(audience).and()
-                .claim("role", role)
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(accessTtlMinutes * 60)))
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(expiresAt))
                 .signWith(privateKey)
                 .compact();
+    }
+
+    public Claims verify(String token, String tokenUse) {
+        Claims claims = verify(token);
+        if (!tokenUse.equals(claims.get(TOKEN_USE_CLAIM, String.class))) {
+            throw new InvalidTokenException();
+        }
+        return claims;
     }
 
     public Claims verify(String token) {

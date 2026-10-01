@@ -25,24 +25,18 @@ public class Usuario {
     @Column(name = "data_nasc")
     private LocalDate dataNasc;
 
+    @Column(name = "foto_url", length = 450)
+    private String fotoUrl;
+
+    @Column(name = "senha", nullable = false, length = 100)
+    private String senha;
+
     @Convert(converter = NivelAcessoConverter.class)
     @Column(name = "nivel_acesso", nullable = false, length = 50)
     private NivelAcesso nivelAcesso = NivelAcesso.USUARIO;
 
     @Column(name = "ultima_sessao")
     private OffsetDateTime ultimaSessao;
-
-    @Column(name = "senha_hash", length = 255)
-    private String senhaHash;
-
-    @Column(name = "falhas_login", nullable = false)
-    private int falhasLogin;
-
-    @Column(name = "bloqueado_ate")
-    private OffsetDateTime bloqueadoAte;
-
-    @Column(name = "ultima_falha_em")
-    private OffsetDateTime ultimaFalhaEm;
 
     public UUID getId() {
         return id;
@@ -76,6 +70,22 @@ public class Usuario {
         this.dataNasc = dataNasc;
     }
 
+    public String getFotoUrl() {
+        return fotoUrl;
+    }
+
+    public void setFotoUrl(String fotoUrl) {
+        this.fotoUrl = fotoUrl;
+    }
+
+    public String getSenha() {
+        return senha;
+    }
+
+    public void setSenha(String senha) {
+        this.senha = senha;
+    }
+
     public NivelAcesso getNivelAcesso() {
         return nivelAcesso;
     }
@@ -90,37 +100,5 @@ public class Usuario {
 
     public void setUltimaSessao(OffsetDateTime ultimaSessao) {
         this.ultimaSessao = ultimaSessao;
-    }
-
-    public String getSenhaHash() {
-        return senhaHash;
-    }
-
-    public void setSenhaHash(String senhaHash) {
-        this.senhaHash = senhaHash;
-    }
-
-    public int getFalhasLogin() {
-        return falhasLogin;
-    }
-
-    public void setFalhasLogin(int falhasLogin) {
-        this.falhasLogin = falhasLogin;
-    }
-
-    public OffsetDateTime getBloqueadoAte() {
-        return bloqueadoAte;
-    }
-
-    public void setBloqueadoAte(OffsetDateTime bloqueadoAte) {
-        this.bloqueadoAte = bloqueadoAte;
-    }
-
-    public OffsetDateTime getUltimaFalhaEm() {
-        return ultimaFalhaEm;
-    }
-
-    public void setUltimaFalhaEm(OffsetDateTime ultimaFalhaEm) {
-        this.ultimaFalhaEm = ultimaFalhaEm;
     }
 }

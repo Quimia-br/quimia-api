@@ -12,6 +12,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class CookieCsrfFilter extends OncePerRequestFilter {
+    private static final String REFRESH_PATH = "/api/v1/empresas/auth/refresh";
+    private static final String LOGOUT_PATH = "/api/v1/empresas/auth/logout";
     private final boolean enabled;
     private final String cookieName;
 
@@ -42,8 +44,7 @@ public class CookieCsrfFilter extends OncePerRequestFilter {
         if (!"POST".equalsIgnoreCase(request.getMethod())) {
             return false;
         }
-        return "/api/v1/auth/refresh".equals(request.getRequestURI())
-                || "/api/v1/auth/logout".equals(request.getRequestURI());
+        return REFRESH_PATH.equals(request.getRequestURI()) || LOGOUT_PATH.equals(request.getRequestURI());
     }
 
     private boolean hasRefreshCookie(HttpServletRequest request) {

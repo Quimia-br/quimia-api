@@ -1,0 +1,31 @@
+meta {
+  name: U04 - Update Me
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/usuarios/me
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "nome": "{{updatedName}}",
+    "fotoUrl": "https://cdn.example.com/avatar.png"
+  }
+}
+
+tests {
+  test("atualiza nome e foto", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().nome).to.equal(bru.getVar("updatedName"));
+  });
+}

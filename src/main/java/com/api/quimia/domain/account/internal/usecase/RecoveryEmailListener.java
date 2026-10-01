@@ -11,25 +11,25 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class RecoveryEmailListener {
     private static final Logger log = LoggerFactory.getLogger(RecoveryEmailListener.class);
 
-    private final RecoveryCodeSender sender;
+    private final AccountMailer mailer;
     private final AuthenticationAuditRecorder audit;
 
-    public RecoveryEmailListener(RecoveryCodeSender sender, AuthenticationAuditRecorder audit) {
-        this.sender = sender;
+    public RecoveryEmailListener(AccountMailer mailer, AuthenticationAuditRecorder audit) {
+        this.mailer = mailer;
         this.audit = audit;
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Async("recoveryEmailExecutor")
-    public void send(RecoveryCodeRequestedEvent event) {
+    public void send(AccountEmailRequestedEvent event) {
         try {
-            boolean delivered = sender.send(event.userId(), event.email(), event.code());
-            audit.record(event.userId(), delivered
-                    ? "password_recovery_email_sent"
-                    : "password_recovery_email_disabled");
+            boolean delivered = mailer.send(event.to(), event.subject(), event.text());
+            audit.record(
+                    delivered ? "password_recovery_email_sent" : "password_recovery_email_disabled",
+                    event.principal());
         } catch (RuntimeException error) {
-            audit.record(event.userId(), "password_recovery_email_failed");
-            log.warn("Recovery email delivery failed user={}", event.userId());
+            audit.record("password_recovery_email_failed", event.principal());
+            log.warn("Recovery email delivery failed principal={}", event.principal().id());
         }
     }
 }

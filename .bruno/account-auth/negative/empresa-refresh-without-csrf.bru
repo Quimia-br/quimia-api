@@ -1,0 +1,23 @@
+meta {
+  name: Empresa Refresh Without CSRF
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/refresh
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/problem+json
+  Cookie: quimia_rt={{empresaRefreshToken}}
+}
+
+tests {
+  test("403 csrf_required", function () {
+    expect(res.getStatus()).to.equal(403);
+    expect(res.getBody().detail).to.equal("csrf_required");
+  });
+}

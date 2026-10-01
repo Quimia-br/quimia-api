@@ -4,7 +4,6 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,13 +36,13 @@ public class RecoveryEmailConfiguration {
 
     @Bean
     @ConditionalOnProperty(prefix = "app.email", name = "sender-mode", havingValue = "noop", matchIfMissing = true)
-    RecoveryCodeSender noOpRecoveryCodeSender() {
-        return new NoOpRecoveryCodeSender();
+    AccountMailer noOpAccountMailer() {
+        return new NoOpAccountMailer();
     }
 
     @Bean
     @ConditionalOnProperty(prefix = "app.email", name = "sender-mode", havingValue = "resend")
-    RecoveryCodeSender resendRecoveryCodeSender(
+    AccountMailer resendAccountMailer(
             org.springframework.core.env.Environment environment) {
         String apiKey = environment.getProperty("app.email.resend.api-key", "");
         String from = environment.getProperty("app.email.resend.from", "");
@@ -53,37 +52,37 @@ public class RecoveryEmailConfiguration {
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(client);
         requestFactory.setReadTimeout(Duration.ofSeconds(5));
-        return new ResendRecoveryCodeSender(RestClient.builder().requestFactory(requestFactory).build(), apiKey, from);
+        return new ResendAccountMailer(RestClient.builder().requestFactory(requestFactory).build(), apiKey, from);
     }
 
-    private static final class NoOpRecoveryCodeSender implements RecoveryCodeSender {
-        private static final Logger log = LoggerFactory.getLogger(NoOpRecoveryCodeSender.class);
+    private static final class NoOpAccountMailer implements AccountMailer {
+        private static final Logger log = LoggerFactory.getLogger(NoOpAccountMailer.class);
 
         @Override
-        public boolean send(UUID userId, String email, String code) {
-            log.info("Recovery email disabled user={}", userId);
+        public boolean send(String to, String subject, String text) {
+            log.info("Account email disabled subject={}", subject);
             return false;
         }
     }
 
-    private static final class ResendRecoveryCodeSender implements RecoveryCodeSender {
+    private static final class ResendAccountMailer implements AccountMailer {
         private final RestClient client;
         private final String apiKey;
         private final String from;
 
-        private ResendRecoveryCodeSender(RestClient client, String apiKey, String from) {
+        private ResendAccountMailer(RestClient client, String apiKey, String from) {
             this.client = client;
             this.apiKey = apiKey;
             this.from = from;
         }
 
         @Override
-        public boolean send(UUID userId, String email, String code) {
+        public boolean send(String to, String subject, String text) {
             Map<String, Object> payload = Map.of(
                     "from", from,
-                    "to", List.of(email),
-                    "subject", "Código de recuperação de senha",
-                    "text", "Seu código de recuperação é " + code + ". Ele expira em 15 minutos. Se você não solicitou a recuperação, ignore esta mensagem.");
+                    "to", List.of(to),
+                    "subject", subject,
+                    "text", text);
             client.post()
                     .uri("https://api.resend.com/emails")
                     .contentType(MediaType.APPLICATION_JSON)

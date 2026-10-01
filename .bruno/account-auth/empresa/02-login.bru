@@ -1,0 +1,44 @@
+meta {
+  name: E02 - Login Empresa
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{empresaEmail}}",
+    "senha": "{{empresaPassword}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.accessToken) {
+    bru.setVar("empresaAccessToken", body.accessToken);
+  }
+  const raw = res.getHeader("set-cookie");
+  const headers = Array.isArray(raw) ? raw : [raw];
+  const refresh = String(headers.find(v => String(v || "").includes("quimia_rt=")) || "").match(/quimia_rt=([^;]+)/);
+  const csrf = String(headers.find(v => String(v || "").includes("quimia_csrf=")) || "").match(/quimia_csrf=([^;]+)/);
+  if (refresh) { bru.setVar("empresaRefreshToken", refresh[1]); }
+  if (csrf) { bru.setVar("csrfToken", csrf[1]); }
+}
+
+tests {
+  test("emite access no JSON e refresh/CSRF em cookies", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.not.have.property("refreshToken");
+    expect(String(res.getHeader("set-cookie"))).to.contain("HttpOnly");
+  });
+}

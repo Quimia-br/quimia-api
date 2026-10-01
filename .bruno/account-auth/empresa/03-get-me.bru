@@ -1,0 +1,23 @@
+meta {
+  name: E03 - Get Empresa Me
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/empresas/me
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("retorna o perfil da empresa", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().ativo).to.equal(true);
+  });
+}

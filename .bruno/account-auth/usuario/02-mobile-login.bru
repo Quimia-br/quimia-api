@@ -1,0 +1,39 @@
+meta {
+  name: U02 - Mobile Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/mobile/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{userEmail}}",
+    "senha": "{{userPassword}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.refreshToken) {
+    bru.setVar("accessToken", body.accessToken);
+    bru.setVar("refreshToken", body.refreshToken);
+  }
+}
+
+tests {
+  test("devolve access e refresh no JSON", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().refreshToken).to.be.a("string").and.not.be.empty;
+    expect(String(res.getHeader("set-cookie") || "")).to.not.contain("quimia_rt=");
+  });
+}

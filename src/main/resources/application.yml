@@ -36,7 +36,12 @@ app:
     refresh-inactivity-days: ${APP_AUTH_REFRESH_INACTIVITY_DAYS:7}
     max-failures: ${APP_AUTH_MAX_FAILURES:5}
     block-minutes: ${APP_AUTH_BLOCK_MINUTES:15}
-    recovery-code-pepper: ${APP_AUTH_RECOVERY_CODE_PEPPER:}
+    # Segredo HMAC (>= 32 bytes) para códigos de recuperação e vínculo de tokens à senha.
+    # APP_AUTH_RECOVERY_CODE_PEPPER segue aceito como nome legado.
+    hmac-secret: ${APP_AUTH_HMAC_SECRET:${APP_AUTH_RECOVERY_CODE_PEPPER:}}
+    empresa-reset-url: ${APP_AUTH_EMPRESA_RESET_URL:http://localhost:3000/recuperar-senha}
+  firebase:
+    project-id: ${FIREBASE_PROJECT_ID:}
   email:
     sender-mode: ${APP_EMAIL_SENDER_MODE:noop}
     resend:

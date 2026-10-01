@@ -1,60 +1,54 @@
 # Contrato do banco — `account`
 
 O PostgreSQL externo é responsável por criar, alterar e versionar o schema. A
-API não inclui Flyway nem executa DDL. Em produção, Hibernate usa `validate`:
-se faltar uma tabela, coluna ou tipo incompatível mapeado, a aplicação falha ao
-iniciar. Essa validação não confirma todas as constraints, índices e colunas
-legadas que a aplicação não mapeia; compare também os requisitos abaixo com o
-schema real antes de publicar uma release.
+fonte de verdade é o DDL `quimia_ddl_com_constraints.sql` (fora do repositório,
+decisão 21). A API não inclui Flyway nem executa DDL e, em produção, usa
+`ddl-auto: validate`: se faltar uma tabela ou coluna mapeada, ou se um tipo for
+incompatível, a aplicação não inicia.
 
-## Tabelas e colunas usadas pelo módulo
+Desde a decisão 21, o módulo usa **somente** tabelas que existem nesse DDL. Ele
+não depende de `refresh_token`, `recuperacao_senha`, `auditoria_autenticacao`
+nem de colunas de bloqueio. Se essas estruturas existirem no banco por causa de
+versões antigas, a API não as lê nem as altera.
 
-Tipos PostgreSQL esperados:
+## Tabelas e colunas mapeadas
 
-| Tabela | Colunas exigidas pelo mapeamento da API |
-|---|---|
-| `usuario` | `id UUID`, `nome VARCHAR(255)`, `email VARCHAR(255)`, `data_nasc DATE`, `nivel_acesso VARCHAR(50)`, `ultima_sessao TIMESTAMPTZ`, `senha_hash VARCHAR(255)`, `falhas_login INTEGER`, `bloqueado_ate TIMESTAMPTZ`, `ultima_falha_em TIMESTAMPTZ` |
-| `refresh_token` | `id UUID`, `id_usuario UUID`, `token_hash VARCHAR(64)`, `familia_id UUID`, `expira_em TIMESTAMPTZ`, `revogado_em TIMESTAMPTZ`, `substituido_por UUID`, `ultimo_uso_em TIMESTAMPTZ`, `criado_em TIMESTAMPTZ` |
-| `recuperacao_senha` | `id UUID`, `id_usuario UUID`, `codigo_hash VARCHAR(64)`, `expira_em TIMESTAMPTZ`, `tentativas INTEGER`, `criado_em TIMESTAMPTZ`, `codigo_consumido_em TIMESTAMPTZ`, `token_reset_hash VARCHAR(64)`, `token_reset_expira_em TIMESTAMPTZ`, `concluido_em TIMESTAMPTZ`, `revogado_em TIMESTAMPTZ` |
-| `auditoria_autenticacao` | `id BIGINT` identity, `id_usuario UUID`, `evento VARCHAR(60)`, `criado_em TIMESTAMPTZ` |
+| Tabela | Colunas usadas pela API | Observações do DDL |
+|---|---|---|
+| `usuario` | `id UUID`, `nome VARCHAR(255)`, `email VARCHAR(255)`, `data_nasc DATE`, `foto_url VARCHAR(450)`, `senha VARCHAR(100)`, `nivel_acesso VARCHAR(50)`, `ultima_sessao TIMESTAMPTZ` | `email` UNIQUE NOT NULL; `senha` NOT NULL; `nivel_acesso` CHECK em `usuario/empresa/admin`, gravado em minúsculas |
+| `empresa` | `id INTEGER identity`, `nome VARCHAR(255)`, `email VARCHAR(255)`, `cnpj VARCHAR(20)`, `ativo BOOLEAN`, `senha VARCHAR(100)`, `foto_url VARCHAR(200)` | `email` **sem** UNIQUE: a API garante unicidade (comparação sem distinção de maiúsculas) e recusa login quando há duplicidade legada; `cnpj` UNIQUE e anulável; `ativo` anulável, e NULL vale como ativo |
+| `localizacao_usuario` | `id INTEGER identity`, `id_usuario UUID`, `cep VARCHAR(9)`, `estado VARCHAR(2)`, `bairro`, `rua`, `numero INTEGER`, `complemento` | `UNIQUE(id_usuario)`: um endereço por usuário. Não há coluna de cidade |
 
-`id` é chave primária em todas as tabelas. `usuario.email` deve ser único e
-obrigatório; `nome`, `nivel_acesso` e `falhas_login` são obrigatórios.
-`usuario.nivel_acesso` armazena `usuario`, `empresa` ou `admin` em minúsculas;
-a API continua expondo os nomes do enum em maiúsculas.
-`refresh_token.token_hash` deve ser único; seus campos de identidade, hash,
-família, expiração e criação são obrigatórios. `recuperacao_senha.tentativas`
-deve aceitar somente valores de 0 a 5; os pares código consumido/hash e token
-de reset/hash-expiração precisam manter a consistência esperada pelo domínio.
-`auditoria_autenticacao.evento` e `criado_em` são obrigatórios.
+## Formato dos dados gravados
 
-Relações esperadas: `refresh_token.id_usuario` referencia `usuario.id` com
-exclusão em cascata; `recuperacao_senha.id_usuario` referencia `usuario.id`
-com exclusão em cascata; `auditoria_autenticacao.id_usuario` referencia
-`usuario.id` com `ON DELETE SET NULL`. Índices usados para consulta devem cobrir
-`refresh_token.id_usuario`, `refresh_token.familia_id`,
-`recuperacao_senha(id_usuario, criado_em DESC)`,
-`recuperacao_senha.token_reset_hash` (único) e
-`auditoria_autenticacao.id_usuario`.
+- `senha` (em `usuario` e `empresa`): `{bcrypt}` seguido de hash BCrypt de
+  custo 12, com 68 caracteres. Valores legados sem prefixo são aceitos no login
+  somente se forem BCrypt; qualquer outro formato não confere e exige
+  recuperação de senha.
+- Usuários criados por login social (Firebase) recebem um hash BCrypt de uma
+  senha aleatória descartada, porque `senha` é NOT NULL.
+- `email` é gravado com `trim` e em minúsculas.
+- `cnpj` é gravado sem pontuação e em maiúsculas: 14 caracteres, aceitando o
+  formato alfanumérico da Receita Federal.
+- `cep` é gravado como `00000-000`; `estado`, como UF em maiúsculas.
 
-## Compatibilidade com o schema legado
+## Estado fora do banco
 
-- A aplicação grava credenciais em `usuario.senha_hash`. Se existir uma coluna
-  legada `usuario.senha` sem valor padrão, ela deve aceitar `NULL`; novos
-  inserts não a preenchem. Valores legados existentes devem ser preservados.
-- Colunas antigas de verificação de email podem permanecer; a API não as lê nem
-  as altera.
-- `localizacao_usuario` e outras tabelas do produto ficam sob administração do
-  banco e não são removidas nem alteradas pela API.
-- Não remova tabelas, colunas, constraints ou a tabela histórica
-  `flyway_schema_history` como parte desta mudança. O histórico antigo pode
-  permanecer sem Flyway instalado.
+| Necessidade | Onde fica | Consequência |
+|---|---|---|
+| Sessão (refresh) | JWT assinado e autocontido | Não há revogação individual; trocar a senha invalida todos os refresh |
+| Bloqueio por falhas, cooldown e tentativas de código | Memória da instância | Os contadores zeram ao reiniciar e não são compartilhados entre réplicas |
+| Desafio e redefinição de senha | Tokens assinados devolvidos ao cliente | Ficam inválidos quando a senha muda (uso único) |
+| Auditoria | Log `account.audit` | Não há trilha consultável no banco |
 
 ## Publicação
 
-Antes de uma release, execute consultas somente leitura no banco de destino
-para conferir colunas, tipos, constraints, índices e permissões de escrita nas
-tabelas usadas. Em particular, `usuario.bloqueado_ate` precisa existir e a
-coluna legada `usuario.senha` não pode rejeitar os inserts atuais. Não use
-`ddl-auto=update/create` na produção. Sem comprovação do schema e do smoke check
-após inicialização, a release não está validada para deploy.
+Antes de uma release, confira com consultas somente leitura no banco de destino
+as tabelas, colunas e tipos acima, além das permissões de leitura e escrita em
+`usuario`, `empresa` e `localizacao_usuario`. Não use `ddl-auto=update/create`
+em produção. Sem schema comprovado e sem o smoke check passando após a
+inicialização, a release não está validada para deploy.
+
+A validação local de 2026-10-01 aplicou o DDL em um PostgreSQL 18 descartável.
+A API iniciou com `validate` e os testes de integração de `account` passaram
+nesse banco.

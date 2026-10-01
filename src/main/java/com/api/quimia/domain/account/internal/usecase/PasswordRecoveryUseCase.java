@@ -1,181 +1,164 @@
 package com.api.quimia.domain.account.internal.usecase;
 
+import com.api.quimia.domain.account.AccountPrincipal;
+import com.api.quimia.domain.account.internal.dto.RecoveryChallengeResponse;
 import com.api.quimia.domain.account.internal.dto.RecoveryGrantResponse;
-import com.api.quimia.domain.account.internal.model.PasswordRecovery;
 import com.api.quimia.domain.account.internal.model.Usuario;
-import com.api.quimia.domain.account.internal.persistence.PasswordRecoveryRepository;
-import com.api.quimia.domain.account.internal.persistence.RefreshTokenRepository;
 import com.api.quimia.domain.account.internal.persistence.UsuarioRepository;
 import java.security.SecureRandom;
-import java.time.OffsetDateTime;
-import java.util.Base64;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Recuperação do app por código (telas LoginPassCode). Sem tabela no schema, o desafio volta ao
+ * cliente como token assinado com o HMAC do código; tentativas e cooldown ficam em memória.
+ */
 @Service
 public class PasswordRecoveryUseCase {
-    private static final int CODE_TTL_MINUTES = 15;
-    private static final int RESET_TOKEN_TTL_MINUTES = 10;
-    private static final int MAX_CODE_ATTEMPTS = 5;
-    private static final int RESEND_COOLDOWN_SECONDS = 60;
+    private static final int CODE_DIGITS = 4;
+    private static final int CODE_BOUND = 10_000;
+    private static final Duration CODE_TTL = Duration.ofMinutes(15);
+    private static final Duration RESET_TOKEN_TTL = Duration.ofMinutes(10);
+    private static final int MAX_CODE_FAILURES = 5;
+    private static final Duration CODE_FAILURE_LOCK = Duration.ofHours(1);
+    private static final Duration RESEND_COOLDOWN = Duration.ofSeconds(15);
     private static final int MAX_REQUESTS_PER_HOUR = 5;
+    private static final String CHALLENGE_TOKEN = "recovery_challenge";
+    private static final String CLAIM_DIGEST = "chd";
+    private static final String EMAIL_SUBJECT = "Código de recuperação de senha";
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final UsuarioRepository users;
-    private final PasswordRecoveryRepository recoveries;
-    private final RefreshTokenRepository refreshes;
     private final PasswordEncoder passwords;
-    private final TokenHasher tokenHasher;
-    private final RecoveryCodeHasher codeHasher;
+    private final SignedTokenCodec codec;
+    private final SecretHasher hasher;
+    private final CredentialFingerprint fingerprints;
+    private final PasswordResetTokens resetTokens;
+    private final AccountThrottle throttle;
     private final ApplicationEventPublisher events;
     private final AuthenticationAuditRecorder audit;
 
     public PasswordRecoveryUseCase(
             UsuarioRepository users,
-            PasswordRecoveryRepository recoveries,
-            RefreshTokenRepository refreshes,
             PasswordEncoder passwords,
-            TokenHasher tokenHasher,
-            RecoveryCodeHasher codeHasher,
+            SignedTokenCodec codec,
+            SecretHasher hasher,
+            CredentialFingerprint fingerprints,
+            PasswordResetTokens resetTokens,
+            AccountThrottle throttle,
             ApplicationEventPublisher events,
             AuthenticationAuditRecorder audit) {
         this.users = users;
-        this.recoveries = recoveries;
-        this.refreshes = refreshes;
         this.passwords = passwords;
-        this.tokenHasher = tokenHasher;
-        this.codeHasher = codeHasher;
+        this.codec = codec;
+        this.hasher = hasher;
+        this.fingerprints = fingerprints;
+        this.resetTokens = resetTokens;
+        this.throttle = throttle;
         this.events = events;
         this.audit = audit;
     }
 
-    @Transactional(noRollbackFor = AccountException.class)
-    public void requestCode(String emailInput) {
-        String email = normalize(emailInput);
-        var found = users.findByEmailForUpdate(email);
-        if (found.isEmpty()) {
-            audit.record(null, "password_recovery_requested");
-            return;
+    /** Sempre devolve um desafio com o mesmo formato, exista ou não a conta (anti-enumeração). */
+    @Transactional(readOnly = true)
+    public RecoveryChallengeResponse requestCode(String emailInput) {
+        String email = Emails.normalize(emailInput);
+        String challengeId = UUID.randomUUID().toString();
+        Optional<Usuario> found = users.findByEmail(email);
+        String digest;
+        if (found.isPresent() && throttle.tryAcquire(requestKey(email), RESEND_COOLDOWN, MAX_REQUESTS_PER_HOUR)) {
+            Usuario user = found.get();
+            AccountPrincipal principal = SessionIssuer.principalOf(user);
+            String code = String.format(Locale.ROOT, "%0" + CODE_DIGITS + "d", RANDOM.nextInt(CODE_BOUND));
+            digest = challengeDigest(challengeId, email, code, fingerprints.of(principal, user.getSenha()));
+            audit.record("password_recovery_requested", principal);
+            events.publishEvent(new AccountEmailRequestedEvent(principal, user.getEmail(), EMAIL_SUBJECT, emailText(code)));
+        } else {
+            digest = hasher.hmac("recovery-decoy", challengeId);
+            found.ifPresentOrElse(
+                    user -> audit.record("password_recovery_throttled", SessionIssuer.principalOf(user)),
+                    () -> audit.record("password_recovery_requested"));
         }
-
-        Usuario user = found.get();
-        OffsetDateTime now = OffsetDateTime.now();
-        var latest = recoveries.findFirstByUserIdOrderByCreatedAtDesc(user.getId());
-        if (latest.isPresent()
-                && latest.get().getCreatedAt().isAfter(now.minusSeconds(RESEND_COOLDOWN_SECONDS))) {
-            audit.record(user.getId(), "password_recovery_throttled");
-            return;
-        }
-        if (recoveries.countByUserIdAndCreatedAtAfter(user.getId(), now.minusHours(1)) >= MAX_REQUESTS_PER_HOUR) {
-            audit.record(user.getId(), "password_recovery_throttled");
-            return;
-        }
-
-        latest.ifPresent(challenge -> challenge.setRevokedAt(now));
-        String code = String.format(Locale.ROOT, "%08d", RANDOM.nextInt(100_000_000));
-        PasswordRecovery challenge = new PasswordRecovery();
-        challenge.setId(UUID.randomUUID());
-        challenge.setUserId(user.getId());
-        challenge.setCodeHash(codeHasher.hash(challenge.getId(), code));
-        challenge.setExpiresAt(now.plusMinutes(CODE_TTL_MINUTES));
-        challenge.setAttempts(0);
-        challenge.setCreatedAt(now);
-        recoveries.save(challenge);
-        audit.record(user.getId(), "password_recovery_requested");
-        events.publishEvent(new RecoveryCodeRequestedEvent(user.getId(), user.getEmail(), code));
+        String challenge = codec.sign(
+                CHALLENGE_TOKEN, challengeId, Map.of(CLAIM_DIGEST, digest), Instant.now().plus(CODE_TTL));
+        return new RecoveryChallengeResponse(challenge, CODE_TTL.toSeconds());
     }
 
-    @Transactional(noRollbackFor = AccountException.class)
-    public RecoveryGrantResponse verifyCode(String emailInput, String code) {
-        String email = normalize(emailInput);
-        var found = users.findByEmailForUpdate(email);
-        if (found.isEmpty()) {
-            audit.record(null, "password_recovery_code_failed");
-            throw invalidRecoveryCode();
+    @Transactional(readOnly = true)
+    public RecoveryGrantResponse verifyCode(String challengeToken, String emailInput, String code) {
+        String email = Emails.normalize(emailInput);
+        String failureKey = codeFailureKey(email);
+        SignedTokenCodec.VerifiedToken challenge =
+                codec.verify(challengeToken, CHALLENGE_TOKEN).orElseThrow(PasswordRecoveryUseCase::invalidCode);
+        String consumedKey = consumedKey(challenge.subject());
+        if (throttle.isBlocked(failureKey) || throttle.isBlocked(consumedKey)) {
+            audit.record("password_recovery_code_rejected");
+            throw invalidCode();
         }
-
+        Optional<Usuario> found = users.findByEmail(email);
+        boolean valid = found.isPresent() && hasher.matches(
+                challengeDigest(
+                        challenge.subject(),
+                        email,
+                        code,
+                        fingerprints.of(SessionIssuer.principalOf(found.get()), found.get().getSenha())),
+                challenge.text(CLAIM_DIGEST));
+        if (!valid) {
+            throttle.recordFailure(failureKey, MAX_CODE_FAILURES, CODE_FAILURE_LOCK);
+            audit.record("password_recovery_code_failed");
+            throw invalidCode();
+        }
+        throttle.block(consumedKey, CODE_TTL);
         Usuario user = found.get();
-        var candidate = recoveries.findFirstByUserIdAndRevokedAtIsNullAndCompletedAtIsNullOrderByCreatedAtDesc(
-                user.getId());
-        if (candidate.isEmpty()) {
-            audit.record(user.getId(), "password_recovery_code_failed");
-            throw invalidRecoveryCode();
-        }
-
-        PasswordRecovery challenge = candidate.get();
-        OffsetDateTime now = OffsetDateTime.now();
-        if (challenge.getCodeConsumedAt() != null
-                || !challenge.getExpiresAt().isAfter(now)
-                || challenge.getAttempts() >= MAX_CODE_ATTEMPTS
-                || challenge.getCodeHash() == null) {
-            audit.record(user.getId(), "password_recovery_code_failed");
-            throw invalidRecoveryCode();
-        }
-        if (!codeHasher.matches(challenge.getId(), code, challenge.getCodeHash())) {
-            challenge.setAttempts(challenge.getAttempts() + 1);
-            if (challenge.getAttempts() >= MAX_CODE_ATTEMPTS) {
-                challenge.setRevokedAt(now);
-            }
-            audit.record(user.getId(), "password_recovery_code_failed");
-            throw invalidRecoveryCode();
-        }
-
-        String resetToken = randomToken();
-        challenge.setCodeConsumedAt(now);
-        challenge.setCodeHash(null);
-        challenge.setResetTokenHash(tokenHasher.hash(resetToken));
-        challenge.setResetTokenExpiresAt(now.plusMinutes(RESET_TOKEN_TTL_MINUTES));
-        audit.record(user.getId(), "password_recovery_code_verified");
-        return new RecoveryGrantResponse(resetToken, RESET_TOKEN_TTL_MINUTES * 60L);
+        AccountPrincipal principal = SessionIssuer.principalOf(user);
+        audit.record("password_recovery_code_verified", principal);
+        String resetToken = resetTokens.issue(principal, user.getSenha(), RESET_TOKEN_TTL);
+        return new RecoveryGrantResponse(resetToken, RESET_TOKEN_TTL.toSeconds());
     }
 
-    @Transactional(noRollbackFor = AccountException.class)
+    @Transactional
     public void resetPassword(String resetToken, String newPassword) {
-        String resetHash = tokenHasher.hash(resetToken);
-        UUID userId = recoveries.findUserIdByResetTokenHash(resetHash)
-                .orElseThrow(PasswordRecoveryUseCase::invalidResetToken);
-        Usuario user = users.findByIdForUpdate(userId).orElseThrow(PasswordRecoveryUseCase::invalidResetToken);
-        PasswordRecovery challenge = recoveries.findByResetTokenHash(resetHash)
-                .orElseThrow(PasswordRecoveryUseCase::invalidResetToken);
-        OffsetDateTime now = OffsetDateTime.now();
-        if (challenge.getCompletedAt() != null
-                || challenge.getRevokedAt() != null
-                || challenge.getResetTokenExpiresAt() == null
-                || !challenge.getResetTokenExpiresAt().isAfter(now)) {
-            throw invalidResetToken();
-        }
-
+        PasswordResetTokens.ResetGrant grant = resetTokens.read(resetToken, AccountPrincipal.Type.USUARIO);
+        Usuario user = users.findById(grant.principal().usuarioId()).orElseThrow(PasswordResetTokens::invalid);
+        resetTokens.requireCurrent(grant, user.getSenha());
         PasswordPolicy.validate(newPassword);
-        user.setSenhaHash(passwords.encode(newPassword));
-        user.setFalhasLogin(0);
-        user.setBloqueadoAte(null);
-        user.setUltimaFalhaEm(null);
-        refreshes.revokeActiveByUserId(user.getId(), now);
-        challenge.setCompletedAt(now);
-        challenge.setResetTokenHash(null);
-        challenge.setResetTokenExpiresAt(null);
-        audit.record(user.getId(), "password_recovery_completed");
+        user.setSenha(passwords.encode(newPassword));
+        String email = Emails.normalize(user.getEmail());
+        throttle.reset(AutenticarUseCase.loginKey(email));
+        throttle.reset(codeFailureKey(email));
+        audit.record("password_recovery_completed", grant.principal());
     }
 
-    private static AccountException invalidRecoveryCode() {
+    private String challengeDigest(String challengeId, String email, String code, String credential) {
+        return hasher.hmac("recovery-code", challengeId, email, code, credential);
+    }
+
+    private static String emailText(String code) {
+        return "Seu código de recuperação do Quimia é " + code
+                + ". Ele expira em 15 minutos. Se você não solicitou a recuperação, ignore esta mensagem.";
+    }
+
+    private static String requestKey(String email) {
+        return "recovery-request:usuario:" + email;
+    }
+
+    private static String codeFailureKey(String email) {
+        return "recovery-code:usuario:" + email;
+    }
+
+    private static String consumedKey(String challengeId) {
+        return "recovery-challenge-consumed:" + challengeId;
+    }
+
+    private static AccountException invalidCode() {
         return new AccountException("invalid_recovery_code", 400);
-    }
-
-    private static AccountException invalidResetToken() {
-        return new AccountException("invalid_reset_token", 400);
-    }
-
-    private static String normalize(String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private static String randomToken() {
-        byte[] bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

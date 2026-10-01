@@ -1,0 +1,20 @@
+meta {
+  name: Empresa Token On Usuario Route
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/usuarios/me
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/problem+json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("403 para tipo de titular errado", function () { expect(res.getStatus()).to.equal(403); });
+}

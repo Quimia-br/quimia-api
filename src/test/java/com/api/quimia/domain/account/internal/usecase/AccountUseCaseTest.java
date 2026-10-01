@@ -36,16 +36,17 @@ class AccountUseCaseTest {
         users.deleteAll();
 
         var created = registrar.execute(new com.api.quimia.domain.account.internal.dto.RegisterRequest(
-                "Case User", "case@example.com", "senha-forte-case", LocalDate.of(1988, 3, 3)));
+                "Case User", "case@example.com", "senhaForteCase1", LocalDate.of(1988, 3, 3), null));
 
         var viewed = perfil.current(created.id());
         assertThat(viewed.nome()).isEqualTo("Case User");
 
-        var updated = perfil.update(created.id(), new UpdateProfileRequest("Renamed", null));
+        var updated = perfil.update(created.id(), new UpdateProfileRequest("Renamed", null, "https://cdn.example.com/me.png"));
         assertThat(updated.nome()).isEqualTo("Renamed");
+        assertThat(updated.fotoUrl()).isEqualTo("https://cdn.example.com/me.png");
 
         assertThatThrownBy(() ->
-                        perfil.update(created.id(), new UpdateProfileRequest(null, LocalDate.now().minusYears(10))))
+                        perfil.update(created.id(), new UpdateProfileRequest(null, LocalDate.now().minusYears(10), null)))
                 .isInstanceOf(AccountException.class)
                 .extracting(error -> ((AccountException) error).code())
                 .isEqualTo("underage");
@@ -60,10 +61,10 @@ class AccountUseCaseTest {
     void registrationStoresDelegatingBcryptWithCostTwelve() {
         users.deleteAll();
         registrar.execute(new com.api.quimia.domain.account.internal.dto.RegisterRequest(
-                "Bcrypt User", "bcrypt@example.com", "senha-forte-bcrypt", LocalDate.of(1988, 3, 3)));
+                "Bcrypt User", "bcrypt@example.com", "senhaForteBcrypt1", LocalDate.of(1988, 3, 3), null));
 
-        String encoded = users.findByEmail("bcrypt@example.com").orElseThrow().getSenhaHash();
+        String encoded = users.findByEmail("bcrypt@example.com").orElseThrow().getSenha();
         assertThat(encoded).matches("\\{bcrypt}\\$2[aby]\\$12\\$.*");
-        assertThat(passwords.matches("senha-forte-bcrypt", encoded)).isTrue();
+        assertThat(passwords.matches("senhaForteBcrypt1", encoded)).isTrue();
     }
 }

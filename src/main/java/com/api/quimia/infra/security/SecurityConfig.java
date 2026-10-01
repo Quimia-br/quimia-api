@@ -21,6 +21,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+    private static final int BCRYPT_STRENGTH = 12;
+    private static final String USUARIO_PRINCIPAL = JwtAuthenticationFilter.PRINCIPAL_AUTHORITY_PREFIX + "USUARIO";
+    private static final String EMPRESA_PRINCIPAL = JwtAuthenticationFilter.PRINCIPAL_AUTHORITY_PREFIX + "EMPRESA";
     private final JwtAuthenticationFilter jwt;
     private final CookieCsrfFilter csrf;
 
@@ -39,12 +42,22 @@ public class SecurityConfig {
                         "/api/v1/auth/forgot-password",
                         "/api/v1/auth/verify-recovery-code",
                         "/api/v1/auth/reset-password",
-                        "/api/v1/auth/login",
-                        "/api/v1/auth/refresh",
                         "/api/v1/auth/mobile/login",
                         "/api/v1/auth/mobile/refresh",
+                        "/api/v1/auth/mobile/logout",
+                        "/api/v1/auth/firebase",
+                        "/api/v1/empresas/auth/register",
+                        "/api/v1/empresas/auth/login",
+                        "/api/v1/empresas/auth/refresh",
+                        "/api/v1/empresas/auth/logout",
+                        "/api/v1/empresas/auth/forgot-password",
+                        "/api/v1/empresas/auth/reset-password",
                         "/actuator/health")
                 .permitAll()
+                .requestMatchers("/api/v1/usuarios/**")
+                .hasAuthority(USUARIO_PRINCIPAL)
+                .requestMatchers("/api/v1/empresas/me/**")
+                .hasAuthority(EMPRESA_PRINCIPAL)
                 .requestMatchers("/api/v1/admin/**")
                 .hasRole("ADMIN")
                 .anyRequest()
@@ -67,7 +80,12 @@ public class SecurityConfig {
 
     @Bean
     PasswordEncoder passwordEncoder() {
-        return new DelegatingPasswordEncoder("bcrypt", Map.of("bcrypt", new BCryptPasswordEncoder(12)));
+        BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder(BCRYPT_STRENGTH);
+        DelegatingPasswordEncoder encoder = new DelegatingPasswordEncoder("bcrypt", Map.of("bcrypt", bcrypt));
+        // Senhas legadas em `usuario.senha`/`empresa.senha` sem prefixo {id}: BCrypt puro é aceito;
+        // qualquer outro formato simplesmente não confere (exige recuperação de senha).
+        encoder.setDefaultPasswordEncoderForMatches(bcrypt);
+        return encoder;
     }
 
     @Bean
@@ -79,7 +97,7 @@ public class SecurityConfig {
                 .toList();
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowed);
-        config.setAllowedMethods(List.of("GET", "POST", "PATCH", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-CSRF-Token"));
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
