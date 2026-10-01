@@ -80,7 +80,10 @@ As variáveis de runtime da API devem ser configuradas na Discloud, separadas
 dos secrets do Actions: `SPRING_DATASOURCE_URL`,
 `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`,
 `QUIMIA_JWT_KID`, `QUIMIA_JWT_PRIVATE_KEY_BASE64`,
-`QUIMIA_JWT_PUBLIC_KEY_BASE64` e `SERVER_PORT=8080`. Não coloque os valores
+`QUIMIA_JWT_PUBLIC_KEY_BASE64`, `APP_AUTH_HMAC_SECRET` (32 bytes ou mais; o
+nome legado `APP_AUTH_RECOVERY_CODE_PEPPER` continua aceito),
+`FIREBASE_PROJECT_ID` (login social), `APP_AUTH_EMPRESA_RESET_URL` e
+`SERVER_PORT=8080`. Não coloque os valores
 no repositório ou no pacote. O PostgreSQL administra o schema: a API não roda
 migrations nem DDL e mantém `ddl-auto: validate`. Antes de publicar, confira
 colunas, tipos, constraints e índices em consultas somente leitura conforme
