@@ -15,6 +15,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.web.client.RestClient;
 
 @Configuration(proxyBeanMethods = false)
@@ -45,7 +47,7 @@ public class RecoveryEmailConfiguration {
     AccountMailer resendAccountMailer(
             org.springframework.core.env.Environment environment) {
         String apiKey = environment.getProperty("app.email.resend.api-key", "");
-        String from = environment.getProperty("app.email.resend.from", "");
+        String from = environment.getProperty("app.email.from", "");
         if (apiKey.isBlank() || from.isBlank()) {
             throw new IllegalStateException("RESEND_API_KEY and APP_EMAIL_FROM are required when email sender mode is resend");
         }
@@ -55,6 +57,19 @@ public class RecoveryEmailConfiguration {
         return new ResendAccountMailer(RestClient.builder().requestFactory(requestFactory).build(), apiKey, from);
     }
 
+    @Bean
+    @ConditionalOnProperty(prefix = "app.email", name = "sender-mode", havingValue = "smtp")
+    AccountMailer smtpAccountMailer(JavaMailSender mailSender, org.springframework.core.env.Environment environment) {
+        String username = environment.getProperty("spring.mail.username", "");
+        String password = environment.getProperty("spring.mail.password", "");
+        String from = environment.getProperty("app.email.from", "");
+        if (username.isBlank() || password.isBlank() || from.isBlank()) {
+            throw new IllegalStateException(
+                    "SPRING_MAIL_USERNAME, SPRING_MAIL_PASSWORD and APP_EMAIL_FROM are required when email sender mode is smtp");
+        }
+        return new SmtpAccountMailer(mailSender, from);
+    }
+
     private static final class NoOpAccountMailer implements AccountMailer {
         private static final Logger log = LoggerFactory.getLogger(NoOpAccountMailer.class);
 
@@ -62,6 +77,28 @@ public class RecoveryEmailConfiguration {
         public boolean send(String to, String subject, String text) {
             log.info("Account email disabled subject={}", subject);
             return false;
+        }
+    }
+
+    /** Gmail exige que o remetente seja a própria conta autenticada (ou um alias verificado nela). */
+    private static final class SmtpAccountMailer implements AccountMailer {
+        private final JavaMailSender mailSender;
+        private final String from;
+
+        private SmtpAccountMailer(JavaMailSender mailSender, String from) {
+            this.mailSender = mailSender;
+            this.from = from;
+        }
+
+        @Override
+        public boolean send(String to, String subject, String text) {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(from);
+            message.setTo(to);
+            message.setSubject(subject);
+            message.setText(text);
+            mailSender.send(message);
+            return true;
         }
     }
 
