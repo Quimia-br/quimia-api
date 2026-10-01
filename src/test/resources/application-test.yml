@@ -14,4 +14,4 @@ quimia:
 app:
   auth:
     cookie-secure: false
-    recovery-code-pepper: test-only-recovery-code-pepper-32-bytes-minimum
+    hmac-secret: test-only-hmac-secret-with-at-least-32-bytes

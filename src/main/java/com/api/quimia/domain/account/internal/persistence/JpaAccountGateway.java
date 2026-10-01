@@ -42,6 +42,7 @@ public class JpaAccountGateway implements AccountGateway {
                 user.getNome(),
                 user.getEmail(),
                 user.getDataNasc(),
+                user.getFotoUrl(),
                 user.getNivelAcesso(),
                 user.getUltimaSessao());
     }

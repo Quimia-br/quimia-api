@@ -4,11 +4,13 @@ import com.api.quimia.TestJwtKeys;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.api.quimia.domain.account.internal.usecase.AccessTokenIssuer;
+import com.api.quimia.domain.account.internal.usecase.SessionIssuer;
+import com.api.quimia.domain.account.internal.usecase.SignedTokenCodec;
 import io.jsonwebtoken.Jwts;
 import java.security.PrivateKey;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +20,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @SpringBootTest(
-        classes = {com.api.quimia.Application.class, com.api.quimia.domain.account.AccountTestConfig.class},
-        properties = "quimia.jwt.access-ttl-minutes=2")
+        classes = {com.api.quimia.Application.class, com.api.quimia.domain.account.AccountTestConfig.class})
 @ActiveProfiles("test")
 @ContextConfiguration(initializers = TestJwtKeys.class)
 class JwtServiceTest {
@@ -27,26 +28,39 @@ class JwtServiceTest {
     private JwtService jwt;
 
     @Autowired
-    private AccessTokenIssuer accessTokens;
+    private SignedTokenCodec codec;
 
     @Test
-    void responseExpiryUsesConfiguredJwtTtl() {
-        var issued = accessTokens.issue(UUID.randomUUID().toString(), "USUARIO");
-        assertThat(issued.expiresInSeconds()).isEqualTo(120);
+    void codecRoundTripsClaimsAndRejectsOtherTokenUses() {
+        String token = codec.sign("refresh", "subject-1", Map.of("tipo", "usuario"), Instant.now().plusSeconds(120));
+
+        var verified = codec.verify(token, "refresh").orElseThrow();
+        assertThat(verified.subject()).isEqualTo("subject-1");
+        assertThat(verified.text("tipo")).isEqualTo("usuario");
+        assertThat(codec.verify(token, SessionIssuer.ACCESS_TOKEN)).isEmpty();
+        assertThat(codec.verify(token + "x", "refresh")).isEmpty();
+        assertThat(codec.verify(null, "refresh")).isEmpty();
     }
 
     @Test
     void issueAndVerify() {
         UUID subject = UUID.randomUUID();
-        String token = jwt.issue(subject, "USUARIO");
-        assertThat(jwt.verify(token).getSubject()).isEqualTo(subject.toString());
+        String token = accessToken(subject);
+        assertThat(jwt.verify(token, SessionIssuer.ACCESS_TOKEN).getSubject()).isEqualTo(subject.toString());
     }
 
     @Test
     void tamperedFails() {
-        UUID subject = UUID.randomUUID();
-        String token = jwt.issue(subject, "USUARIO") + "x";
+        String token = accessToken(UUID.randomUUID()) + "x";
         assertThatThrownBy(() -> jwt.verify(token)).isInstanceOf(JwtService.InvalidTokenException.class);
+    }
+
+    private String accessToken(UUID subject) {
+        return jwt.sign(
+                SessionIssuer.ACCESS_TOKEN,
+                subject.toString(),
+                Map.of("tipo", "usuario", "role", "USUARIO"),
+                Instant.now().plusSeconds(120));
     }
 
     @Test

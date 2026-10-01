@@ -10,5 +10,6 @@ public record UserView(
         String nome,
         String email,
         LocalDate dataNasc,
+        String fotoUrl,
         NivelAcesso nivelAcesso,
         OffsetDateTime ultimaSessao) {}

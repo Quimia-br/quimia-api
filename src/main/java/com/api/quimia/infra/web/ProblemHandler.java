@@ -42,10 +42,12 @@ public class ProblemHandler {
 
     private static String codeTitle(String code) {
         return switch (code) {
-            case "invalid_credentials", "invalid_refresh", "invalid_token" -> "Unauthorized";
-            case "blocked" -> "Forbidden";
-            case "email_in_use" -> "Conflict";
-            case "weak_password", "underage" -> "Unprocessable";
+            case "invalid_credentials", "invalid_refresh", "invalid_token", "invalid_firebase_token" -> "Unauthorized";
+            case "blocked", "inactive", "email_not_verified" -> "Forbidden";
+            case "email_in_use", "cnpj_in_use" -> "Conflict";
+            case "weak_password", "password_too_long", "underage", "invalid_cnpj", "invalid_cep" -> "Unprocessable";
+            case "not_found" -> "Not Found";
+            case "firebase_disabled" -> "Service Unavailable";
             case "invalid_transport", "invalid_recovery_code", "invalid_reset_token" -> "Bad Request";
             default -> "Error";
         };

@@ -6,11 +6,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.api.quimia.domain.account.internal.usecase.SessionIssuer;
 import com.api.quimia.infra.security.JwtService;
 import io.jsonwebtoken.Jwts;
 import java.security.PrivateKey;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,16 +43,34 @@ class SecurityNegativeTest {
         assertUnauthorized(signedToken("quimia-auth", "other-api", configuredKid(), 900, true));
         assertUnauthorized(signedToken("quimia-auth", "quimia-api", "unknown-kid", 900, true));
         assertUnauthorized(signedToken("quimia-auth", "quimia-api", null, 900, false));
+        assertUnauthorized(token("refresh", "usuario", "USUARIO"));
+        assertUnauthorized(token(SessionIssuer.ACCESS_TOKEN, "desconhecido", "USUARIO"));
 
-        assertThat(jwt.verify(jwt.issue(UUID.randomUUID(), "USUARIO")).getSubject()).isNotBlank();
+        assertThat(jwt.verify(token(SessionIssuer.ACCESS_TOKEN, "usuario", "USUARIO")).getSubject()).isNotBlank();
     }
 
     @Test
     void regularUserCannotReachAdminWriteRoute() throws Exception {
-        String token = jwt.issue(UUID.randomUUID(), "USUARIO");
         mvc.perform(patch("/api/v1/admin/usuarios/" + UUID.randomUUID())
-                        .header("Authorization", "Bearer " + token))
+                        .header("Authorization", "Bearer " + token(SessionIssuer.ACCESS_TOKEN, "usuario", "USUARIO")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void principalTypesCannotUseEachOthersRoutes() throws Exception {
+        mvc.perform(get("/api/v1/usuarios/me")
+                        .header("Authorization", "Bearer " + token(SessionIssuer.ACCESS_TOKEN, "empresa", "EMPRESA")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/empresas/me")
+                        .header("Authorization", "Bearer " + token(SessionIssuer.ACCESS_TOKEN, "usuario", "USUARIO")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/empresas/me")
+                        .header("Authorization", "Bearer " + token(SessionIssuer.ACCESS_TOKEN, "usuario", "EMPRESA")))
+                .andExpect(status().isForbidden());
+    }
+
+    private String token(String tokenUse, String tipo, String role) {
+        return jwt.sign(tokenUse, "1", Map.of("tipo", tipo, "role", role), Instant.now().plusSeconds(60));
     }
 
     private void assertUnauthorized(String token) throws Exception {
@@ -76,6 +96,8 @@ class SecurityNegativeTest {
                 .add(audience)
                 .and()
                 .claim("role", "USUARIO")
+                .claim("tipo", "usuario")
+                .claim("token_use", SessionIssuer.ACCESS_TOKEN)
                 .issuedAt(Date.from(now.minusSeconds(expiresInSeconds < 0 ? 600 : 0)))
                 .expiration(Date.from(now.plusSeconds(expiresInSeconds)))
                 .signWith(privateKey)

@@ -7,4 +7,5 @@ import jakarta.validation.constraints.Size;
 
 public record RecoveryCodeRequest(
         @NotBlank @Email @Size(max = 255) String email,
-        @NotBlank @Pattern(regexp = "[0-9]{8}") String code) {}
+        @NotBlank @Pattern(regexp = "[0-9]{4}") String code,
+        @NotBlank @Size(max = 2048) String challengeToken) {}

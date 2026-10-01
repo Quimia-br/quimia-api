@@ -1,17 +1,11 @@
 package com.api.quimia.domain.account.internal.usecase;
 
-import com.api.quimia.domain.account.dto.UserSummary;
 import com.api.quimia.domain.account.internal.dto.LoginRequest;
-import com.api.quimia.domain.account.internal.dto.LoginResponse;
-import com.api.quimia.domain.account.internal.model.RefreshToken;
 import com.api.quimia.domain.account.internal.model.Usuario;
-import com.api.quimia.domain.account.internal.persistence.RefreshTokenRepository;
 import com.api.quimia.domain.account.internal.persistence.UsuarioRepository;
-import java.security.SecureRandom;
-import java.time.OffsetDateTime;
-import java.util.Base64;
-import java.util.Locale;
-import java.util.UUID;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,91 +14,57 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AutenticarUseCase {
     private final UsuarioRepository users;
-    private final RefreshTokenRepository refreshes;
     private final PasswordEncoder passwords;
-    private final TokenHasher hasher;
-    private final AccessTokenIssuer tokens;
-    private final int maxFailures;
-    private final int blockMinutes;
-    private final int refreshTtlDays;
+    private final SessionIssuer sessions;
+    private final AccountThrottle throttle;
     private final AuthenticationAuditRecorder audit;
+    private final int maxFailures;
+    private final Duration blockDuration;
 
     public AutenticarUseCase(
             UsuarioRepository users,
-            RefreshTokenRepository refreshes,
             PasswordEncoder passwords,
-            TokenHasher hasher,
-            AccessTokenIssuer tokens,
+            SessionIssuer sessions,
+            AccountThrottle throttle,
+            AuthenticationAuditRecorder audit,
             @Value("${app.auth.max-failures:5}") int maxFailures,
-            @Value("${app.auth.block-minutes:15}") int blockMinutes,
-            @Value("${app.auth.refresh-ttl-days:30}") int refreshTtlDays,
-            AuthenticationAuditRecorder audit) {
+            @Value("${app.auth.block-minutes:15}") long blockMinutes) {
         this.users = users;
-        this.refreshes = refreshes;
         this.passwords = passwords;
-        this.hasher = hasher;
-        this.tokens = tokens;
-        this.maxFailures = maxFailures;
-        this.blockMinutes = blockMinutes;
-        this.refreshTtlDays = refreshTtlDays;
+        this.sessions = sessions;
+        this.throttle = throttle;
         this.audit = audit;
+        this.maxFailures = maxFailures;
+        this.blockDuration = Duration.ofMinutes(blockMinutes);
     }
 
-    @Transactional(noRollbackFor = AccountException.class)
-    public IssuedSession execute(LoginRequest request) {
-        String email = request.email().trim().toLowerCase(Locale.ROOT);
-        var found = users.findByEmailForUpdate(email);
-        if (found.isEmpty()) {
-            audit.record(null, "login_failed");
-            throw new AccountException("invalid_credentials", 401);
+    public static String loginKey(String normalizedEmail) {
+        return "login:usuario:" + normalizedEmail;
+    }
+
+    @Transactional
+    public SessionIssuer.UsuarioSession execute(LoginRequest request) {
+        String email = Emails.normalize(request.email());
+        String key = loginKey(email);
+        if (throttle.isBlocked(key)) {
+            audit.record("login_blocked");
+            throw blocked();
         }
+        Optional<Usuario> found = users.findByEmail(email);
+        if (found.isEmpty() || !passwords.matches(request.senha(), found.get().getSenha())) {
+            boolean nowBlocked = throttle.recordFailure(key, maxFailures, blockDuration);
+            found.ifPresentOrElse(
+                    user -> audit.record("login_failed", SessionIssuer.principalOf(user)),
+                    () -> audit.record("login_failed"));
+            throw nowBlocked ? blocked() : new AccountException("invalid_credentials", 401);
+        }
+        throttle.reset(key);
         Usuario user = found.get();
-        if (user.getBloqueadoAte() != null && user.getBloqueadoAte().isAfter(OffsetDateTime.now())) {
-            audit.record(user.getId(), "login_blocked");
-            throw new AccountException("blocked", 423);
-        }
-        if (user.getSenhaHash() == null || !passwords.matches(request.senha(), user.getSenhaHash())) {
-            int failures = user.getFalhasLogin() + 1;
-            OffsetDateTime blocked = failures >= maxFailures
-                    ? OffsetDateTime.now().plusMinutes(blockMinutes)
-                    : null;
-            user.setFalhasLogin(failures);
-            user.setBloqueadoAte(blocked);
-            user.setUltimaFalhaEm(OffsetDateTime.now());
-            audit.record(user.getId(), "login_failed");
-            if (blocked != null) {
-                throw new AccountException("blocked", 423);
-            }
-            throw new AccountException("invalid_credentials", 401);
-        }
-        user.setFalhasLogin(0);
-        user.setBloqueadoAte(null);
-        user.setUltimaSessao(OffsetDateTime.now());
-        AccessTokenIssuer.IssuedToken access =
-                tokens.issue(user.getId().toString(), user.getNivelAcesso().name());
-        String rawRefresh = randomToken();
-        RefreshToken refresh = new RefreshToken();
-        refresh.setId(UUID.randomUUID());
-        refresh.setUserId(user.getId());
-        refresh.setTokenHash(hasher.hash(rawRefresh));
-        refresh.setFamilyId(UUID.randomUUID());
-        OffsetDateTime issuedAt = OffsetDateTime.now();
-        refresh.setExpiresAt(issuedAt.plusDays(refreshTtlDays));
-        refresh.setLastUsedAt(issuedAt);
-        refresh.setCreatedAt(issuedAt);
-        refreshes.save(refresh);
-        audit.record(user.getId(), "login_success");
-        LoginResponse response = new LoginResponse(
-                access.token(),
-                "Bearer",
-                access.expiresInSeconds(),
-                new UserSummary(user.getId(), user.getNome(), user.getEmail()));
-        return new IssuedSession(response, rawRefresh);
+        audit.record("login_success", SessionIssuer.principalOf(user));
+        return sessions.openUsuario(user, Instant.now());
     }
 
-    private static String randomToken() {
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    static AccountException blocked() {
+        return new AccountException("blocked", 423);
     }
 }
