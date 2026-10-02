@@ -1,0 +1,40 @@
+meta {
+  name: P03 - Busca por Código de Barras
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/produtos/busca-por-codigo-barras
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "codBarras": "{{codBarras}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setVar("produtoId", res.getBody().id);
+  }
+}
+
+tests {
+  test("encontra o produto do código lido no rótulo", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Usado pelo "Escanear rótulo" do app. Aceita o código como UPC-A (12 dígitos) ou
+  EAN-13 com 0 inicial. Só dígitos; outro formato responde 422 `codigo_barras_invalido`.
+}

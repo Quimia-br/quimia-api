@@ -1,0 +1,37 @@
+meta {
+  name: P01 - Listar Produtos
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produtos?q={{termo}}&page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body.itens.length > 0) {
+    bru.setVar("produtoId", body.itens[0].id);
+  }
+}
+
+tests {
+  test("lista paginada", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("totalItens");
+    expect(res.getBody()).to.have.property("totalPaginas");
+  });
+}
+
+docs {
+  `q` busca no nome e na descrição sem diferenciar maiúsculas e acentos. Filtros
+  opcionais: `tipo` (código do banco, ex. `limpeza_geral`) e `codBarras`.
+  Produtos cujos vínculos com empresa foram todos desativados não aparecem.
+}

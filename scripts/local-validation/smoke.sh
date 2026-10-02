@@ -48,6 +48,7 @@ expect() {
 }
 
 json_field() { grep -o "\"$1\":\"[^\"]*\"" <<< "$BODY" | head -1 | cut -d'"' -f4; }
+json_number() { grep -o "\"$1\":[0-9]*" <<< "$BODY" | head -1 | cut -d: -f2; }
 
 build_jar() {
   cd "$REPO_ROOT"
@@ -105,6 +106,26 @@ smoke_account() {
   expect 403 "token de empresa em rota de usuário"
 }
 
+smoke_catalog() {
+  log "Etapa 1: catálogo do app (seed com produto visível, com vínculo ativo e oculto)"
+  call GET "/produtos?q=agua%20sanitaria" "" "$USER_TOKEN"
+  expect 200 "busca sem acento encontra 'Água Sanitária'" '"nome":"Água Sanitária Smoke"'
+  call GET "/produtos?q=oculto" "" "$USER_TOKEN"
+  expect 200 "produto com vínculo desativado não aparece" '"totalItens":0'
+  call GET "/produtos?tipo=squeeze" "" "$USER_TOKEN"
+  expect 400 "tipo fora do CHECK" '"tipo_invalido"'
+  call POST /produtos/busca-por-codigo-barras '{"codBarras":"0789200000002"}' "$USER_TOKEN"
+  expect 200 "código EAN-13 encontra produto gravado como UPC-A" '"nome":"Água Sanitária Smoke"'
+  local produto_id
+  produto_id="$(json_number id)"
+  call GET "/produtos/$produto_id" "" "$USER_TOKEN"
+  expect 200 "detalhe traz a logo da marca" '"logoUrl":"https://cdn.test/smoke.png"'
+  call POST /produtos/busca-por-codigo-barras '{"codBarras":"7892000000004"}' "$USER_TOKEN"
+  expect 404 "código de produto oculto" '"produto_nao_encontrado"'
+  call GET /produtos "" "$EMPRESA_TOKEN"
+  expect 403 "token de empresa no catálogo do app"
+}
+
 check_database() {
   log "Conferindo o que a API gravou no PostgreSQL"
   "$PG_BIN/psql" -h localhost -p "$PG_PORT" -U postgres -d "$PG_DB" -tA -c \
@@ -114,9 +135,10 @@ check_database() {
 use_jdk21
 build_jar "${1:-}"
 start_cluster "$WORK_DIR"
-apply_schema
+apply_schema "$SCHEMA_DIR/seed-smoke-catalogo.sql"
 start_api
 smoke_account
+smoke_catalog
 check_database
 
 log "Resultado: $CHECKS verificações, $FAILURES falha(s)"

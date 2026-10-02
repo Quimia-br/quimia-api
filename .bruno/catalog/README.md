@@ -6,6 +6,8 @@ implementação acrescenta uma pasta.
 1. Suba a API em `http://localhost:8080` e selecione o ambiente `local`.
 2. Rode `auth/` na ordem: `A01` e `A02` (usuário), `A03` e `A04` (empresa).
    Os tokens ficam em `accessToken` e `empresaAccessToken`.
+3. `produtos/` (app, token de usuário): listar com busca, detalhe e busca por
+   código de barras. Ajuste `termo` e `codBarras` no ambiente para produtos do seu banco.
 
 Para validar contra um banco descartável com o schema real, use
 `scripts/local-validation/smoke.sh`, que faz as mesmas chamadas por `curl`.

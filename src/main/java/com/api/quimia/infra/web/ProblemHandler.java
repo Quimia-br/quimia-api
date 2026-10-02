@@ -1,6 +1,7 @@
 package com.api.quimia.infra.web;
 
 import com.api.quimia.domain.account.internal.usecase.AccountException;
+import com.api.quimia.domain.catalog.internal.usecase.CatalogException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
@@ -15,6 +16,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class ProblemHandler {
     @ExceptionHandler(AccountException.class)
     ProblemDetail account(AccountException error, HttpServletRequest request) {
+        return problem(error.status(), codeTitle(error.code()), error.code(), request);
+    }
+
+    @ExceptionHandler(CatalogException.class)
+    ProblemDetail catalog(CatalogException error, HttpServletRequest request) {
         return problem(error.status(), codeTitle(error.code()), error.code(), request);
     }
 
@@ -46,7 +52,9 @@ public class ProblemHandler {
             case "blocked", "inactive", "email_not_verified" -> "Forbidden";
             case "email_in_use", "cnpj_in_use" -> "Conflict";
             case "weak_password", "password_too_long", "underage", "invalid_cnpj", "invalid_cep" -> "Unprocessable";
-            case "not_found" -> "Not Found";
+            case "not_found", "produto_nao_encontrado" -> "Not Found";
+            case "codigo_barras_invalido" -> "Unprocessable";
+            case "paginacao_invalida", "tipo_invalido", "termo_muito_longo" -> "Bad Request";
             case "firebase_disabled" -> "Service Unavailable";
             case "invalid_transport", "invalid_recovery_code", "invalid_reset_token" -> "Bad Request";
             default -> "Error";
