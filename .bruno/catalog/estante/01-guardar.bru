@@ -1,0 +1,36 @@
+meta {
+  name: E01 - Guardar na Estante
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/estante/produtos
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "produtoIds": [{{produtoId}}]
+  }
+}
+
+tests {
+  test("informa o resultado de cada produto", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(["adicionado", "ja_na_estante", "nao_encontrado"]).to.include(res.getBody().itens[0].status);
+  });
+}
+
+docs {
+  "Guardar" e "Guardar todos": aceita até 50 ids. Cria a estante padrão no primeiro uso.
+  Cada item volta com `adicionado`, `ja_na_estante` ou `nao_encontrado` (inexistente
+  ou oculto no catálogo); o app usa os nomes para o aviso de sucesso ou erro.
+}

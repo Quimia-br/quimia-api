@@ -8,6 +8,8 @@ implementação acrescenta uma pasta.
    Os tokens ficam em `accessToken` e `empresaAccessToken`.
 3. `produtos/` (app, token de usuário): listar com busca, detalhe e busca por
    código de barras. Ajuste `termo` e `codBarras` no ambiente para produtos do seu banco.
+4. `estante/` (app, token de usuário): guardar o `produtoId` obtido em `produtos/`,
+   listar a estante e remover.
 
 Para validar contra um banco descartável com o schema real, use
 `scripts/local-validation/smoke.sh`, que faz as mesmas chamadas por `curl`.

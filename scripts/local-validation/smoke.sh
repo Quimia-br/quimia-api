@@ -116,9 +116,8 @@ smoke_catalog() {
   expect 400 "tipo fora do CHECK" '"tipo_invalido"'
   call POST /produtos/busca-por-codigo-barras '{"codBarras":"0789200000002"}' "$USER_TOKEN"
   expect 200 "código EAN-13 encontra produto gravado como UPC-A" '"nome":"Água Sanitária Smoke"'
-  local produto_id
-  produto_id="$(json_number id)"
-  call GET "/produtos/$produto_id" "" "$USER_TOKEN"
+  AGUA_ID="$(json_number id)"
+  call GET "/produtos/$AGUA_ID" "" "$USER_TOKEN"
   expect 200 "detalhe traz a logo da marca" '"logoUrl":"https://cdn.test/smoke.png"'
   call POST /produtos/busca-por-codigo-barras '{"codBarras":"7892000000004"}' "$USER_TOKEN"
   expect 404 "código de produto oculto" '"produto_nao_encontrado"'
@@ -126,10 +125,31 @@ smoke_catalog() {
   expect 403 "token de empresa no catálogo do app"
 }
 
+smoke_estante() {
+  log "Etapa 2: estante do usuário"
+  call POST /produtos/busca-por-codigo-barras '{"codBarras":"7892000000001"}' "$USER_TOKEN"
+  local vidros_id oculto_id
+  vidros_id="$(json_number id)"
+  oculto_id="$("$PG_BIN/psql" -h localhost -p "$PG_PORT" -U postgres -d "$PG_DB" -tA     -c "SELECT id FROM produto WHERE cod_barras = '7892000000004'")"
+  call POST /estante/produtos "{\"produtoIds\":[$vidros_id,$AGUA_ID,$oculto_id,999999]}" "$USER_TOKEN"
+  expect 200 "guardar em lote informa adicionados" '"status":"adicionado"'
+  expect 200 "guardar em lote informa oculto/inexistente" '"status":"nao_encontrado"'
+  call POST /estante/produtos "{\"produtoIds\":[$vidros_id]}" "$USER_TOKEN"
+  expect 200 "guardar de novo não duplica" '"status":"ja_na_estante"'
+  call GET /estante/produtos "" "$USER_TOKEN"
+  expect 200 "estante lista os dois produtos guardados" '"totalItens":2'
+  call DELETE "/estante/produtos/$vidros_id" "" "$USER_TOKEN"
+  expect 204 "remover da estante"
+  call GET /estante/produtos "" "$USER_TOKEN"
+  expect 200 "estante sem o produto removido" '"totalItens":1'
+  call GET /estante/produtos "" "$EMPRESA_TOKEN"
+  expect 403 "token de empresa na estante"
+}
+
 check_database() {
   log "Conferindo o que a API gravou no PostgreSQL"
   "$PG_BIN/psql" -h localhost -p "$PG_PORT" -U postgres -d "$PG_DB" -tA -c \
-    "SELECT '  usuarios: ' || (SELECT count(*) FROM usuario) || ' | empresas: ' || (SELECT count(*) FROM empresa) || ' | senha com {bcrypt}: ' || (SELECT count(*) FROM usuario WHERE senha LIKE '{bcrypt}%');"
+    "SELECT '  usuarios: ' || (SELECT count(*) FROM usuario) || ' | empresas: ' || (SELECT count(*) FROM empresa) || ' | senha com {bcrypt}: ' || (SELECT count(*) FROM usuario WHERE senha LIKE '{bcrypt}%') || ' | estantes: ' || (SELECT count(*) FROM estante) || ' | itens na estante: ' || (SELECT count(*) FROM estante_produto);"
 }
 
 use_jdk21
@@ -139,6 +159,7 @@ apply_schema "$SCHEMA_DIR/seed-smoke-catalogo.sql"
 start_api
 smoke_account
 smoke_catalog
+smoke_estante
 check_database
 
 log "Resultado: $CHECKS verificações, $FAILURES falha(s)"
