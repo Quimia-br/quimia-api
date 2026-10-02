@@ -1,0 +1,32 @@
+meta {
+  name: A01 - Register Usuario
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "nome": "Bruno Catalogo",
+    "email": "{{userEmail}}",
+    "senha": "{{userPassword}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar("userEmail", `bruno.catalogo.${Date.now()}@example.com`);
+}
+
+tests {
+  test("cria o usuário", function () { expect(res.getStatus()).to.equal(201); });
+}
