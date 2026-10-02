@@ -5,9 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.api.quimia.TestCatalogo;
 import com.api.quimia.TestJwtKeys;
 import com.api.quimia.TestLogins;
-import java.sql.PreparedStatement;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,29 +45,28 @@ class ProdutoCatalogoWebTest {
 
     @BeforeEach
     void seed() throws Exception {
-        jdbc.update("DELETE FROM empresa_produto");
-        jdbc.update("DELETE FROM produto");
-        jdbc.update("DELETE FROM marca");
+        TestCatalogo catalogo = new TestCatalogo(jdbc);
+        catalogo.limpar();
         jdbc.update("DELETE FROM empresa WHERE email LIKE '%@catalogo.test'");
         jdbc.update("DELETE FROM usuario WHERE email LIKE '%@catalogo.test'");
         usuarioToken = TestLogins.usuario(mvc, "app@catalogo.test");
 
-        int mrMusculo = insert("INSERT INTO marca (nome, logo_url) VALUES (?, ?)", "Mr Músculo", "https://cdn.test/mr.png");
-        int veja = insert("INSERT INTO marca (nome) VALUES (?)", "Veja");
-        int empresaA = insert("INSERT INTO empresa (nome, email, senha, ativo) VALUES (?, ?, 'x', TRUE)", "A", "a@catalogo.test");
-        int empresaB = insert("INSERT INTO empresa (nome, email, senha, ativo) VALUES (?, ?, 'x', TRUE)", "B", "b@catalogo.test");
+        int mrMusculo = catalogo.marca("Mr Músculo", "https://cdn.test/mr.png");
+        int veja = catalogo.marca("Veja", null);
+        int empresaA = catalogo.empresa("A", "a@catalogo.test");
+        int empresaB = catalogo.empresa("B", "b@catalogo.test");
 
-        limpaVidros = produto("Limpa Vidros", mrMusculo, "limpeza_geral", "7891000000001", "Remove gordura e marcas");
-        aguaSanitaria = produto("Água Sanitária", veja, "alvejante", "789100000002", "Alvejante clorado");
-        desinfetante = produto("Desinfetante Pinho", veja, "desinfetante", "0789100000003", "Perfume de pinho");
-        oculto = produto("Limpador Oculto", veja, "limpeza_geral", "7891000000004", "Fora de linha");
-        compartilhado = produto("Multiuso Compartilhado", mrMusculo, "limpeza_geral", "7891000000005", "100% multiuso");
+        limpaVidros = catalogo.produto("Limpa Vidros", mrMusculo, "limpeza_geral", "7891000000001", "Remove gordura e marcas");
+        aguaSanitaria = catalogo.produto("Água Sanitária", veja, "alvejante", "789100000002", "Alvejante clorado");
+        desinfetante = catalogo.produto("Desinfetante Pinho", veja, "desinfetante", "0789100000003", "Perfume de pinho");
+        oculto = catalogo.produto("Limpador Oculto", veja, "limpeza_geral", "7891000000004", "Fora de linha");
+        compartilhado = catalogo.produto("Multiuso Compartilhado", mrMusculo, "limpeza_geral", "7891000000005", "100% multiuso");
 
-        vinculo(empresaA, aguaSanitaria, "TRUE");
-        vinculo(empresaA, desinfetante, "NULL");
-        vinculo(empresaA, oculto, "FALSE");
-        vinculo(empresaA, compartilhado, "FALSE");
-        vinculo(empresaB, compartilhado, "TRUE");
+        catalogo.vinculo(empresaA, aguaSanitaria, "TRUE");
+        catalogo.vinculo(empresaA, desinfetante, "NULL");
+        catalogo.vinculo(empresaA, oculto, "FALSE");
+        catalogo.vinculo(empresaA, compartilhado, "FALSE");
+        catalogo.vinculo(empresaB, compartilhado, "TRUE");
     }
 
     @Test
@@ -172,29 +170,5 @@ class ProdutoCatalogoWebTest {
                 .header("Authorization", "Bearer " + usuarioToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"codBarras\":\"" + codBarras + "\"}"));
-    }
-
-    private int produto(String nome, int marca, String tipo, String codBarras, String descricao) {
-        return insert(
-                "INSERT INTO produto (nome, id_marca, tipo_produto, cod_barras, descricao) VALUES (?, ?, ?, ?, ?)",
-                nome, marca, tipo, codBarras, descricao);
-    }
-
-    /** `ativo` é SQL literal (TRUE, FALSE ou NULL) para exercitar o NULL do schema. */
-    private void vinculo(int empresa, int produto, String ativo) {
-        jdbc.update("INSERT INTO empresa_produto (id_empresa, id_produto, ativo) VALUES (?, ?, " + ativo + ")",
-                empresa, produto);
-    }
-
-    private int insert(String sql, Object... args) {
-        GeneratedKeyHolder keys = new GeneratedKeyHolder();
-        jdbc.update(connection -> {
-            PreparedStatement statement = connection.prepareStatement(sql, new String[] {"id"});
-            for (int i = 0; i < args.length; i++) {
-                statement.setObject(i + 1, args[i]);
-            }
-            return statement;
-        }, keys);
-        return keys.getKeyAs(Number.class).intValue();
     }
 }
