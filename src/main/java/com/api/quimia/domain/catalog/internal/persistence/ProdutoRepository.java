@@ -21,16 +21,20 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
                         where ea.produtoId = p.id and (ea.ativo is null or ea.ativo = true)))
             """;
 
-    String FILTROS = """
-            and (:termo is null
-                 or lower(unaccent(p.nome)) like :termo escape '!'
-                 or lower(unaccent(p.descricao)) like :termo escape '!')
-            and (:tipo is null or p.tipo = :tipo)
-            and (:codBarras is null or p.codBarras = :codBarras)
+    /** O termo chega pronto de {@code TermoBusca.like}. */
+    String FILTRO_TERMO = """
+             and (:termo is null
+                  or lower(unaccent(p.nome)) like :termo escape '!'
+                  or lower(unaccent(p.descricao)) like :termo escape '!')
             """;
 
-    @Query(value = "select p from Produto p join fetch p.marca where " + VISIVEL + FILTROS,
-            countQuery = "select count(p) from Produto p where " + VISIVEL + FILTROS)
+    String FILTROS_CATALOGO = FILTRO_TERMO + """
+             and (:tipo is null or p.tipo = :tipo)
+             and (:codBarras is null or p.codBarras = :codBarras)
+            """;
+
+    @Query(value = "select p from Produto p join fetch p.marca where " + VISIVEL + FILTROS_CATALOGO,
+            countQuery = "select count(p) from Produto p where " + VISIVEL + FILTROS_CATALOGO)
     Page<Produto> buscarVisiveis(
             @Param("termo") String termoLike,
             @Param("tipo") String tipo,
@@ -42,4 +46,12 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
 
     @Query("select p from Produto p join fetch p.marca where p.codBarras in :codigos and " + VISIVEL)
     List<Produto> findVisiveisPorCodigos(@Param("codigos") Collection<String> codigos);
+
+    @Query("select p from Produto p join fetch p.marca where p.id in :ids and " + VISIVEL)
+    List<Produto> findVisiveisPorIds(@Param("ids") Collection<Integer> ids);
+
+    @Query(value = "select p from Produto p join fetch p.marca where p.id in :ids" + FILTRO_TERMO,
+            countQuery = "select count(p) from Produto p where p.id in :ids" + FILTRO_TERMO)
+    Page<Produto> buscarPorIds(
+            @Param("ids") Collection<Integer> ids, @Param("termo") String termoLike, Pageable pageable);
 }

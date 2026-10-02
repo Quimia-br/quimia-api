@@ -6,7 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.api.quimia.TestJwtKeys;
-import com.jayway.jsonpath.JsonPath;
+import com.api.quimia.TestLogins;
 import java.sql.PreparedStatement;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +51,7 @@ class ProdutoCatalogoWebTest {
         jdbc.update("DELETE FROM marca");
         jdbc.update("DELETE FROM empresa WHERE email LIKE '%@catalogo.test'");
         jdbc.update("DELETE FROM usuario WHERE email LIKE '%@catalogo.test'");
-        usuarioToken = loginUsuario();
+        usuarioToken = TestLogins.usuario(mvc, "app@catalogo.test");
 
         int mrMusculo = insert("INSERT INTO marca (nome, logo_url) VALUES (?, ?)", "Mr Músculo", "https://cdn.test/mr.png");
         int veja = insert("INSERT INTO marca (nome) VALUES (?)", "Veja");
@@ -150,7 +150,7 @@ class ProdutoCatalogoWebTest {
     @Test
     void exigeTokenDeUsuario() throws Exception {
         mvc.perform(get("/api/v1/produtos")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/v1/produtos").header("Authorization", "Bearer " + loginEmpresa()))
+        mvc.perform(get("/api/v1/produtos").header("Authorization", "Bearer " + TestLogins.empresa(mvc, "portal@catalogo.test", "11.444.777/0001-61")))
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/produtos/busca-por-codigo-barras")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -196,28 +196,5 @@ class ProdutoCatalogoWebTest {
             return statement;
         }, keys);
         return keys.getKeyAs(Number.class).intValue();
-    }
-
-    /** Token obtido pelo fluxo real de cadastro e login do app. */
-    private String loginUsuario() throws Exception {
-        String body = "{\"email\":\"app@catalogo.test\",\"senha\":\"SenhaCatalogo1\"}";
-        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nome\":\"App\",\"email\":\"app@catalogo.test\",\"senha\":\"SenhaCatalogo1\"}"))
-                .andExpect(status().isCreated());
-        return accessToken(mvc.perform(post("/api/v1/auth/mobile/login").contentType(MediaType.APPLICATION_JSON).content(body)));
-    }
-
-    /** Token de empresa obtido pelo fluxo real do portal (CNPJ exclusivo deste teste). */
-    private String loginEmpresa() throws Exception {
-        mvc.perform(post("/api/v1/empresas/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nome\":\"Portal\",\"cnpj\":\"11.444.777/0001-61\",\"email\":\"portal@catalogo.test\",\"senha\":\"SenhaCatalogo1\"}"))
-                .andExpect(status().isCreated());
-        return accessToken(mvc.perform(post("/api/v1/empresas/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"portal@catalogo.test\",\"senha\":\"SenhaCatalogo1\"}")));
-    }
-
-    private static String accessToken(ResultActions login) throws Exception {
-        String json = login.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        return JsonPath.read(json, "$.accessToken");
     }
 }

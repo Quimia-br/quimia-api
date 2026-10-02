@@ -1,6 +1,7 @@
 package com.api.quimia.domain.catalog.internal.usecase;
 
-import com.api.quimia.domain.catalog.internal.dto.ProdutoResponse;
+import com.api.quimia.domain.catalog.dto.ProdutoView;
+import com.api.quimia.domain.catalog.internal.mapper.ProdutoMapper;
 import com.api.quimia.domain.catalog.internal.model.Produto;
 import com.api.quimia.domain.catalog.internal.persistence.ProdutoRepository;
 import java.util.LinkedHashSet;
@@ -23,9 +24,9 @@ public class ConsultarProdutoUseCase {
     }
 
     @Transactional(readOnly = true)
-    public ProdutoResponse porId(Integer id) {
+    public ProdutoView porId(Integer id) {
         return produtos.findVisivelById(id)
-                .map(ProdutoViews::of)
+                .map(ProdutoMapper::view)
                 .orElseThrow(CatalogException::produtoNaoEncontrado);
     }
 
@@ -34,7 +35,7 @@ public class ConsultarProdutoUseCase {
      * `0` inicial, então a busca tenta as duas formas e prefere o código exato.
      */
     @Transactional(readOnly = true)
-    public ProdutoResponse porCodigoBarras(String codBarras) {
+    public ProdutoView porCodigoBarras(String codBarras) {
         String codigo = codBarras.trim();
         if (!SO_DIGITOS.matcher(codigo).matches()) {
             throw new CatalogException("codigo_barras_invalido", 422);
@@ -44,7 +45,7 @@ public class ConsultarProdutoUseCase {
                 .filter(produto -> codigo.equals(produto.getCodBarras()))
                 .findFirst()
                 .or(() -> encontrados.stream().findFirst())
-                .map(ProdutoViews::of)
+                .map(ProdutoMapper::view)
                 .orElseThrow(CatalogException::produtoNaoEncontrado);
     }
 

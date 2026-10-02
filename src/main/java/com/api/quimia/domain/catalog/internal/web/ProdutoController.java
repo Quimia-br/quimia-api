@@ -1,8 +1,8 @@
 package com.api.quimia.domain.catalog.internal.web;
 
+import com.api.quimia.domain.catalog.dto.Pagina;
+import com.api.quimia.domain.catalog.dto.ProdutoView;
 import com.api.quimia.domain.catalog.internal.dto.BuscaCodigoBarrasRequest;
-import com.api.quimia.domain.catalog.internal.dto.PaginaResponse;
-import com.api.quimia.domain.catalog.internal.dto.ProdutoResponse;
 import com.api.quimia.domain.catalog.internal.usecase.ConsultarProdutoUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosUseCase;
 import jakarta.validation.Valid;
@@ -27,7 +27,7 @@ public class ProdutoController {
     }
 
     @GetMapping
-    public PaginaResponse<ProdutoResponse> listar(
+    public Pagina<ProdutoView> listar(
             @RequestParam(name = "q", required = false) String termo,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String codBarras,
@@ -37,12 +37,12 @@ public class ProdutoController {
     }
 
     @GetMapping("/{id}")
-    public ProdutoResponse detalhe(@PathVariable Integer id) {
+    public ProdutoView detalhe(@PathVariable Integer id) {
         return consultar.porId(id);
     }
 
     @PostMapping("/busca-por-codigo-barras")
-    public ProdutoResponse buscarPorCodigoBarras(@Valid @RequestBody BuscaCodigoBarrasRequest request) {
+    public ProdutoView buscarPorCodigoBarras(@Valid @RequestBody BuscaCodigoBarrasRequest request) {
         return consultar.porCodigoBarras(request.codBarras());
     }
 }
