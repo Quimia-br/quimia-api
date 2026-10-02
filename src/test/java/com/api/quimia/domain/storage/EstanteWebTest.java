@@ -161,7 +161,7 @@ class EstanteWebTest {
         guardar(tokenA).andExpect(status().isBadRequest());
         guardar(tokenA, IntStream.rangeClosed(1, 51).toArray()).andExpect(status().isBadRequest());
         mvc.perform(get("/api/v1/estante/produtos")).andExpect(status().isUnauthorized());
-        String tokenEmpresa = TestLogins.empresa(mvc, "portal@estante.test", "12.ABC.345/01DE-35");
+        String tokenEmpresa = TestLogins.empresa(mvc, "portal@estante.test", "44.556.677/0001-86");
         mvc.perform(get("/api/v1/estante/produtos").header("Authorization", "Bearer " + tokenEmpresa))
                 .andExpect(status().isForbidden());
     }
