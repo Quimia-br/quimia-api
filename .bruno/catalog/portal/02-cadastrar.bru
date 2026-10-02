@@ -1,0 +1,46 @@
+meta {
+  name: PT02 - Cadastrar Produto
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  nome: Limpa Vidros Portal
+  tipo: limpeza_geral
+  descricao: Cadastrado pelo Bruno
+  codBarras: {{portalCodBarras}}
+}
+
+script:pre-request {
+  bru.setVar("portalCodBarras", `789${Date.now()}`.slice(0, 13));
+}
+
+script:post-response {
+  if (res.getStatus() === 201 || res.getStatus() === 200) {
+    bru.setVar("portalProdutoId", res.getBody().produto.id);
+  }
+}
+
+tests {
+  test("cria (201) ou vincula/reativa (200)", function () {
+    expect([200, 201]).to.include(res.getStatus());
+    expect(["criado", "vinculado", "reativado"]).to.include(res.getBody().situacao);
+  });
+}
+
+docs {
+  multipart/form-data, como o formulário do portal. Não há campo de marca: a API usa o
+  nome da empresa. `tipo` é o código do banco (ex.: `limpeza_geral`). Se o código de
+  barras já existir no catálogo, a empresa é vinculada ao produto existente (`vinculado`).
+}

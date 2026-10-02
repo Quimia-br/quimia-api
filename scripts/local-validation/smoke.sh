@@ -34,6 +34,17 @@ call() {
   BODY="$(cat "$WORK_DIR/body")"
 }
 
+# call_form MÉTODO CAMINHO TOKEN [campo=valor ...]: envia multipart/form-data (como o portal).
+call_form() {
+  local method="$1" path="$2" token="$3"
+  shift 3
+  local args=(-s -o "$WORK_DIR/body" -w '%{http_code}' -X "$method" -H "Authorization: Bearer $token")
+  local field
+  for field in "$@"; do args+=(-F "$field"); done
+  STATUS="$(curl "${args[@]}" "$BASE_URL$path")"
+  BODY="$(cat "$WORK_DIR/body")"
+}
+
 # expect STATUS_ESPERADO DESCRIÇÃO [TRECHO_ESPERADO_NO_CORPO]
 expect() {
   local expected="$1" description="$2" fragment="${3:-}"
@@ -146,10 +157,37 @@ smoke_estante() {
   expect 403 "token de empresa na estante"
 }
 
+smoke_portal() {
+  log "Etapa 3: produtos da empresa no portal (multipart real)"
+  call_form POST /empresas/me/produtos "$EMPRESA_TOKEN" "nome=Produto Portal Smoke" "tipo=limpeza_geral"     "descricao=Cadastrado pelo smoke" "codBarras=7892000000009"
+  expect 201 "cadastro cria produto com a marca da empresa" '"marca":{"id"'
+  local criado_id
+  criado_id="$(json_number id)"
+  expect 201 "situação criado" '"situacao":"criado"'
+  call_form POST /empresas/me/produtos "$EMPRESA_TOKEN" "nome=Repetido" "tipo=outro" "codBarras=7892000000009"
+  expect 409 "mesmo código de novo" '"produto_ja_cadastrado"'
+  call_form POST /empresas/me/produtos "$EMPRESA_TOKEN" "nome=Outro Nome" "tipo=outro" "codBarras=789200000002"
+  expect 200 "código já existente no catálogo só vincula" '"situacao":"vinculado"'
+  call GET /empresas/me/produtos "" "$EMPRESA_TOKEN"
+  expect 200 "lista do portal com os dois produtos" '"totalItens":2'
+  call_form PATCH "/empresas/me/produtos/$criado_id" "$EMPRESA_TOKEN" "nome=Produto Portal Smoke 2"
+  expect 200 "PATCH multipart altera o produto exclusivo" '"nome":"Produto Portal Smoke 2"'
+  call_form PATCH "/empresas/me/produtos/$AGUA_ID" "$EMPRESA_TOKEN" "nome=Invasao"
+  expect 409 "produto compartilhado não pode ser alterado" '"produto_compartilhado"'
+  call DELETE "/empresas/me/produtos/$criado_id" "" "$EMPRESA_TOKEN"
+  expect 204 "deletar desativa o vínculo"
+  call GET /empresas/me/produtos "" "$EMPRESA_TOKEN"
+  expect 200 "produto deletado sai do portal" '"totalItens":1'
+  call GET "/produtos/$criado_id" "" "$USER_TOKEN"
+  expect 404 "produto sem vínculo ativo some do app"
+  call GET /empresas/me/produtos "" "$USER_TOKEN"
+  expect 403 "token de usuário no portal"
+}
+
 check_database() {
   log "Conferindo o que a API gravou no PostgreSQL"
   "$PG_BIN/psql" -h localhost -p "$PG_PORT" -U postgres -d "$PG_DB" -tA -c \
-    "SELECT '  usuarios: ' || (SELECT count(*) FROM usuario) || ' | empresas: ' || (SELECT count(*) FROM empresa) || ' | senha com {bcrypt}: ' || (SELECT count(*) FROM usuario WHERE senha LIKE '{bcrypt}%') || ' | estantes: ' || (SELECT count(*) FROM estante) || ' | itens na estante: ' || (SELECT count(*) FROM estante_produto);"
+    "SELECT '  usuarios: ' || (SELECT count(*) FROM usuario) || ' | empresas: ' || (SELECT count(*) FROM empresa) || ' | senha com {bcrypt}: ' || (SELECT count(*) FROM usuario WHERE senha LIKE '{bcrypt}%') || ' | estantes: ' || (SELECT count(*) FROM estante) || ' | itens na estante: ' || (SELECT count(*) FROM estante_produto) || ' | marcas: ' || (SELECT string_agg(nome, ', ' ORDER BY nome) FROM marca) || ' | vinculos inativos: ' || (SELECT count(*) FROM empresa_produto WHERE ativo = FALSE);"
 }
 
 use_jdk21
@@ -160,6 +198,7 @@ start_api
 smoke_account
 smoke_catalog
 smoke_estante
+smoke_portal
 check_database
 
 log "Resultado: $CHECKS verificações, $FAILURES falha(s)"

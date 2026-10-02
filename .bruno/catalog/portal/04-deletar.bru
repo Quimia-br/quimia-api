@@ -1,0 +1,24 @@
+meta {
+  name: PT04 - Deletar Produto
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos/{{portalProdutoId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("desativa o vínculo", function () { expect(res.getStatus()).to.equal(204); });
+}
+
+docs {
+  Não apaga o produto: só desativa o vínculo da empresa. O produto continua nas estantes
+  dos usuários; some do catálogo do app quando nenhuma empresa ativa estiver vinculada.
+}

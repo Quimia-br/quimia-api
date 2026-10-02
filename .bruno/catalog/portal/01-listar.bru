@@ -1,0 +1,27 @@
+meta {
+  name: PT01 - Produtos Cadastrados
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos?q=&page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("lista os produtos com vínculo ativo da empresa", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("totalItens");
+  });
+}
+
+docs {
+  Mesmos filtros do catálogo (`q`, `tipo`, `codBarras`) e paginação. Grade e tabela do portal usam esta lista.
+}
