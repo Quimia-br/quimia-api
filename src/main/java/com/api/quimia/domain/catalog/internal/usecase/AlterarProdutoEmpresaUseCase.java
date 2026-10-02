@@ -1,0 +1,62 @@
+package com.api.quimia.domain.catalog.internal.usecase;
+
+import com.api.quimia.domain.catalog.dto.ProdutoView;
+import com.api.quimia.domain.catalog.internal.dto.AlteracaoProdutoForm;
+import com.api.quimia.domain.catalog.internal.mapper.ProdutoMapper;
+import com.api.quimia.domain.catalog.internal.model.Produto;
+import com.api.quimia.domain.catalog.internal.persistence.EmpresaProdutoRepository;
+import com.api.quimia.domain.catalog.internal.persistence.ProdutoRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * O produto é compartilhado (estantes e outras empresas), então só pode ser alterado pela empresa
+ * que tem o único vínculo ativo com ele.
+ */
+@Service
+public class AlterarProdutoEmpresaUseCase {
+    private static final int NOME_MINIMO = 2;
+
+    private final EmpresaDoPortal portal;
+    private final ProdutoRepository produtos;
+    private final EmpresaProdutoRepository vinculos;
+
+    public AlterarProdutoEmpresaUseCase(
+            EmpresaDoPortal portal, ProdutoRepository produtos, EmpresaProdutoRepository vinculos) {
+        this.portal = portal;
+        this.produtos = produtos;
+        this.vinculos = vinculos;
+    }
+
+    @Transactional
+    public ProdutoView execute(Integer empresaId, Integer produtoId, AlteracaoProdutoForm form) {
+        portal.exigirAtiva(empresaId);
+        Produto produto = produtos.findDaEmpresa(produtoId, empresaId)
+                .orElseThrow(CatalogException::produtoNaoEncontrado);
+        if (vinculos.contarAtivos(produtoId) > 1) {
+            throw new CatalogException("produto_compartilhado", 409);
+        }
+        String nome = CadastrarProdutoEmpresaUseCase.textoOuNulo(form.nome());
+        if (nome != null) {
+            if (nome.length() < NOME_MINIMO) {
+                throw new CatalogException("nome_invalido", 400);
+            }
+            produto.setNome(nome);
+        }
+        if (CadastrarProdutoEmpresaUseCase.textoOuNulo(form.tipo()) != null) {
+            produto.setTipo(EmpresaDoPortal.tipoValido(form.tipo()));
+        }
+        String descricao = CadastrarProdutoEmpresaUseCase.textoOuNulo(form.descricao());
+        if (descricao != null) {
+            produto.setDescricao(descricao);
+        }
+        String codBarras = CatalogException.codigoBarras(form.codBarras());
+        if (codBarras != null && !codBarras.equals(produto.getCodBarras())) {
+            if (produtos.findByCodBarras(codBarras).isPresent()) {
+                throw new CatalogException("cod_barras_em_uso", 409);
+            }
+            produto.setCodBarras(codBarras);
+        }
+        return ProdutoMapper.view(produto);
+    }
+}

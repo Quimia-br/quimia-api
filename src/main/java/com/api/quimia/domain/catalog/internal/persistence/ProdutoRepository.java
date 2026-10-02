@@ -41,6 +41,26 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
             @Param("codBarras") String codBarras,
             Pageable pageable);
 
+    /** Produtos com vínculo ativo da empresa (portal). */
+    String DA_EMPRESA = """
+            exists (select 1 from EmpresaProduto ve
+                    where ve.produtoId = p.id and ve.empresaId = :empresa and (ve.ativo is null or ve.ativo = true))
+            """;
+
+    @Query(value = "select p from Produto p join fetch p.marca where " + DA_EMPRESA + FILTROS_CATALOGO,
+            countQuery = "select count(p) from Produto p where " + DA_EMPRESA + FILTROS_CATALOGO)
+    Page<Produto> buscarDaEmpresa(
+            @Param("empresa") Integer empresaId,
+            @Param("termo") String termoLike,
+            @Param("tipo") String tipo,
+            @Param("codBarras") String codBarras,
+            Pageable pageable);
+
+    @Query("select p from Produto p join fetch p.marca where p.id = :id and " + DA_EMPRESA)
+    Optional<Produto> findDaEmpresa(@Param("id") Integer id, @Param("empresa") Integer empresaId);
+
+    Optional<Produto> findByCodBarras(String codBarras);
+
     @Query("select p from Produto p join fetch p.marca where p.id = :id and " + VISIVEL)
     Optional<Produto> findVisivelById(@Param("id") Integer id);
 

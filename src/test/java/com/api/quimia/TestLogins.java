@@ -24,8 +24,13 @@ public final class TestLogins {
 
     /** O CNPJ precisa ser válido e não usado por outro teste. */
     public static String empresa(MockMvc mvc, String email, String cnpj) throws Exception {
+        return empresa(mvc, "Empresa Teste", email, cnpj);
+    }
+
+    /** O nome da empresa vira o nome da marca dos produtos que ela cadastra. */
+    public static String empresa(MockMvc mvc, String nome, String email, String cnpj) throws Exception {
         mvc.perform(post("/api/v1/empresas/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nome\":\"Empresa Teste\",\"cnpj\":\"" + cnpj + "\",\"email\":\"" + email
+                        .content("{\"nome\":\"" + nome + "\",\"cnpj\":\"" + cnpj + "\",\"email\":\"" + email
                                 + "\",\"senha\":\"" + SENHA + "\"}"))
                 .andExpect(status().isCreated());
         return accessToken(mvc.perform(post("/api/v1/empresas/auth/login").contentType(MediaType.APPLICATION_JSON)

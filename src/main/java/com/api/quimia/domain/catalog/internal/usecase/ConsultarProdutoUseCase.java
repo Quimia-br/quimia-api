@@ -7,13 +7,11 @@ import com.api.quimia.domain.catalog.internal.persistence.ProdutoRepository;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ConsultarProdutoUseCase {
-    private static final Pattern SO_DIGITOS = Pattern.compile("\\d+");
     private static final int UPC_A = 12;
     private static final int EAN_13 = 13;
 
@@ -36,10 +34,7 @@ public class ConsultarProdutoUseCase {
      */
     @Transactional(readOnly = true)
     public ProdutoView porCodigoBarras(String codBarras) {
-        String codigo = codBarras.trim();
-        if (!SO_DIGITOS.matcher(codigo).matches()) {
-            throw new CatalogException("codigo_barras_invalido", 422);
-        }
+        String codigo = CatalogException.codigoBarras(codBarras);
         List<Produto> encontrados = produtos.findVisiveisPorCodigos(variacoes(codigo));
         return encontrados.stream()
                 .filter(produto -> codigo.equals(produto.getCodBarras()))

@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -40,6 +41,12 @@ public class ProblemHandler {
         return detail;
     }
 
+    /** Corrida entre requisições simultâneas que viola um UNIQUE do banco (ex.: mesmo código de barras). */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ProblemDetail conflict(DataIntegrityViolationException error, HttpServletRequest request) {
+        return problem(409, "Conflict", "conflito", request);
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail constraint(ConstraintViolationException error, HttpServletRequest request) {
         return problem(400, "Validation failed", "validation", request);
@@ -56,11 +63,12 @@ public class ProblemHandler {
         return switch (code) {
             case "invalid_credentials", "invalid_refresh", "invalid_token", "invalid_firebase_token" -> "Unauthorized";
             case "blocked", "inactive", "email_not_verified" -> "Forbidden";
-            case "email_in_use", "cnpj_in_use" -> "Conflict";
+            case "email_in_use", "cnpj_in_use", "produto_ja_cadastrado", "produto_compartilhado", "cod_barras_em_uso" -> "Conflict";
+            case "empresa_inativa" -> "Forbidden";
             case "weak_password", "password_too_long", "underage", "invalid_cnpj", "invalid_cep" -> "Unprocessable";
-            case "not_found", "produto_nao_encontrado", "usuario_nao_encontrado" -> "Not Found";
+            case "not_found", "produto_nao_encontrado", "usuario_nao_encontrado", "empresa_nao_encontrada" -> "Not Found";
             case "codigo_barras_invalido" -> "Unprocessable";
-            case "paginacao_invalida", "tipo_invalido", "termo_muito_longo" -> "Bad Request";
+            case "paginacao_invalida", "tipo_invalido", "termo_muito_longo", "nome_invalido" -> "Bad Request";
             case "firebase_disabled" -> "Service Unavailable";
             case "invalid_transport", "invalid_recovery_code", "invalid_reset_token" -> "Bad Request";
             default -> "Error";
