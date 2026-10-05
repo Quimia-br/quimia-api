@@ -2,6 +2,7 @@ package com.api.quimia.infra.web;
 
 import com.api.quimia.domain.account.internal.usecase.AccountException;
 import com.api.quimia.domain.catalog.internal.usecase.CatalogException;
+import com.api.quimia.domain.safety.internal.usecase.SafetyException;
 import com.api.quimia.domain.storage.internal.usecase.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -24,6 +25,11 @@ public class ProblemHandler {
 
     @ExceptionHandler(CatalogException.class)
     ProblemDetail catalog(CatalogException error, HttpServletRequest request) {
+        return problem(error.status(), codeTitle(error.code()), error.code(), request);
+    }
+
+    @ExceptionHandler(SafetyException.class)
+    ProblemDetail safety(SafetyException error, HttpServletRequest request) {
         return problem(error.status(), codeTitle(error.code()), error.code(), request);
     }
 
@@ -73,7 +79,8 @@ public class ProblemHandler {
             case "email_in_use", "cnpj_in_use", "produto_ja_cadastrado", "produto_compartilhado", "cod_barras_em_uso" -> "Conflict";
             case "empresa_inativa" -> "Forbidden";
             case "weak_password", "password_too_long", "underage", "invalid_cnpj", "invalid_cep" -> "Unprocessable";
-            case "not_found", "produto_nao_encontrado", "usuario_nao_encontrado", "empresa_nao_encontrada" -> "Not Found";
+            case "not_found", "produto_nao_encontrado", "usuario_nao_encontrado", "empresa_nao_encontrada",
+                    "produto_nao_esta_na_estante", "substancia_nao_encontrada" -> "Not Found";
             case "codigo_barras_invalido" -> "Unprocessable";
             case "paginacao_invalida", "tipo_invalido", "termo_muito_longo", "nome_invalido" -> "Bad Request";
             case "imagem_invalida" -> "Unsupported Media Type";

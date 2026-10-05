@@ -54,7 +54,8 @@ public class SecurityConfig {
                         "/api/v1/empresas/auth/reset-password",
                         "/actuator/health")
                 .permitAll()
-                .requestMatchers("/api/v1/usuarios/**", "/api/v1/produtos/**", "/api/v1/estante/**")
+                .requestMatchers(
+                        "/api/v1/usuarios/**", "/api/v1/produtos/**", "/api/v1/estante/**", "/api/v1/substancias/**")
                 .hasAuthority(USUARIO_PRINCIPAL)
                 .requestMatchers("/api/v1/empresas/me/**")
                 .hasAuthority(EMPRESA_PRINCIPAL)
