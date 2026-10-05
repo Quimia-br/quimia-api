@@ -20,6 +20,7 @@ body:multipart-form {
   tipo: limpeza_geral
   descricao: Cadastrado pelo Bruno
   codBarras: {{portalCodBarras}}
+  ~imagem: @file(imagem-produto.png)
 }
 
 script:pre-request {
@@ -43,4 +44,6 @@ docs {
   multipart/form-data, como o formulário do portal. Não há campo de marca: a API usa o
   nome da empresa. `tipo` é o código do banco (ex.: `limpeza_geral`). Se o código de
   barras já existir no catálogo, a empresa é vinculada ao produto existente (`vinculado`).
+  `imagem` (JPEG, PNG ou WebP, até 5 MB) é opcional: habilite o campo e coloque um arquivo
+  `imagem-produto.png` nesta pasta. Exige CLOUDINARY_* na API; sem elas responde 503.
 }

@@ -184,6 +184,29 @@ smoke_portal() {
   expect 403 "token de usuário no portal"
 }
 
+smoke_imagem() {
+  log "Etapa 4: imagem do produto (arquivo real pelo parser multipart do Tomcat)"
+  local png="$WORK_DIR/smoke.png" texto="$WORK_DIR/smoke.txt" grande="$WORK_DIR/smoke-grande.png"
+  printf '\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\0' > "$png"
+  printf 'isto não é uma imagem, mesmo com extensão png' > "$texto"
+  { printf '\x89PNG\r\n\x1a\n\0\0\0\rIHDR'; head -c 5500000 /dev/zero; } > "$grande"
+
+  call_form POST /empresas/me/produtos "$EMPRESA_TOKEN" "nome=Sem Imagem" "tipo=outro" "codBarras=7892000000108"
+  expect 201 "cadastro sem imagem continua funcionando"
+  call_form POST /empresas/me/produtos "$EMPRESA_TOKEN" "nome=Texto Png" "tipo=outro" "codBarras=7892000000207" "imagem=@$texto;type=image/png"
+  expect 415 "arquivo que não é imagem é recusado pelo conteúdo" '"imagem_invalida"'
+  call_form POST /empresas/me/produtos "$EMPRESA_TOKEN" "nome=Grande" "tipo=outro" "codBarras=7892000000306" "imagem=@$grande;type=image/png"
+  expect 413 "imagem acima de 5 MB é recusada" '"imagem_muito_grande"'
+  call_form POST /empresas/me/produtos "$EMPRESA_TOKEN" "nome=Com Png" "tipo=outro" "codBarras=7892000000405" "imagem=@$png;type=image/png"
+  if [[ -n "${CLOUDINARY_API_SECRET:-}" ]]; then
+    expect 201 "imagem válida vai ao Cloudinary de teste" '"fotoUrl":"https://res.cloudinary.com/'
+  else
+    expect 503 "sem CLOUDINARY_* a imagem é recusada com 503" '"armazenamento_imagem_indisponivel"'
+    call GET "/empresas/me/produtos?codBarras=7892000000405" "" "$EMPRESA_TOKEN"
+    expect 200 "nada foi cadastrado quando a imagem falhou" '"totalItens":0'
+  fi
+}
+
 check_database() {
   log "Conferindo o que a API gravou no PostgreSQL"
   "$PG_BIN/psql" -h localhost -p "$PG_PORT" -U postgres -d "$PG_DB" -tA -c \
@@ -199,6 +222,7 @@ smoke_account
 smoke_catalog
 smoke_estante
 smoke_portal
+smoke_imagem
 check_database
 
 log "Resultado: $CHECKS verificações, $FAILURES falha(s)"

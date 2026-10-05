@@ -10,7 +10,7 @@ implementação acrescenta uma pasta.
    código de barras. Ajuste `termo` e `codBarras` no ambiente para produtos do seu banco.
 4. `estante/` (app, token de usuário): guardar o `produtoId` obtido em `produtos/`,
    listar a estante e remover.
-5. `portal/` (portal, token de empresa): listar, cadastrar (multipart), alterar e
+5. `portal/` (portal, token de empresa): listar, cadastrar (multipart, com `imagem` opcional), alterar e
    deletar. O cadastro gera um código de barras novo a cada execução.
 
 Para validar contra um banco descartável com o schema real, use

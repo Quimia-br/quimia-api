@@ -17,6 +17,7 @@ headers {
 
 body:multipart-form {
   nome: Limpa Vidros Portal Alterado
+  ~imagem: @file(imagem-produto.png)
 }
 
 tests {
@@ -27,5 +28,5 @@ tests {
 
 docs {
   Campos ausentes mantêm o valor. Só altera se a empresa for a única com vínculo ativo
-  (senão 409 `produto_compartilhado`).
+  (senão 409 `produto_compartilhado`). Com `imagem`, troca a foto e apaga a anterior do Cloudinary.
 }
