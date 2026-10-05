@@ -13,6 +13,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class ProblemHandler {
@@ -47,6 +48,12 @@ public class ProblemHandler {
         return problem(409, "Conflict", "conflito", request);
     }
 
+    /** Imagem acima do limite do multipart (spring.servlet.multipart), recusada antes de chegar ao controller. */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ProblemDetail uploadGrande(MaxUploadSizeExceededException error, HttpServletRequest request) {
+        return problem(413, "Payload Too Large", "imagem_muito_grande", request);
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail constraint(ConstraintViolationException error, HttpServletRequest request) {
         return problem(400, "Validation failed", "validation", request);
@@ -69,6 +76,10 @@ public class ProblemHandler {
             case "not_found", "produto_nao_encontrado", "usuario_nao_encontrado", "empresa_nao_encontrada" -> "Not Found";
             case "codigo_barras_invalido" -> "Unprocessable";
             case "paginacao_invalida", "tipo_invalido", "termo_muito_longo", "nome_invalido" -> "Bad Request";
+            case "imagem_invalida" -> "Unsupported Media Type";
+            case "imagem_muito_grande" -> "Payload Too Large";
+            case "armazenamento_imagem_falhou" -> "Bad Gateway";
+            case "armazenamento_imagem_indisponivel" -> "Service Unavailable";
             case "firebase_disabled" -> "Service Unavailable";
             case "invalid_transport", "invalid_recovery_code", "invalid_reset_token" -> "Bad Request";
             default -> "Error";

@@ -203,7 +203,7 @@ class EmpresaProdutoWebTest {
         ExecutorService pool = Executors.newFixedThreadPool(CADASTROS_SIMULTANEOS);
         List<Callable<Object>> chamadas = new ArrayList<>();
         for (int i = 0; i < CADASTROS_SIMULTANEOS; i++) {
-            CadastroProdutoForm form = new CadastroProdutoForm("Produto " + i, "outro", null, "78950000000" + i);
+            CadastroProdutoForm form = new CadastroProdutoForm("Produto " + i, "outro", null, "78950000000" + i, null);
             chamadas.add(() -> cadastrarProduto.execute(empresaId, form));
         }
         try {

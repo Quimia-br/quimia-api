@@ -20,17 +20,23 @@ public class AlterarProdutoEmpresaUseCase {
     private final EmpresaDoPortal portal;
     private final ProdutoRepository produtos;
     private final EmpresaProdutoRepository vinculos;
+    private final ImagemDoProduto imagens;
 
     public AlterarProdutoEmpresaUseCase(
-            EmpresaDoPortal portal, ProdutoRepository produtos, EmpresaProdutoRepository vinculos) {
+            EmpresaDoPortal portal,
+            ProdutoRepository produtos,
+            EmpresaProdutoRepository vinculos,
+            ImagemDoProduto imagens) {
         this.portal = portal;
         this.produtos = produtos;
         this.vinculos = vinculos;
+        this.imagens = imagens;
     }
 
     @Transactional
     public ProdutoView execute(Integer empresaId, Integer produtoId, AlteracaoProdutoForm form) {
         portal.exigirAtiva(empresaId);
+        byte[] imagem = imagens.ler(form.imagem());
         Produto produto = produtos.findDaEmpresa(produtoId, empresaId)
                 .orElseThrow(CatalogException::produtoNaoEncontrado);
         if (vinculos.contarAtivos(produtoId) > 1) {
@@ -56,6 +62,9 @@ public class AlterarProdutoEmpresaUseCase {
                 throw new CatalogException("cod_barras_em_uso", 409);
             }
             produto.setCodBarras(codBarras);
+        }
+        if (imagem != null) {
+            produto.setFotoUrl(imagens.enviar(imagem, produto.getFotoUrl()));
         }
         return ProdutoMapper.view(produto);
     }

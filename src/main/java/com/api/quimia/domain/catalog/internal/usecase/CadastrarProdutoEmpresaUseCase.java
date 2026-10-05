@@ -29,16 +29,19 @@ public class CadastrarProdutoEmpresaUseCase {
     private final ProdutoRepository produtos;
     private final MarcaRepository marcas;
     private final EmpresaProdutoRepository vinculos;
+    private final ImagemDoProduto imagens;
 
     public CadastrarProdutoEmpresaUseCase(
             EmpresaDoPortal portal,
             ProdutoRepository produtos,
             MarcaRepository marcas,
-            EmpresaProdutoRepository vinculos) {
+            EmpresaProdutoRepository vinculos,
+            ImagemDoProduto imagens) {
         this.portal = portal;
         this.produtos = produtos;
         this.marcas = marcas;
         this.vinculos = vinculos;
+        this.imagens = imagens;
     }
 
     @Transactional
@@ -46,6 +49,7 @@ public class CadastrarProdutoEmpresaUseCase {
         EmpresaView empresa = portal.exigirAtiva(empresaId);
         String tipo = EmpresaDoPortal.tipoValido(form.tipo());
         String codBarras = CatalogException.codigoBarras(form.codBarras());
+        byte[] imagem = imagens.ler(form.imagem());
         if (codBarras != null) {
             Optional<Produto> existente = produtos.findByCodBarras(codBarras);
             if (existente.isPresent()) {
@@ -58,6 +62,9 @@ public class CadastrarProdutoEmpresaUseCase {
         produto.setDescricao(textoOuNulo(form.descricao()));
         produto.setCodBarras(codBarras);
         produto.setMarca(marcaDa(empresa));
+        if (imagem != null) {
+            produto.setFotoUrl(imagens.enviar(imagem, null));
+        }
         produtos.save(produto);
         vinculos.save(novoVinculo(empresaId, produto.getId()));
         return new CadastroProdutoResponse(ProdutoMapper.view(produto), CRIADO);
