@@ -1,0 +1,27 @@
+meta {
+  name: S03 - Substâncias da Estante
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/estante/substancias
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("agrupa por substância", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("itens");
+  });
+}
+
+docs {
+  Cada substância presente nos produtos da estante, com os produtos do usuário em que aparece.
+}

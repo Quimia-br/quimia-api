@@ -1,0 +1,35 @@
+meta {
+  name: S02 - Substâncias do Produto
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produtos/{{produtoId}}/substancias
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+script:post-response {
+  const itens = res.getBody();
+  if (res.getStatus() === 200 && itens.length > 0) {
+    bru.setVar("substanciaId", itens[0].substanciaId);
+  }
+}
+
+tests {
+  test("lista a composição do produto", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.be.an("array");
+  });
+}
+
+docs {
+  Composição da FDS ativa mais recente: substância, CAS, concentração, unidade e classes.
+  Composto que o parser não resolveu não aparece. 404 se o produto não está visível no app.
+}

@@ -12,6 +12,8 @@ implementação acrescenta uma pasta.
    listar a estante e remover.
 5. `portal/` (portal, token de empresa): listar, cadastrar (multipart, com `imagem` opcional), alterar e
    deletar. O cadastro gera um código de barras novo a cada execução.
+6. `safety/` (app, token de usuário): resumo do rótulo (produto na estante), composição do produto,
+   substâncias da estante e detalhe da substância. Todos são GET; os dados vêm do banco.
 
 Para validar contra um banco descartável com o schema real, use
 `scripts/local-validation/smoke.sh`, que faz as mesmas chamadas por `curl`.

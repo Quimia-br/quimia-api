@@ -207,6 +207,29 @@ smoke_imagem() {
   fi
 }
 
+smoke_seguranca() {
+  log "Etapa 5: resumo do rótulo e substâncias (FDS do seed processada pelo trigger do banco)"
+  local vidros_id
+  vidros_id="$("$PG_BIN/psql" -h localhost -p "$PG_PORT" -U postgres -d "$PG_DB" -tA -c "SELECT id FROM produto WHERE cod_barras = '7892000000001'")"
+  call GET "/estante/produtos/$AGUA_ID/resumo-simplificado" "" "$USER_TOKEN"
+  expect 200 "resumo simplificado vem do banco" '"resumo":"Não misture com ácidos nem amônia."'
+  call GET "/estante/produtos/$vidros_id/resumo-simplificado" "" "$USER_TOKEN"
+  expect 404 "produto removido da estante não tem resumo" '"produto_nao_esta_na_estante"'
+  call GET "/produtos/$AGUA_ID/substancias" "" "$USER_TOKEN"
+  expect 200 "composição resolvida por CAS" '"nome":"Hipoclorito de sódio"'
+  expect 200 "composição resolvida por sinônimo" '"nome":"Hidróxido de sódio"'
+  local soda_id
+  soda_id="$(json_number substanciaId)"
+  call GET "/substancias/$soda_id" "" "$USER_TOKEN"
+  expect 200 "detalhe da substância com sinônimo e classe" '"sinonimos":["Soda cáustica"]'
+  call GET /estante/substancias "" "$USER_TOKEN"
+  expect 200 "substâncias da estante trazem o produto" '"nome":"Água Sanitária Smoke"'
+  call GET /substancias/999999 "" "$USER_TOKEN"
+  expect 404 "substância inexistente" '"substancia_nao_encontrada"'
+  call GET /estante/substancias "" "$EMPRESA_TOKEN"
+  expect 403 "token de empresa nas substâncias"
+}
+
 check_database() {
   log "Conferindo o que a API gravou no PostgreSQL"
   "$PG_BIN/psql" -h localhost -p "$PG_PORT" -U postgres -d "$PG_DB" -tA -c \
@@ -223,6 +246,7 @@ smoke_catalog
 smoke_estante
 smoke_portal
 smoke_imagem
+smoke_seguranca
 check_database
 
 log "Resultado: $CHECKS verificações, $FAILURES falha(s)"
