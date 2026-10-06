@@ -1,0 +1,36 @@
+meta {
+  name: 03 - Buscar por código de barras
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/produtos/busca-por-codigo-barras
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "codBarras": "{{codBarras}}"
+  }
+}
+
+tests {
+  test("encontra o produto pelo código", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("id");
+  });
+}
+
+docs {
+  Recebe o código lido no rótulo e devolve o produto. UPC-A (12) e EAN-13 (13, com zero à esquerda) valem como o mesmo código.
+  Antes: 01 (preenche `codBarras`).
+  Respostas: 200, 404 produto_nao_encontrado, 422 codigo_barras_invalido.
+}

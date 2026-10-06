@@ -1,0 +1,51 @@
+meta {
+  name: 03 - Cadastrar produto com imagem
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  nome: Limpa Vidros Com Foto
+  tipo: limpeza_geral
+  descricao: Cadastrado pelo Bruno com imagem
+  codBarras: {{portalCodBarras}}
+  imagem: @file(fixtures/imagem-produto.png)
+}
+
+script:pre-request {
+  bru.setVar("portalCodBarras", `789${Date.now()}`.slice(0, 13));
+}
+
+script:post-response {
+  if (res.getStatus() === 201 || res.getStatus() === 200) {
+    const produto = res.getBody().produto;
+    bru.setVar("portalProdutoId", produto.id);
+    bru.setVar("produtoId", produto.id);
+    if (produto.codBarras) { bru.setVar("codBarras", produto.codBarras); }
+  }
+}
+
+tests {
+  test("cria com a URL da imagem (exige Cloudinary configurado)", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().produto.fotoUrl).to.be.a("string").and.not.be.empty;
+  });
+}
+
+docs {
+  Igual ao 02, enviando `fixtures/imagem-produto.png` (JPEG, PNG ou WebP, até 5 MB). A API envia ao Cloudinary e grava a URL em `fotoUrl`.
+  Exige `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` e `CLOUDINARY_API_SECRET` na API; sem elas responde 503.
+  Antes: `00 / 04`.
+  Respostas: 201, 413 imagem_muito_grande, 415 imagem_invalida, 502 armazenamento_imagem_falhou, 503 armazenamento_imagem_indisponivel.
+}

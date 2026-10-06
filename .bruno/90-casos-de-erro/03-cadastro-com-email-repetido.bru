@@ -1,0 +1,36 @@
+meta {
+  name: 03 - Cadastro com email repetido
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "nome": "{{userName}}",
+    "email": "{{userEmail}}",
+    "senha": "{{userPassword}}"
+  }
+}
+
+tests {
+  test("409 email_in_use", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().detail).to.equal("email_in_use");
+  });
+}
+
+docs {
+  Lacuna conhecida: o 409 revela que o email existe. Antes: `00 / 01`.
+  Respostas: ver o teste da requisição.
+}

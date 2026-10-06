@@ -1,0 +1,26 @@
+meta {
+  name: 03 - Remover da estante
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/estante/produtos/{{produtoId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("remove (idempotente)", function () { expect(res.getStatus()).to.equal(204); });
+}
+
+docs {
+  Remove o produto da estante. Remover o que não está lá também responde 204.
+  Antes: 01.
+  Respostas: 204.
+}

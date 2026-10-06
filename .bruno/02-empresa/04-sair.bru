@@ -1,0 +1,30 @@
+meta {
+  name: 04 - Sair
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/logout
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: quimia_rt={{empresaRefreshToken}}; quimia_csrf={{csrfToken}}
+  X-CSRF-Token: {{csrfToken}}
+}
+
+tests {
+  test("limpa os cookies", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(String(res.getHeader("set-cookie"))).to.contain("Max-Age=0");
+  });
+}
+
+docs {
+  Limpa os cookies de refresh e CSRF. Depois disso, rode `00 / 04` para entrar de novo.
+  Antes: `00 / 04`.
+  Respostas: 204.
+}

@@ -1,0 +1,25 @@
+meta {
+  name: 07 - Token de usuário no portal
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("403 para o titular errado", function () { expect(res.getStatus()).to.equal(403); });
+}
+
+docs {
+  Antes: `00 / 02`.
+  Respostas: ver o teste da requisição.
+}

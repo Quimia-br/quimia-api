@@ -1,0 +1,38 @@
+meta {
+  name: 01 - Listar produtos
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produtos?page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body.itens && body.itens.length > 0) {
+    bru.setVar("produtoId", body.itens[0].id);
+    if (body.itens[0].codBarras) { bru.setVar("codBarras", body.itens[0].codBarras); }
+  }
+}
+
+tests {
+  test("lista paginada", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("totalItens");
+  });
+}
+
+docs {
+  Catálogo visível no app, ordenado por nome. Guarda `produtoId` e `codBarras` do primeiro item para as próximas requisições.
+  Filtros opcionais na URL: `q` (busca sem acento), `tipo`, `codBarras`, `page`, `size` (1 a 50).
+  Sem produtos? Rode `06 - Portal / 02` para cadastrar um.
+  Respostas: 200, 400 paginacao_invalida/tipo_invalido/termo_muito_longo.
+}

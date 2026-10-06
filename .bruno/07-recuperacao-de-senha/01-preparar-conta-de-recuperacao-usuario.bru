@@ -1,0 +1,34 @@
+meta {
+  name: 01 - Preparar conta de recuperação (usuário)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "nome": "Bruno Recuperação",
+    "email": "{{recoveryEmail}}",
+    "senha": "{{recoveryPassword}}"
+  }
+}
+
+tests {
+  test("cria (201) ou já existia (409)", function () { expect([201, 409]).to.include(res.getStatus()); });
+}
+
+docs {
+  Conta separada para não mexer na senha do usuário principal. Troque `recoveryEmail` no ambiente por um email seu que receba mensagens.
+  Antes: configurar o envio de email na API (`APP_EMAIL_SENDER_MODE=smtp`) e `recoveryEmail` no ambiente.
+  Respostas: 201, 409 email_in_use.
+}

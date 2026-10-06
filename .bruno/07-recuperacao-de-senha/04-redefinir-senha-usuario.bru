@@ -1,0 +1,33 @@
+meta {
+  name: 04 - Redefinir senha (usuário)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/reset-password
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "resetToken": "{{recoveryResetToken}}",
+    "novaSenha": "{{recoveryPassword}}"
+  }
+}
+
+tests {
+  test("redefine a senha", function () { expect(res.getStatus()).to.equal(204); });
+}
+
+docs {
+  Define a nova senha (aqui, a mesma `recoveryPassword`, para o fluxo poder se repetir). Invalida os refresh anteriores e o próprio resetToken.
+  Antes: 03.
+  Respostas: 204, 400 invalid_reset_token, 422 weak_password.
+}

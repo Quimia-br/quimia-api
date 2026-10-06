@@ -1,0 +1,29 @@
+meta {
+  name: 01 - Resumo simplificado do rótulo
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/estante/produtos/{{produtoId}}/resumo-simplificado
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("lê o resumo", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("resumo");
+  });
+}
+
+docs {
+  Texto de `fds.resumo_simplificado` da FDS ativa mais recente. `resumo` nulo quando não há FDS ou texto.
+  Antes: `04 - Estante / 01` (o produto precisa estar na estante).
+  Respostas: 200, 404 produto_nao_esta_na_estante.
+}

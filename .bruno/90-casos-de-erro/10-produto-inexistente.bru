@@ -1,0 +1,28 @@
+meta {
+  name: 10 - Produto inexistente
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produtos/999999
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("404 produto_nao_encontrado", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().detail).to.equal("produto_nao_encontrado");
+  });
+}
+
+docs {
+  Antes: `00 / 02`.
+  Respostas: ver o teste da requisição.
+}

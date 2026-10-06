@@ -1,0 +1,41 @@
+meta {
+  name: 02 - Pedir código (usuário)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/forgot-password
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{recoveryEmail}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 202 && body && body.challengeToken) { bru.setVar("challengeToken", body.challengeToken); }
+}
+
+tests {
+  test("devolve o desafio genérico", function () {
+    expect(res.getStatus()).to.equal(202);
+    expect(res.getBody().expiresIn).to.equal(900);
+  });
+}
+
+docs {
+  Envia um código de 4 dígitos por email (vale 15 min). A resposta é igual exista a conta ou não. Guarda `challengeToken`.
+  Reenvio: mínimo 15 s entre envios e 5 por hora por email.
+  Antes: 01.
+  Respostas: 202, 400.
+}

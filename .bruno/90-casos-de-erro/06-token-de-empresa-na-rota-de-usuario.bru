@@ -1,0 +1,25 @@
+meta {
+  name: 06 - Token de empresa na rota de usuário
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/usuarios/me
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("403 para o titular errado", function () { expect(res.getStatus()).to.equal(403); });
+}
+
+docs {
+  Antes: `00 / 04`.
+  Respostas: ver o teste da requisição.
+}

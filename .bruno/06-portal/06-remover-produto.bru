@@ -1,0 +1,26 @@
+meta {
+  name: 06 - Remover produto
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos/{{portalProdutoId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("desativa o vínculo", function () { expect(res.getStatus()).to.equal(204); });
+}
+
+docs {
+  Só desativa o vínculo da empresa. O produto continua nas estantes; some do catálogo se nenhuma empresa ativa estiver vinculada. A imagem é mantida.
+  Antes: 02.
+  Respostas: 204, 404 produto_nao_encontrado.
+}

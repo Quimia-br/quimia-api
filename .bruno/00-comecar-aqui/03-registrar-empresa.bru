@@ -1,0 +1,37 @@
+meta {
+  name: 03 - Registrar empresa
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "nome": "{{empresaNome}}",
+    "cnpj": "{{empresaCnpj}}",
+    "email": "{{empresaEmail}}",
+    "senha": "{{empresaPassword}}"
+  }
+}
+
+tests {
+  test("cria a empresa (201) ou já existia (409)", function () {
+    expect([201, 409]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Cria a empresa de teste do portal. Pode repetir: se já existir, responde 409 e segue.
+  Antes: nada.
+  Respostas: 201 criada, 409 email_in_use/cnpj_in_use, 422 invalid_cnpj/weak_password.
+}
