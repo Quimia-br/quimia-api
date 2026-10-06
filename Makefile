@@ -7,6 +7,8 @@
 # texto); as variáveis já definidas no terminal têm precedência sobre ele.
 
 PORT ?= 8080
+# validate (padrão) recusa subir se faltar coluna no banco; none só pula essa checagem, não altera o banco.
+DDL_AUTO ?= validate
 JDK21 ?= C:/Program Files/Java/jdk-21.0.11
 
 empty :=
@@ -17,6 +19,7 @@ export JAVA_HOME := $(JDK21)
 endif
 
 export SERVER_PORT := $(PORT)
+export SPRING_JPA_HIBERNATE_DDL_AUTO := $(DDL_AUTO)
 export SPRING_CONFIG_IMPORT := optional:file:.env[.properties]
 
 # ./mvnw (e não mvnw.cmd): o cmd.exe não lida com o "&" de "Instituto J&F" no caminho do projeto.
@@ -25,7 +28,7 @@ MVN := ./mvnw
 .PHONY: help run run-local build test smoke
 
 help:
-	@echo "make run [PORT=8080]  sobe a API na porta indicada (padrao 8080)"
+	@echo "make run [PORT=8080] [DDL_AUTO=none]  sobe a API (DDL_AUTO=none pula a checagem de colunas)"
 	@echo "make run-local     sobe a API num PostgreSQL descartavel (schema real + dados de exemplo)"
 	@echo "make build            gera o jar sem rodar os testes"
 	@echo "make test             roda os testes e a cobertura (H2)"
