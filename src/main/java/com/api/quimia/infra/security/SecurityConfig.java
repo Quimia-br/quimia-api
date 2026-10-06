@@ -1,5 +1,6 @@
 package com.api.quimia.infra.security;
 
+import jakarta.servlet.DispatcherType;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,11 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable());
         http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         http.cors(cors -> {});
-        http.authorizeHttpRequests(auth -> auth.requestMatchers(
+        // Sem isto, qualquer exceção não tratada (ex.: coluna inexistente no banco) é reencaminhada
+        // para /error, que exigiria token, e o cliente recebe 401 em vez do 500 real.
+        http.authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ERROR)
+                .permitAll()
+                .requestMatchers(
                         "/api/v1/auth/register",
                         "/api/v1/auth/forgot-password",
                         "/api/v1/auth/verify-recovery-code",
