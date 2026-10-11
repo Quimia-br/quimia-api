@@ -45,9 +45,10 @@ public class EstanteController {
     public Pagina<ProdutoView> listar(
             @AuthenticationPrincipal AccountPrincipal principal,
             @RequestParam(name = "q", required = false) String termo,
+            @RequestParam(name = "ordem", required = false) String ordem,
             @RequestParam(name = "page", defaultValue = "0") int pagina,
             @RequestParam(name = "size", defaultValue = "" + ListarEstanteUseCase.TAMANHO_PADRAO) int tamanho) {
-        return listar.execute(principal.usuarioId(), termo, pagina, tamanho);
+        return listar.execute(principal.usuarioId(), termo, ordem, pagina, tamanho);
     }
 
     @DeleteMapping("/{produtoId}")

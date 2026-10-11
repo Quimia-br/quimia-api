@@ -29,8 +29,14 @@ public class ListarSubstanciasDaEstanteUseCase {
         this.catalogo = catalogo;
     }
 
+    private static final int TERMO_MAXIMO = 100;
+
     @Transactional(readOnly = true)
-    public List<SubstanciaDaEstante> execute(UUID usuarioId) {
+    public List<SubstanciaDaEstante> execute(UUID usuarioId, String termo, String ordem) {
+        OrdemDaEstante.validar(ordem);
+        if (termo != null && termo.length() > TERMO_MAXIMO) {
+            throw new StorageException("termo_muito_longo", 400);
+        }
         List<Integer> produtoIds = itens.produtoIds(usuarioId);
         List<SubstanciaNaEstanteView> substancias = seguranca.substanciasDosProdutos(produtoIds);
         if (substancias.isEmpty()) {
@@ -43,10 +49,12 @@ public class ListarSubstanciasDaEstanteUseCase {
                 .stream()
                 .collect(Collectors.toMap(ProdutoView::id, Function.identity()));
         return substancias.stream()
+                .filter(substancia -> TextoBusca.contem(substancia.nome(), termo))
                 .map(substancia -> new SubstanciaDaEstante(
                         substancia.id(),
                         substancia.nome(),
                         substancia.casNumero(),
+                        substancia.descricao(),
                         substancia.classes(),
                         substancia.produtoIds().stream()
                                 .map(produtos::get)

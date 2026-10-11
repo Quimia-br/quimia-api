@@ -9,6 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Segurança química a partir da estante do usuário. Tudo é leitura. */
@@ -31,7 +32,10 @@ public class EstanteSegurancaController {
     }
 
     @GetMapping("/substancias")
-    public SubstanciasDaEstanteResponse substancias(@AuthenticationPrincipal AccountPrincipal principal) {
-        return new SubstanciasDaEstanteResponse(substancias.execute(principal.usuarioId()));
+    public SubstanciasDaEstanteResponse substancias(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @RequestParam(name = "q", required = false) String termo,
+            @RequestParam(name = "ordem", required = false) String ordem) {
+        return new SubstanciasDaEstanteResponse(substancias.execute(principal.usuarioId(), termo, ordem));
     }
 }
