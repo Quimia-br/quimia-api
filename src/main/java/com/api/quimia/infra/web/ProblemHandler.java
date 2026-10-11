@@ -2,6 +2,9 @@ package com.api.quimia.infra.web;
 
 import com.api.quimia.domain.account.internal.usecase.AccountException;
 import com.api.quimia.domain.catalog.internal.usecase.CatalogException;
+import com.api.quimia.domain.insights.internal.usecase.InsightsException;
+import com.api.quimia.domain.partner.internal.usecase.PartnerException;
+import com.api.quimia.domain.recommendation.internal.usecase.RecommendationException;
 import com.api.quimia.domain.safety.internal.usecase.SafetyException;
 import com.api.quimia.domain.storage.internal.usecase.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,6 +54,21 @@ public class ProblemHandler {
 
     @ExceptionHandler(StorageException.class)
     ProblemDetail storage(StorageException error, HttpServletRequest request) {
+        return problem(error.status(), codeTitle(error.code()), error.code(), request);
+    }
+
+    @ExceptionHandler(RecommendationException.class)
+    ProblemDetail recommendation(RecommendationException error, HttpServletRequest request) {
+        return problem(error.status(), codeTitle(error.code()), error.code(), request);
+    }
+
+    @ExceptionHandler(PartnerException.class)
+    ProblemDetail partner(PartnerException error, HttpServletRequest request) {
+        return problem(error.status(), codeTitle(error.code()), error.code(), request);
+    }
+
+    @ExceptionHandler(InsightsException.class)
+    ProblemDetail insights(InsightsException error, HttpServletRequest request) {
         return problem(error.status(), codeTitle(error.code()), error.code(), request);
     }
 
@@ -153,6 +171,18 @@ public class ProblemHandler {
             case "armazenamento_imagem_indisponivel" -> "Service Unavailable";
             case "firebase_disabled" -> "Service Unavailable";
             case "invalid_transport", "invalid_recovery_code", "invalid_reset_token" -> "Bad Request";
+            case "ordem_invalida", "ordenacao_invalida", "imagem_obrigatoria" -> "Bad Request";
+            case "comodo_nao_encontrado", "produto_sem_comodo", "mistura_nao_encontrada" -> "Not Found";
+            case "comodo_ja_existe", "produto_em_outro_comodo" -> "Conflict";
+            case "comodo_produtos_insuficientes", "comodo_produtos_demais", "produto_fora_da_estante",
+                    "produtos_iguais", "estado_invalido", "cep_invalido", "localizacao_necessaria",
+                    "fds_obrigatoria", "fds_invalida" -> "Unprocessable";
+            case "pdf_muito_grande" -> "Payload Too Large";
+            case "pdf_invalido" -> "Unsupported Media Type";
+            case "limite_excedido" -> "Too Many Requests";
+            case "agente_falhou" -> "Bad Gateway";
+            case "agente_indisponivel" -> "Service Unavailable";
+            case "agente_timeout" -> "Gateway Timeout";
             default -> "Error";
         };
     }
