@@ -1,5 +1,6 @@
 package com.api.quimia.infra.security;
 
+import com.api.quimia.infra.web.RespostaProblema;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -8,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -43,7 +45,7 @@ public class CookieCsrfFilter extends OncePerRequestFilter {
         String header = request.getHeader("X-CSRF-Token");
         String cookie = csrfCookie(request);
         if (header == null || cookie == null || !constantTime(header, cookie)) {
-            problem(response, 403, "csrf_required");
+            RespostaProblema.escrever(request, response, HttpStatus.FORBIDDEN, "csrf_required");
             return;
         }
         chain.doFilter(request, response);
@@ -82,13 +84,5 @@ public class CookieCsrfFilter extends OncePerRequestFilter {
             result |= left.charAt(i) ^ right.charAt(i);
         }
         return result == 0;
-    }
-
-    private static void problem(HttpServletResponse response, int status, String code) throws IOException {
-        response.setStatus(status);
-        response.setContentType("application/problem+json");
-        response.getWriter().write("{\"title\":\""
-                + (status == 403 ? "Forbidden" : "Error") + "\",\"status\":" + status
-                + ",\"detail\":\"" + code + "\"}");
     }
 }

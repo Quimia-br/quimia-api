@@ -9,15 +9,19 @@ import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.util.List;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class ProblemHandler {
@@ -55,6 +59,22 @@ public class ProblemHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail conflict(DataIntegrityViolationException error, HttpServletRequest request) {
         return problem(409, "Conflict", "conflito", request);
+    }
+
+    /** Rota que não existe (com token válido; sem token o Spring Security responde 401 antes). */
+    @ExceptionHandler(NoResourceFoundException.class)
+    ProblemDetail rotaNaoEncontrada(NoResourceFoundException error, HttpServletRequest request) {
+        return problem(404, "Not Found", "rota_nao_encontrada", request);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ProblemDetail> metodoNaoPermitido(
+            HttpRequestMethodNotSupportedException error, HttpServletRequest request) {
+        ResponseEntity.BodyBuilder resposta = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        if (error.getSupportedHttpMethods() != null) {
+            resposta.allow(error.getSupportedHttpMethods().toArray(HttpMethod[]::new));
+        }
+        return resposta.body(problem(405, "Method Not Allowed", "metodo_nao_permitido", request));
     }
 
     /** Imagem acima do limite do multipart (spring.servlet.multipart), recusada antes de chegar ao controller. */
