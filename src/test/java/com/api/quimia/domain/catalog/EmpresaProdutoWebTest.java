@@ -1,6 +1,7 @@
 package com.api.quimia.domain.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -259,6 +260,17 @@ class EmpresaProdutoWebTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM marca WHERE nome = 'Omo Brasil'", Integer.class))
                 .isEqualTo(1);
         listar(tokenA, "").andExpect(jsonPath("$.totalItens").value(CADASTROS_SIMULTANEOS));
+    }
+
+    /** O H2 aceita o byte NUL; só o PostgreSQL o recusa (SQLSTATE 22021), então o caso roda só nele. */
+    @Test
+    void nomeComByteNuloEhValorInvalidoENaoConflito() throws Exception {
+        assumeTrue(new TestCatalogo(jdbc).postgres(), "o H2 armazena o byte NUL");
+
+        cadastrar(tokenA, "Produto\0Nulo", "outro", null)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("valor_invalido"));
+        listar(tokenA, "").andExpect(jsonPath("$.totalItens").value(0));
     }
 
     private ResultActions cadastrar(String token, String nome, String tipo, String codBarras) throws Exception {

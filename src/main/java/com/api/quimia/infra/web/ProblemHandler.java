@@ -7,7 +7,9 @@ import com.api.quimia.domain.storage.internal.usecase.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
+import java.sql.SQLException;
 import java.util.List;
+import java.util.Set;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,13 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class ProblemHandler {
+    /**
+     * SQLSTATEs de texto que o banco não consegue representar (22021: byte inválido para a codificação, como o
+     * NUL; 22P05: caractere sem tradução). Vêm do texto enviado pelo cliente. Os demais erros de dado (ex.:
+     * 22001, texto maior que a coluna) podem nascer de valor gerado pela própria API e não mudam de tratamento.
+     */
+    private static final Set<String> SQLSTATES_TEXTO_INVALIDO = Set.of("22021", "22P05");
+
     @ExceptionHandler(AccountException.class)
     ProblemDetail account(AccountException error, HttpServletRequest request) {
         return problem(error.status(), codeTitle(error.code()), error.code(), request);
@@ -55,9 +64,15 @@ public class ProblemHandler {
         return detail;
     }
 
-    /** Corrida entre requisições simultâneas que viola um UNIQUE do banco (ex.: mesmo código de barras). */
+    /**
+     * Corrida entre requisições simultâneas que viola um UNIQUE do banco (ex.: mesmo código de barras) é
+     * conflito. Texto com caractere que o banco não aceita (ex.: byte NUL) é erro de entrada, não conflito.
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
-    ProblemDetail conflict(DataIntegrityViolationException error, HttpServletRequest request) {
+    ProblemDetail integridade(DataIntegrityViolationException error, HttpServletRequest request) {
+        if (textoRecusadoPeloBanco(error)) {
+            return problem(400, "Bad Request", "valor_invalido", request);
+        }
         return problem(409, "Conflict", "conflito", request);
     }
 
@@ -103,6 +118,15 @@ public class ProblemHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail constraint(ConstraintViolationException error, HttpServletRequest request) {
         return problem(400, "Validation failed", "validation", request);
+    }
+
+    private static boolean textoRecusadoPeloBanco(Throwable error) {
+        for (Throwable causa = error; causa != null; causa = causa.getCause()) {
+            if (causa instanceof SQLException sql && SQLSTATES_TEXTO_INVALIDO.contains(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ProblemDetail problem(int status, String title, String code, HttpServletRequest request) {
