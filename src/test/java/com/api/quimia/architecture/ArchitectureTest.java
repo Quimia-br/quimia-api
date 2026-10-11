@@ -24,15 +24,18 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 class ArchitectureTest {
 
     // ------------------------------------------------------------------
-    // 1) `internal/` e privado: nenhum codigo fora de `..internal..` pode
+    // 1) `internal/` e privado: nenhum codigo de um modulo de `domain` pode
     //    depender de classes em `..internal..` de OUTRO modulo. Importacoes
-    //    dentro do mesmo modulo continuam permitidas.
+    //    dentro do mesmo modulo continuam permitidas. Codigo fora de `domain`
+    //    (ex.: `infra.web.ProblemHandler`) fica isento.
+    //    A regra usa `classes().should(...)`: com `noClasses()` a condicao
+    //    ficava invertida e a regra nunca falhava (provado em 2026-10-11).
     // ------------------------------------------------------------------
     @ArchTest
     static final ArchRule internal_is_private_across_modules =
-            noClasses()
+            classes()
                     .should(new ArchCondition<JavaClass>(
-                            "depend on `..internal..` of another domain module") {
+                            "not depend on `..internal..` of another domain module") {
                         @Override
                         public void check(JavaClass item, ConditionEvents events) {
                             String origin = item.getPackageName();
@@ -47,7 +50,8 @@ class ArchitectureTest {
                                 if (targetModule == null) {
                                     return;
                                 }
-                                if (originModule != null && originModule.equals(targetModule)) {
+                                // Fora de `domain` (infra, Application, helpers de teste) não há módulo de origem.
+                                if (originModule == null || originModule.equals(targetModule)) {
                                     return;
                                 }
                                 events.add(SimpleConditionEvent.violated(
@@ -139,5 +143,16 @@ class ArchitectureTest {
     static final ArchRule layers_inside_a_module_are_acyclic =
             SlicesRuleDefinition.slices()
                     .matching("..domain.(*).internal.(*)..")
+                    .should().beFreeOfCycles();
+
+    // ------------------------------------------------------------------
+    // 8) Modulos de `domain` nao formam ciclo entre si (ex.: `account`
+    //    nao pode depender de `catalog` se `catalog` depende de `account`).
+    //    A comunicacao e por Gateway, DTO e evento publicos.
+    // ------------------------------------------------------------------
+    @ArchTest
+    static final ArchRule domain_modules_are_acyclic =
+            SlicesRuleDefinition.slices()
+                    .matching("com.api.quimia.domain.(*)..")
                     .should().beFreeOfCycles();
 }
