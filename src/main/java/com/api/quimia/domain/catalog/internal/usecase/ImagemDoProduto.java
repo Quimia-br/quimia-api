@@ -15,6 +15,8 @@ import org.springframework.web.multipart.MultipartFile;
  */
 @Component
 public class ImagemDoProduto {
+    /** Pasta das imagens de produto no armazenamento. */
+    static final String PASTA_PRODUTOS = "produtos";
     static final long TAMANHO_MAXIMO = 5L * 1024 * 1024;
     private static final int ASSINATURA_MINIMA = 12;
 
@@ -45,16 +47,16 @@ public class ImagemDoProduto {
     }
 
     /**
-     * Envia a imagem e registra a compensação na transação corrente. `urlAnterior` (pode ser nula)
-     * é apagada só depois do commit.
+     * Envia a imagem para `pasta` e registra a compensação na transação corrente. `urlAnterior` (pode ser nula)
+     * é apagada só depois do commit e só se estiver na mesma `pasta`.
      */
-    public String enviar(byte[] conteudo, String urlAnterior) {
+    public String enviar(byte[] conteudo, String pasta, String urlAnterior) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             throw new IllegalStateException("upload de imagem exige transação ativa");
         }
         String url;
         try {
-            url = storage.upload(conteudo);
+            url = storage.upload(conteudo, pasta);
         } catch (ImageStorageException falha) {
             throw switch (falha.motivo()) {
                 case INDISPONIVEL -> new CatalogException("armazenamento_imagem_indisponivel", 503);
@@ -64,7 +66,7 @@ public class ImagemDoProduto {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCompletion(int status) {
-                storage.delete(status == STATUS_COMMITTED ? urlAnterior : url);
+                storage.delete(status == STATUS_COMMITTED ? urlAnterior : url, pasta);
             }
         });
         return url;

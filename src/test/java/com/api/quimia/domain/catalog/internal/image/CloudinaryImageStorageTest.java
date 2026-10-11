@@ -31,6 +31,8 @@ class CloudinaryImageStorageTest {
     private static final String FIM_LINHA = "\r\n";
     private static final String FIM_CABECALHO = FIM_LINHA + FIM_LINHA;
     private static final String BASE = "https://api.cloudinary.com/v1_1/" + CLOUD;
+    private static final String PRODUTOS = "produtos";
+    private static final String EMPRESA_7 = "empresas/7";
     private static final String URL_DA_CONTA =
             "https://res.cloudinary.com/" + CLOUD + "/image/upload/v1700000000/produtos/abc-123.png";
 
@@ -53,7 +55,7 @@ class CloudinaryImageStorageTest {
                 .andExpect(request -> corpo.set(((MockClientHttpRequest) request).getBodyAsString()))
                 .andRespond(withSuccess("{\"secure_url\":\"" + URL_DA_CONTA + "\"}", MediaType.APPLICATION_JSON));
 
-        String url = storage.upload(new byte[] {1, 2, 3});
+        String url = storage.upload(new byte[] {1, 2, 3}, PRODUTOS);
 
         assertThat(url).isEqualTo(URL_DA_CONTA);
         String publicId = campo(corpo.get(), "public_id");
@@ -69,7 +71,7 @@ class CloudinaryImageStorageTest {
     void falhaDoServicoViraBadGatewaySemVazarDetalhes() {
         servidor.expect(requestTo(BASE + "/image/upload")).andRespond(withServerError());
 
-        assertThatThrownBy(() -> storage.upload(new byte[] {1}))
+        assertThatThrownBy(() -> storage.upload(new byte[] {1}, PRODUTOS))
                 .isInstanceOfSatisfying(ImageStorageException.class, erro -> {
                     assertThat(erro.motivo()).isEqualTo(ImageStorageException.Motivo.FALHOU);
                 });
@@ -79,7 +81,7 @@ class CloudinaryImageStorageTest {
     void respostaSemUrlEhFalha() {
         servidor.expect(requestTo(BASE + "/image/upload")).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> storage.upload(new byte[] {1}))
+        assertThatThrownBy(() -> storage.upload(new byte[] {1}, PRODUTOS))
                 .isInstanceOfSatisfying(ImageStorageException.class, erro -> assertThat(erro.motivo()).isEqualTo(ImageStorageException.Motivo.FALHOU));
     }
 
@@ -90,17 +92,45 @@ class CloudinaryImageStorageTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("produtos/abc-123")))
                 .andRespond(withSuccess("{\"result\":\"ok\"}", MediaType.APPLICATION_JSON));
 
-        storage.delete(URL_DA_CONTA);
+        storage.delete(URL_DA_CONTA, PRODUTOS);
 
         servidor.verify();
     }
 
     @Test
     void naoApagaUrlDeOutraContaForaDaPastaOuNula() {
-        storage.delete(null);
-        storage.delete("https://res.cloudinary.com/outra-conta/image/upload/v1/produtos/abc.png");
-        storage.delete("https://res.cloudinary.com/" + CLOUD + "/image/upload/v1/logos/marca.png");
-        storage.delete("https://exemplo.com/foto.png");
+        storage.delete(null, PRODUTOS);
+        storage.delete("https://res.cloudinary.com/outra-conta/image/upload/v1/produtos/abc.png", PRODUTOS);
+        storage.delete("https://res.cloudinary.com/" + CLOUD + "/image/upload/v1/logos/marca.png", PRODUTOS);
+        storage.delete("https://exemplo.com/foto.png", PRODUTOS);
+
+        servidor.verify();
+    }
+
+    @Test
+    void logoVaiParaAPastaDaEmpresa() {
+        AtomicReference<String> corpo = new AtomicReference<>();
+        servidor.expect(requestTo(BASE + "/image/upload"))
+                .andExpect(request -> corpo.set(((MockClientHttpRequest) request).getBodyAsString()))
+                .andRespond(withSuccess("{\"secure_url\":\"" + URL_DA_CONTA + "\"}", MediaType.APPLICATION_JSON));
+
+        storage.upload(new byte[] {1}, EMPRESA_7);
+
+        assertThat(campo(corpo.get(), "public_id")).matches("empresas/7/[0-9a-f-]{36}");
+    }
+
+    @Test
+    void apagaSoDentroDaPastaPedida() {
+        String logoDaEmpresa7 = "https://res.cloudinary.com/" + CLOUD + "/image/upload/v1/empresas/7/logo-1.png";
+        servidor.expect(requestTo(BASE + "/image/destroy"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("empresas/7/logo-1")))
+                .andRespond(withSuccess("{\"result\":\"ok\"}", MediaType.APPLICATION_JSON));
+
+        storage.delete(URL_DA_CONTA, EMPRESA_7);
+        storage.delete("https://res.cloudinary.com/" + CLOUD + "/image/upload/v1/empresas/70/logo-2.png", EMPRESA_7);
+        storage.delete("https://res.cloudinary.com/" + CLOUD + "/image/upload/v1/empresas/8/logo-3.png", EMPRESA_7);
+        storage.delete(logoDaEmpresa7, PRODUTOS);
+        storage.delete(logoDaEmpresa7, EMPRESA_7);
 
         servidor.verify();
     }
@@ -109,7 +139,7 @@ class CloudinaryImageStorageTest {
     void falhaAoApagarNaoPropagaExcecao() {
         servidor.expect(requestTo(BASE + "/image/destroy")).andRespond(withServerError());
 
-        storage.delete(URL_DA_CONTA);
+        storage.delete(URL_DA_CONTA, PRODUTOS);
 
         servidor.verify();
     }
@@ -118,11 +148,11 @@ class CloudinaryImageStorageTest {
     void semVariaveisOArmazenamentoFicaIndisponivel() {
         ImageStorage desativado = new ImageStorageConfiguration().imageStorage("", "", "");
 
-        assertThatThrownBy(() -> desativado.upload(new byte[] {1}))
+        assertThatThrownBy(() -> desativado.upload(new byte[] {1}, PRODUTOS))
                 .isInstanceOfSatisfying(ImageStorageException.class, erro -> {
                     assertThat(erro.motivo()).isEqualTo(ImageStorageException.Motivo.INDISPONIVEL);
                 });
-        desativado.delete(URL_DA_CONTA);
+        desativado.delete(URL_DA_CONTA, PRODUTOS);
     }
 
     private static String campo(String multipart, String nome) {

@@ -65,7 +65,7 @@ public class AlterarProdutoEmpresaUseCase {
             produto.setCodBarras(codBarras);
         }
         if (imagem != null) {
-            produto.setFotoUrl(imagens.enviar(imagem, produto.getFotoUrl()));
+            produto.setFotoUrl(imagens.enviar(imagem, ImagemDoProduto.PASTA_PRODUTOS, produto.getFotoUrl()));
         }
         return ProdutoMapper.view(produto);
     }

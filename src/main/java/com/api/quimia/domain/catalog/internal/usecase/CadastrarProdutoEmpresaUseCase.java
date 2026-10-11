@@ -70,7 +70,7 @@ public class CadastrarProdutoEmpresaUseCase {
         produto.setCodBarras(codBarras);
         produto.setMarca(marcaDa(empresa));
         if (imagem != null) {
-            produto.setFotoUrl(imagens.enviar(imagem, null));
+            produto.setFotoUrl(imagens.enviar(imagem, ImagemDoProduto.PASTA_PRODUTOS, null));
         }
         produtos.save(produto);
         vinculos.save(novoVinculo(empresaId, produto.getId()));
