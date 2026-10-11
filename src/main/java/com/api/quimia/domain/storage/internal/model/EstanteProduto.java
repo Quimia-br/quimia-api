@@ -29,7 +29,19 @@ public class EstanteProduto {
     @Column(name = "id_estante", nullable = false)
     private Integer estanteId;
 
+    /** Cômodo do produto; um produto pertence a no máximo um cômodo. */
+    @Column(name = "id_comodo")
+    private Integer comodoId;
+
     public Integer getProdutoId() {
         return produtoId;
+    }
+
+    public Integer getComodoId() {
+        return comodoId;
+    }
+
+    public void setComodoId(Integer comodoId) {
+        this.comodoId = comodoId;
     }
 }
