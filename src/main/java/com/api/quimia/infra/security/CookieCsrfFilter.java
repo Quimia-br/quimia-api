@@ -7,13 +7,22 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class CookieCsrfFilter extends OncePerRequestFilter {
-    private static final String REFRESH_PATH = "/api/v1/empresas/auth/refresh";
-    private static final String LOGOUT_PATH = "/api/v1/empresas/auth/logout";
+    /**
+     * Casa pelo caminho decodificado, como o MVC e o Spring Security: variantes como
+     * `/empresas/auth/%72efresh` chegam ao mesmo controller e não podem escapar da checagem.
+     */
+    private static final RequestMatcher PROTECTED_WEB_ENDPOINTS = new OrRequestMatcher(
+            PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/empresas/auth/refresh"),
+            PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/empresas/auth/logout"));
     private final boolean enabled;
     private final String cookieName;
 
@@ -27,7 +36,7 @@ public class CookieCsrfFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        if (!enabled || !isProtectedWebEndpoint(request) || !hasRefreshCookie(request)) {
+        if (!enabled || !PROTECTED_WEB_ENDPOINTS.matches(request) || !hasRefreshCookie(request)) {
             chain.doFilter(request, response);
             return;
         }
@@ -38,13 +47,6 @@ public class CookieCsrfFilter extends OncePerRequestFilter {
             return;
         }
         chain.doFilter(request, response);
-    }
-
-    private static boolean isProtectedWebEndpoint(HttpServletRequest request) {
-        if (!"POST".equalsIgnoreCase(request.getMethod())) {
-            return false;
-        }
-        return REFRESH_PATH.equals(request.getRequestURI()) || LOGOUT_PATH.equals(request.getRequestURI());
     }
 
     private boolean hasRefreshCookie(HttpServletRequest request) {

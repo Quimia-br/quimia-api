@@ -25,7 +25,8 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
     String FILTRO_TERMO = """
              and (:termo is null
                   or lower(unaccent(p.nome)) like :termo escape '!'
-                  or lower(unaccent(p.descricao)) like :termo escape '!')
+                  or lower(unaccent(p.descricao)) like :termo escape '!'
+                  or lower(unaccent(p.marca.nome)) like :termo escape '!')
             """;
 
     String FILTROS_CATALOGO = FILTRO_TERMO + """
@@ -60,6 +61,16 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
     Optional<Produto> findDaEmpresa(@Param("id") Integer id, @Param("empresa") Integer empresaId);
 
     Optional<Produto> findByCodBarras(String codBarras);
+
+    /** Inclui os produtos sem vínculo ativo: o código continua ocupado no catálogo. */
+    List<Produto> findByCodBarrasIn(Collection<String> codigos);
+
+    /**
+     * Serializa, até o fim da transação, quem grava códigos equivalentes: o UNIQUE de `cod_barras`
+     * só barra o código exato, não o par UPC-A/EAN-13.
+     */
+    @Query(value = "select count(*) from (select pg_advisory_xact_lock(:chave)) bloqueio", nativeQuery = true)
+    long bloquearCodigo(@Param("chave") long chave);
 
     @Query("select p from Produto p join fetch p.marca where p.id = :id and " + VISIVEL)
     Optional<Produto> findVisivelById(@Param("id") Integer id);

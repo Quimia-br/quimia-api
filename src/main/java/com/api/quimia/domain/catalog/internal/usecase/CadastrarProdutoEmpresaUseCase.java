@@ -4,6 +4,7 @@ import com.api.quimia.domain.account.dto.EmpresaView;
 import com.api.quimia.domain.catalog.internal.dto.CadastroProdutoForm;
 import com.api.quimia.domain.catalog.internal.dto.CadastroProdutoResponse;
 import com.api.quimia.domain.catalog.internal.mapper.ProdutoMapper;
+import com.api.quimia.domain.catalog.internal.model.CodigoBarras;
 import com.api.quimia.domain.catalog.internal.model.EmpresaProduto;
 import com.api.quimia.domain.catalog.internal.model.Marca;
 import com.api.quimia.domain.catalog.internal.model.Produto;
@@ -11,6 +12,7 @@ import com.api.quimia.domain.catalog.internal.persistence.EmpresaProdutoReposito
 import com.api.quimia.domain.catalog.internal.persistence.MarcaRepository;
 import com.api.quimia.domain.catalog.internal.persistence.ProdutoRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,7 @@ public class CadastrarProdutoEmpresaUseCase {
     public static final String CRIADO = "criado";
     public static final String VINCULADO = "vinculado";
     public static final String REATIVADO = "reativado";
+    static final int NOME_MINIMO = 2;
 
     private final EmpresaDoPortal portal;
     private final ProdutoRepository produtos;
@@ -47,17 +50,21 @@ public class CadastrarProdutoEmpresaUseCase {
     @Transactional
     public CadastroProdutoResponse execute(Integer empresaId, CadastroProdutoForm form) {
         EmpresaView empresa = portal.exigirAtiva(empresaId);
+        String nome = form.nome().trim();
+        if (nome.length() < NOME_MINIMO) {
+            throw new CatalogException("nome_invalido", 400);
+        }
         String tipo = EmpresaDoPortal.tipoValido(form.tipo());
         String codBarras = CatalogException.codigoBarras(form.codBarras());
         byte[] imagem = imagens.ler(form.imagem());
         if (codBarras != null) {
-            Optional<Produto> existente = produtos.findByCodBarras(codBarras);
+            Optional<Produto> existente = equivalente(produtos, codBarras);
             if (existente.isPresent()) {
                 return vincular(empresaId, existente.get());
             }
         }
         Produto produto = new Produto();
-        produto.setNome(form.nome().trim());
+        produto.setNome(nome);
         produto.setTipo(tipo);
         produto.setDescricao(textoOuNulo(form.descricao()));
         produto.setCodBarras(codBarras);
@@ -100,6 +107,20 @@ public class CadastrarProdutoEmpresaUseCase {
         vinculo.setAtivo(true);
         vinculo.setDataCadastro(LocalDateTime.now());
         return vinculo;
+    }
+
+    /**
+     * Produto já cadastrado com o código ou com sua forma equivalente (UPC-A/EAN-13), preferindo o
+     * exato. Bloqueia o código canônico até o fim da transação para que cadastros simultâneos das
+     * duas formas não criem dois produtos.
+     */
+    static Optional<Produto> equivalente(ProdutoRepository produtos, String codBarras) {
+        produtos.bloquearCodigo(CodigoBarras.canonico(codBarras).hashCode());
+        List<Produto> encontrados = produtos.findByCodBarrasIn(CodigoBarras.equivalentes(codBarras));
+        return encontrados.stream()
+                .filter(produto -> codBarras.equals(produto.getCodBarras()))
+                .findFirst()
+                .or(() -> encontrados.stream().findFirst());
     }
 
     static String textoOuNulo(String valor) {

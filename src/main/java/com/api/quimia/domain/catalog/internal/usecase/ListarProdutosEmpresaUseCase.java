@@ -24,7 +24,8 @@ public class ListarProdutosEmpresaUseCase {
     @Transactional(readOnly = true)
     public Pagina<ProdutoView> execute(
             Integer empresaId, String termo, String tipo, String codBarras, int pagina, int tamanho) {
-        if (pagina < 0 || tamanho < 1 || tamanho > ListarProdutosUseCase.TAMANHO_MAXIMO) {
+        if (pagina < 0 || tamanho < 1 || tamanho > ListarProdutosUseCase.TAMANHO_MAXIMO
+                || ListarProdutosUseCase.offsetExcedeLimite(pagina, tamanho)) {
             throw new CatalogException("paginacao_invalida", 400);
         }
         if (termo != null && termo.length() > ListarProdutosUseCase.TERMO_MAXIMO) {

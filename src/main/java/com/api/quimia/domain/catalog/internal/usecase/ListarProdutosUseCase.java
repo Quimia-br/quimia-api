@@ -25,7 +25,7 @@ public class ListarProdutosUseCase {
 
     @Transactional(readOnly = true)
     public Pagina<ProdutoView> execute(String termo, String tipo, String codBarras, int pagina, int tamanho) {
-        if (pagina < 0 || tamanho < 1 || tamanho > TAMANHO_MAXIMO) {
+        if (pagina < 0 || tamanho < 1 || tamanho > TAMANHO_MAXIMO || offsetExcedeLimite(pagina, tamanho)) {
             throw new CatalogException("paginacao_invalida", 400);
         }
         if (tipo != null && !TipoProduto.existe(tipo)) {
@@ -39,5 +39,10 @@ public class ListarProdutosUseCase {
                 tipo,
                 codBarras == null || codBarras.isBlank() ? null : codBarras.trim(),
                 PageRequest.of(pagina, tamanho, Sort.by("nome").and(Sort.by("id")))));
+    }
+
+    /** O offset da consulta é um int: páginas além dele viravam 500 no Spring Data. */
+    static boolean offsetExcedeLimite(int pagina, int tamanho) {
+        return (long) pagina * tamanho > Integer.MAX_VALUE;
     }
 }

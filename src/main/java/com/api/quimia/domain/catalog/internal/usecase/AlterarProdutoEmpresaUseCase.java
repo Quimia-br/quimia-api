@@ -15,8 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class AlterarProdutoEmpresaUseCase {
-    private static final int NOME_MINIMO = 2;
-
     private final EmpresaDoPortal portal;
     private final ProdutoRepository produtos;
     private final EmpresaProdutoRepository vinculos;
@@ -44,7 +42,7 @@ public class AlterarProdutoEmpresaUseCase {
         }
         String nome = CadastrarProdutoEmpresaUseCase.textoOuNulo(form.nome());
         if (nome != null) {
-            if (nome.length() < NOME_MINIMO) {
+            if (nome.length() < CadastrarProdutoEmpresaUseCase.NOME_MINIMO) {
                 throw new CatalogException("nome_invalido", 400);
             }
             produto.setNome(nome);
@@ -58,7 +56,10 @@ public class AlterarProdutoEmpresaUseCase {
         }
         String codBarras = CatalogException.codigoBarras(form.codBarras());
         if (codBarras != null && !codBarras.equals(produto.getCodBarras())) {
-            if (produtos.findByCodBarras(codBarras).isPresent()) {
+            boolean ocupado = CadastrarProdutoEmpresaUseCase.equivalente(produtos, codBarras)
+                    .filter(outro -> !outro.getId().equals(produto.getId()))
+                    .isPresent();
+            if (ocupado) {
                 throw new CatalogException("cod_barras_em_uso", 409);
             }
             produto.setCodBarras(codBarras);

@@ -12,4 +12,7 @@ public final class H2Functions {
         }
         return Normalizer.normalize(value, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
     }
+
+    /** Sem efeito: o H2 não tem advisory lock; a serialização real só é exercitada no PostgreSQL. */
+    public static void pgAdvisoryXactLock(long key) {}
 }

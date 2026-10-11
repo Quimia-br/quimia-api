@@ -2,6 +2,7 @@ package com.api.quimia.domain.catalog;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -115,6 +116,46 @@ class ProdutoCatalogoWebTest {
         listar("size=0").andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value("paginacao_invalida"));
         listar("size=51").andExpect(status().isBadRequest());
         listar("page=-1").andExpect(status().isBadRequest());
+        listar("page=2147483647&size=50")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("paginacao_invalida"));
+    }
+
+    @Test
+    void buscaTambemPeloNomeDaMarca() throws Exception {
+        buscar("veja").andExpect(jsonPath("$.itens[*].id", Matchers.containsInAnyOrder(aguaSanitaria, desinfetante)));
+        buscar("mr musculo").andExpect(jsonPath("$.itens[*].id", Matchers.containsInAnyOrder(limpaVidros, compartilhado)));
+    }
+
+    @Test
+    void entradaQueNaoConverteRespondeProblemDetail() throws Exception {
+        listar("size=abc")
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value("parametro_invalido"));
+        mvc.perform(get("/api/v1/produtos/abc").header("Authorization", "Bearer " + usuarioToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("parametro_invalido"));
+        mvc.perform(post("/api/v1/produtos/busca-por-codigo-barras")
+                        .header("Authorization", "Bearer " + usuarioToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codBarras\":{\"x\":1}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+        mvc.perform(post("/api/v1/produtos/busca-por-codigo-barras")
+                        .header("Authorization", "Bearer " + usuarioToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codBarras\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+        mvc.perform(post("/api/v1/produtos/busca-por-codigo-barras")
+                        .header("Authorization", "Bearer " + usuarioToken)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("7891000000001"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value("tipo_midia_nao_suportado"));
     }
 
     @Test

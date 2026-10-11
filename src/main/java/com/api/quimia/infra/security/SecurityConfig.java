@@ -103,7 +103,7 @@ public class SecurityConfig {
                 .toList();
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowed);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-CSRF-Token"));
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

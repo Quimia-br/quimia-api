@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -115,6 +117,46 @@ class EmpresaProdutoWebTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM produto WHERE cod_barras = '7894000000004'", Integer.class))
                 .isEqualTo(1);
         listar(tokenB, "").andExpect(jsonPath("$.itens[*].id", Matchers.contains(id)));
+    }
+
+    @Test
+    void codigoEquivalenteUpcEanVinculaAoProdutoExistente() throws Exception {
+        int upc = catalogo.produto("Água Sanitária", catalogo.marca("Veja", null), "alvejante", "789200000002", null);
+
+        cadastrar(tokenA, "Água duplicada EAN", "limpeza_geral", "0789200000002")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.situacao").value("vinculado"))
+                .andExpect(jsonPath("$.produto.id").value(upc))
+                .andExpect(jsonPath("$.produto.codBarras").value("789200000002"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM produto", Integer.class)).isEqualTo(1);
+
+        int outro = idDe(cadastrar(tokenB, "Outro", "outro", "7894000000010"));
+        alterar(tokenB, outro, "codBarras", "0789200000002")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("cod_barras_em_uso"));
+    }
+
+    @Test
+    void nomeCurtoDepoisDoTrimEhRecusadoNoCadastro() throws Exception {
+        cadastrar(tokenA, " x ", "limpeza_geral", null)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("nome_invalido"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM produto", Integer.class)).isZero();
+    }
+
+    @Test
+    void buscaPelaMarcaPaginaNoLimiteEAceitaPreflightDeDelete() throws Exception {
+        cadastrar(tokenA, "Limpa Vidros", "limpeza_geral", "7894000000011").andExpect(status().isCreated());
+
+        listar(tokenA, "q=omo brasil").andExpect(jsonPath("$.totalItens").value(1));
+        listar(tokenA, "page=2147483647&size=50")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("paginacao_invalida"));
+        mvc.perform(options(BASE + "/1")
+                        .header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "DELETE"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Methods", Matchers.containsString("DELETE")));
     }
 
     @Test

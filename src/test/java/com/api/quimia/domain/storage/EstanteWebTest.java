@@ -128,6 +128,9 @@ class EstanteWebTest {
                 .andExpect(jsonPath("$.itens.length()").value(1))
                 .andExpect(jsonPath("$.totalPaginas").value(2));
         listar(tokenA, "size=0").andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value("paginacao_invalida"));
+        listar(tokenA, "page=2147483647&size=50")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("paginacao_invalida"));
         guardar(tokenA, aguaSanitaria).andExpect(jsonPath("$.itens[0].status").value("nao_encontrado"));
     }
 
@@ -160,6 +163,11 @@ class EstanteWebTest {
                 .andExpect(status().isBadRequest());
         guardar(tokenA).andExpect(status().isBadRequest());
         guardar(tokenA, IntStream.rangeClosed(1, 51).toArray()).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/estante/produtos").header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"produtoIds\":[" + limpaVidros + ".9]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+        assertThat(contarItens(usuarioId("a@estante.test"))).isZero();
         mvc.perform(get("/api/v1/estante/produtos")).andExpect(status().isUnauthorized());
         String tokenEmpresa = TestLogins.empresa(mvc, "portal@estante.test", "44.556.677/0001-86");
         mvc.perform(get("/api/v1/estante/produtos").header("Authorization", "Bearer " + tokenEmpresa))

@@ -11,9 +11,12 @@ import java.util.List;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
@@ -58,6 +61,23 @@ public class ProblemHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ProblemDetail uploadGrande(MaxUploadSizeExceededException error, HttpServletRequest request) {
         return problem(413, "Payload Too Large", "imagem_muito_grande", request);
+    }
+
+    /** JSON malformado, corpo ausente ou campo com tipo errado (ex.: objeto no lugar de texto, 1.9 como id). */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ProblemDetail corpoInvalido(HttpMessageNotReadableException error, HttpServletRequest request) {
+        return problem(400, "Bad Request", "corpo_invalido", request);
+    }
+
+    /** Parâmetro de query ou de caminho que não converte para o tipo esperado (ex.: size=abc). */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ProblemDetail parametroInvalido(MethodArgumentTypeMismatchException error, HttpServletRequest request) {
+        return problem(400, "Bad Request", "parametro_invalido", request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    ProblemDetail midiaNaoSuportada(HttpMediaTypeNotSupportedException error, HttpServletRequest request) {
+        return problem(415, "Unsupported Media Type", "tipo_midia_nao_suportado", request);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
