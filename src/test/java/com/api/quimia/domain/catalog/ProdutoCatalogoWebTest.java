@@ -200,6 +200,17 @@ class ProdutoCatalogoWebTest {
     }
 
     @Test
+    void caractereDeControleNaPontaDoCodigoNaoEhRemovido() throws Exception {
+        buscaComCorpo("{\"codBarras\":\"7891000000001\\u0000\"}")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("codigo_barras_invalido"));
+        buscaComCorpo("{\"codBarras\":\"\\t7891000000001\"}")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("codigo_barras_invalido"));
+        codigo("  7891000000001  ").andExpect(status().isOk()).andExpect(jsonPath("$.id").value(limpaVidros));
+    }
+
+    @Test
     void exigeTokenDeUsuario() throws Exception {
         mvc.perform(get("/api/v1/produtos")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/produtos").header("Authorization", "Bearer " + TestLogins.empresa(mvc, "portal@catalogo.test", "11.444.777/0001-61")))

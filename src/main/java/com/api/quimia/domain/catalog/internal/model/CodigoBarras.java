@@ -12,16 +12,34 @@ public final class CodigoBarras {
 
     private CodigoBarras() {}
 
-    /** Código sem espaços nas pontas, ou `null` quando vazio. Lança se tiver algo além de dígitos. */
+    /**
+     * Código sem os espaços (U+0020) das pontas, ou `null` quando vazio. Lança se tiver algo além de dígitos,
+     * inclusive tabulação e outros caracteres de controle nas pontas, que `trim()` removeria em silêncio.
+     */
     public static String normalizar(String codigo) {
-        if (codigo == null || codigo.isBlank()) {
+        if (codigo == null) {
             return null;
         }
-        String valor = codigo.trim();
+        String valor = semEspacosNasPontas(codigo);
+        if (valor.isEmpty()) {
+            return null;
+        }
         if (!SO_DIGITOS.matcher(valor).matches()) {
             throw new IllegalArgumentException("codigo_barras_invalido");
         }
         return valor;
+    }
+
+    private static String semEspacosNasPontas(String texto) {
+        int inicio = 0;
+        int fim = texto.length();
+        while (inicio < fim && texto.charAt(inicio) == ' ') {
+            inicio++;
+        }
+        while (fim > inicio && texto.charAt(fim - 1) == ' ') {
+            fim--;
+        }
+        return texto.substring(inicio, fim);
     }
 
     /**
