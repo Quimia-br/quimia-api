@@ -156,6 +156,26 @@ class AccountWebTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    /** `""` em campo opcional continua vazio; texto no lugar de número não é convertido. */
+    @Test
+    void campoOpcionalVazioViraNuloMasTextoNaoViraNumero() throws Exception {
+        mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Campos Vazios","email":"vazios@example.com","senha":"senhaVazia1",
+                                 "dataNasc":"","localizacao":{"cep":"06000-000","numero":""}}
+                                """))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Numero Texto","email":"numtexto@example.com","senha":"senhaTexto1",
+                                 "localizacao":{"cep":"06000-000","numero":"1"}}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+    }
+
     @Test
     void empresaWebFlowUsesCookiesCsrfAndSeparateProfile() throws Exception {
         mvc.perform(post("/api/v1/empresas/auth/register")

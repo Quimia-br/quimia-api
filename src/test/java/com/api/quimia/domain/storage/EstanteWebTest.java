@@ -168,6 +168,11 @@ class EstanteWebTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("corpo_invalido"));
         assertThat(contarItens(usuarioId("a@estante.test"))).isZero();
+        mvc.perform(post("/api/v1/estante/produtos").header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"produtoIds\":[\"" + limpaVidros + "\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+        assertThat(contarItens(usuarioId("a@estante.test"))).isZero();
         mvc.perform(get("/api/v1/estante/produtos")).andExpect(status().isUnauthorized());
         String tokenEmpresa = TestLogins.empresa(mvc, "portal@estante.test", "44.556.677/0001-86");
         mvc.perform(get("/api/v1/estante/produtos").header("Authorization", "Bearer " + tokenEmpresa))

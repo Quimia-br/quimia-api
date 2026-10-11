@@ -187,6 +187,19 @@ class ProdutoCatalogoWebTest {
     }
 
     @Test
+    void codigoQueNaoEhTextoEhRecusadoSemConversao() throws Exception {
+        buscaComCorpo("{\"codBarras\":7891000000001}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+        buscaComCorpo("{\"codBarras\":7891000000001.0}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+        buscaComCorpo("{\"codBarras\":true}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+    }
+
+    @Test
     void exigeTokenDeUsuario() throws Exception {
         mvc.perform(get("/api/v1/produtos")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/produtos").header("Authorization", "Bearer " + TestLogins.empresa(mvc, "portal@catalogo.test", "11.444.777/0001-61")))
@@ -204,6 +217,13 @@ class ProdutoCatalogoWebTest {
     /** Termo enviado como parâmetro já codificado pelo MockMvc (sem montar a URL à mão). */
     private ResultActions buscar(String termo) throws Exception {
         return mvc.perform(get("/api/v1/produtos").param("q", termo).header("Authorization", "Bearer " + usuarioToken));
+    }
+
+    private ResultActions buscaComCorpo(String corpo) throws Exception {
+        return mvc.perform(post("/api/v1/produtos/busca-por-codigo-barras")
+                .header("Authorization", "Bearer " + usuarioToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(corpo));
     }
 
     private ResultActions codigo(String codBarras) throws Exception {
