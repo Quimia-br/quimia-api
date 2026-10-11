@@ -53,9 +53,11 @@ public class EmpresaProdutoController {
             @RequestParam(name = "q", required = false) String termo,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String codBarras,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String direcao,
             @RequestParam(name = "page", defaultValue = "0") int pagina,
             @RequestParam(name = "size", defaultValue = "" + ListarProdutosUseCase.TAMANHO_PADRAO) int tamanho) {
-        return listar.execute(principal.empresaId(), termo, tipo, codBarras, pagina, tamanho);
+        return listar.execute(principal.empresaId(), termo, tipo, codBarras, sort, direcao, pagina, tamanho);
     }
 
     /** `201` quando o produto foi criado; `200` quando a empresa foi vinculada ou reativada. */

@@ -3,6 +3,7 @@ package com.api.quimia.domain.catalog.internal.usecase;
 import com.api.quimia.domain.catalog.dto.Pagina;
 import com.api.quimia.domain.catalog.dto.ProdutoView;
 import com.api.quimia.domain.catalog.internal.mapper.ProdutoMapper;
+import com.api.quimia.domain.catalog.internal.model.CodigoBarras;
 import com.api.quimia.domain.catalog.internal.model.TermoBusca;
 import com.api.quimia.domain.catalog.internal.model.TipoProduto;
 import com.api.quimia.domain.catalog.internal.persistence.ProdutoRepository;
@@ -34,10 +35,12 @@ public class ListarProdutosUseCase {
         if (termo != null && termo.length() > TERMO_MAXIMO) {
             throw new CatalogException("termo_muito_longo", 400);
         }
+        String codigo = codBarras == null || codBarras.isBlank() ? null : codBarras.trim();
         return ProdutoMapper.pagina(produtos.buscarVisiveis(
                 TermoBusca.like(termo),
                 tipo,
-                codBarras == null || codBarras.isBlank() ? null : codBarras.trim(),
+                codigo == null,
+                CodigoBarras.paraFiltro(codigo),
                 PageRequest.of(pagina, tamanho, Sort.by("nome").and(Sort.by("id")))));
     }
 

@@ -31,7 +31,7 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
 
     String FILTROS_CATALOGO = FILTRO_TERMO + """
              and (:tipo is null or p.tipo = :tipo)
-             and (:codBarras is null or p.codBarras = :codBarras)
+             and (:semCodigo = true or p.codBarras in :codigos)
             """;
 
     @Query(value = "select p from Produto p join fetch p.marca where " + VISIVEL + FILTROS_CATALOGO,
@@ -39,7 +39,8 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
     Page<Produto> buscarVisiveis(
             @Param("termo") String termoLike,
             @Param("tipo") String tipo,
-            @Param("codBarras") String codBarras,
+            @Param("semCodigo") boolean semCodigo,
+            @Param("codigos") Collection<String> codigos,
             Pageable pageable);
 
     /** Produtos com vínculo ativo da empresa (portal). */
@@ -54,8 +55,18 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
             @Param("empresa") Integer empresaId,
             @Param("termo") String termoLike,
             @Param("tipo") String tipo,
-            @Param("codBarras") String codBarras,
+            @Param("semCodigo") boolean semCodigo,
+            @Param("codigos") Collection<String> codigos,
             Pageable pageable);
+
+    /** Produtos ativos da empresa do mais recente vínculo para o mais antigo; empate pelo maior id. */
+    @Query("""
+            select p from Produto p join fetch p.marca
+            join EmpresaProduto ep on ep.produtoId = p.id
+            where ep.empresaId = :empresa and (ep.ativo is null or ep.ativo = true)
+            order by ep.dataCadastro desc nulls last, p.id desc
+            """)
+    List<Produto> maisRecentesDaEmpresa(@Param("empresa") Integer empresaId, Pageable pageable);
 
     @Query("select p from Produto p join fetch p.marca where p.id = :id and " + DA_EMPRESA)
     Optional<Produto> findDaEmpresa(@Param("id") Integer id, @Param("empresa") Integer empresaId);
