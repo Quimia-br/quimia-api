@@ -32,7 +32,7 @@ tests {
 
 docs {
   Catálogo visível no app, ordenado por nome. Guarda `produtoId` e `codBarras` do primeiro item para as próximas requisições.
-  Filtros opcionais na URL: `q` (busca sem acento), `tipo`, `codBarras`, `page`, `size` (1 a 50).
+  Filtros opcionais na URL: `q` (busca sem acento), `tipo`, `codBarras` (UPC-A e EAN-13 com zero são o mesmo código), `page`, `size` (1 a 50).
   Sem produtos? Rode `06 - Portal / 02` para cadastrar um.
   Respostas: 200, 400 paginacao_invalida/tipo_invalido/termo_muito_longo.
 }

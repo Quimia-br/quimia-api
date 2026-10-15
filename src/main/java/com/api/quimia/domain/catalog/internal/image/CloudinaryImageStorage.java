@@ -21,14 +21,11 @@ import org.springframework.web.client.RestClientException;
 
 /**
  * Cloudinary pela API REST com requisição assinada (SHA-1 dos parâmetros + segredo), sem SDK e sem
- * upload preset aberto. O `public_id` é gerado aqui (`produtos/{uuid}`), nunca vem do cliente.
+ * upload preset aberto. O `public_id` é gerado aqui (`{pasta}/{uuid}`), nunca vem do cliente.
  */
 public final class CloudinaryImageStorage implements ImageStorage {
-    static final String PASTA = "produtos/";
     private static final Logger log = LoggerFactory.getLogger(CloudinaryImageStorage.class);
     private static final String API = "https://api.cloudinary.com/v1_1/";
-    private static final Pattern PUBLIC_ID =
-            Pattern.compile("/image/upload/(?:v\\d+/)?(" + PASTA + "[^/.]+)\\.?[A-Za-z0-9]*$");
     private static final ParameterizedTypeReference<Map<String, Object>> RESPOSTA =
             new ParameterizedTypeReference<>() {};
 
@@ -47,12 +44,12 @@ public final class CloudinaryImageStorage implements ImageStorage {
     }
 
     @Override
-    public String upload(byte[] conteudo) {
-        MultiValueMap<String, Object> form = assinado(PASTA + UUID.randomUUID());
+    public String upload(byte[] conteudo, String pasta) {
+        MultiValueMap<String, Object> form = assinado(pasta + "/" + UUID.randomUUID());
         form.add("file", new ByteArrayResource(conteudo) {
             @Override
             public String getFilename() {
-                return "produto";
+                return "imagem";
             }
         });
         Map<String, Object> resposta;
@@ -75,8 +72,8 @@ public final class CloudinaryImageStorage implements ImageStorage {
     }
 
     @Override
-    public void delete(String url) {
-        String publicId = publicIdDe(url);
+    public void delete(String url, String pasta) {
+        String publicId = publicIdDe(url, pasta);
         if (publicId == null) {
             return;
         }
@@ -93,12 +90,14 @@ public final class CloudinaryImageStorage implements ImageStorage {
         }
     }
 
-    /** Só reconhece imagens desta conta dentro da pasta `produtos/`; qualquer outra URL é ignorada. */
-    String publicIdDe(String url) {
+    /** Só reconhece imagens desta conta diretamente dentro de `pasta`; qualquer outra URL é ignorada. */
+    String publicIdDe(String url, String pasta) {
         if (url == null || !url.contains("/" + cloudName + "/image/upload/")) {
             return null;
         }
-        Matcher achou = PUBLIC_ID.matcher(url);
+        Pattern publicIdNaPasta =
+                Pattern.compile("/image/upload/(?:v\\d+/)?(" + Pattern.quote(pasta + "/") + "[^/.]+)\\.?[A-Za-z0-9]*$");
+        Matcher achou = publicIdNaPasta.matcher(url);
         return achou.find() ? achou.group(1) : null;
     }
 

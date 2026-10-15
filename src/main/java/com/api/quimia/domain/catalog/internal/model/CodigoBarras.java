@@ -9,6 +9,7 @@ public final class CodigoBarras {
     private static final Pattern SO_DIGITOS = Pattern.compile("\\d+");
     private static final int UPC_A = 12;
     private static final int EAN_13 = 13;
+    private static final Set<String> LISTA_SEM_FILTRO = Set.of("");
 
     private CodigoBarras() {}
 
@@ -56,6 +57,14 @@ public final class CodigoBarras {
             codigos.add(codigo.substring(1));
         }
         return codigos;
+    }
+
+    /**
+     * Lista para o filtro `p.codBarras in :codigos` das listagens. Sem código, a consulta ignora a lista
+     * (`semCodigo`), mas `IN` não aceita lista vazia: vai um valor que nenhum código gravado tem.
+     */
+    public static Set<String> paraFiltro(String codigo) {
+        return codigo == null ? LISTA_SEM_FILTRO : equivalentes(codigo);
     }
 
     /** Representante único das formas equivalentes (UPC-A vira EAN-13). */

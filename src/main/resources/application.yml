@@ -43,7 +43,7 @@ quimia:
     issuer: ${QUIMIA_JWT_ISSUER:quimia-auth}
     audience: ${QUIMIA_JWT_AUDIENCE:quimia-api}
     access-ttl-minutes: ${QUIMIA_JWT_ACCESS_TTL_MINUTES:15}
-  # Imagens dos produtos. Sem as três variáveis o cadastro funciona, mas enviar imagem responde 503.
+  # Imagens dos produtos e logos das empresas. Sem as três variáveis o cadastro funciona, mas enviar imagem responde 503.
   cloudinary:
     cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     api-key: ${CLOUDINARY_API_KEY:}

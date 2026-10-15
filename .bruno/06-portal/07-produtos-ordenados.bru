@@ -1,0 +1,30 @@
+meta {
+  name: 07 - Produtos ordenados
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos?sort=codBarras&direcao=desc&page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("ordena pela coluna pedida", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("itens");
+  });
+}
+
+docs {
+  Ordenação da tabela do portal. `sort`: nome (padrão), tipo, descricao ou codBarras. `direcao`: asc (padrão) ou desc.
+  Descrição e código nulos ficam por último nos dois sentidos; empate desempata pelo id.
+  Antes: `00 / 04`.
+  Respostas: 200, 400 ordenacao_invalida, 403 empresa_inativa.
+}

@@ -1,0 +1,34 @@
+meta {
+  name: 08 - Trocar logo da empresa
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/foto
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  imagem: @file(fixtures/imagem-produto.png)
+}
+
+tests {
+  test("troca o logo (exige Cloudinary configurado)", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().fotoUrl).to.be.a("string").and.not.be.empty;
+  });
+}
+
+docs {
+  Envia o logo da empresa (JPEG, PNG ou WebP, até 5 MB) para a pasta `empresas/{id}` do Cloudinary e grava a URL no perfil.
+  O logo anterior só é apagado depois da gravação e só se estiver na pasta da própria empresa; se a gravação falhar, o novo é descartado.
+  Antes: `00 / 04`. Confira com `02 / 01 - Meu perfil`.
+  Respostas: 200, 400 imagem_obrigatoria, 403 empresa_inativa, 404 empresa_nao_encontrada, 413, 415, 502, 503.
+}
