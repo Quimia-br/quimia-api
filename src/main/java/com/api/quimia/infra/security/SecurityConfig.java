@@ -66,7 +66,14 @@ public class SecurityConfig {
                         "/actuator/health")
                 .permitAll()
                 .requestMatchers(
-                        "/api/v1/usuarios/**", "/api/v1/produtos/**", "/api/v1/estante/**", "/api/v1/substancias/**")
+                        "/api/v1/usuarios/**",
+                        "/api/v1/produtos/**",
+                        "/api/v1/estante/**",
+                        "/api/v1/substancias/**",
+                        "/api/v1/comodos/**",
+                        "/api/v1/misturas/**",
+                        "/api/v1/pontos/**",
+                        "/api/v1/chat/**")
                 .hasAuthority(USUARIO_PRINCIPAL)
                 .requestMatchers("/api/v1/empresas/me/**")
                 .hasAuthority(EMPRESA_PRINCIPAL)

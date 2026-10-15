@@ -92,6 +92,7 @@ public class JpaSafetyGateway implements SafetyGateway {
                         substancia.getId(),
                         substancia.getNomeCanonico(),
                         substancia.getCasNumero(),
+                        substancia.getDescricao(),
                         classes.getOrDefault(substancia.getId(), List.of()),
                         List.copyOf(produtosPorSubstancia.get(substancia.getId()))))
                 .toList();
