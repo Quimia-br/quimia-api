@@ -1,0 +1,34 @@
+meta {
+  name: 02 - Atualizar perfil
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/empresas/me
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:json {
+  {
+    "nome": "{{empresaNome}}",
+    "fotoUrl": "https://cdn.example.com/logo.png"
+  }
+}
+
+tests {
+  test("atualiza o perfil", function () { expect(res.getStatus()).to.equal(200); });
+}
+
+docs {
+  Altera nome e/ou foto da empresa.
+  Antes: `00 / 04`.
+  Respostas: 200, 400.
+}

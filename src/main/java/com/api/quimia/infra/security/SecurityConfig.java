@@ -1,11 +1,16 @@
 package com.api.quimia.infra.security;
 
+import com.api.quimia.infra.web.RespostaProblema;
+import jakarta.servlet.DispatcherType;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -14,6 +19,7 @@ import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.firewall.RequestRejectedHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -21,6 +27,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
     private static final int BCRYPT_STRENGTH = 12;
     private static final String USUARIO_PRINCIPAL = JwtAuthenticationFilter.PRINCIPAL_AUTHORITY_PREFIX + "USUARIO";
     private static final String EMPRESA_PRINCIPAL = JwtAuthenticationFilter.PRINCIPAL_AUTHORITY_PREFIX + "EMPRESA";
@@ -37,7 +44,11 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable());
         http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         http.cors(cors -> {});
-        http.authorizeHttpRequests(auth -> auth.requestMatchers(
+        // Sem isto, qualquer exceção não tratada (ex.: coluna inexistente no banco) é reencaminhada
+        // para /error, que exigiria token, e o cliente recebe 401 em vez do 500 real.
+        http.authorizeHttpRequests(auth -> auth.dispatcherTypeMatchers(DispatcherType.ERROR)
+                .permitAll()
+                .requestMatchers(
                         "/api/v1/auth/register",
                         "/api/v1/auth/forgot-password",
                         "/api/v1/auth/verify-recovery-code",
@@ -54,7 +65,8 @@ public class SecurityConfig {
                         "/api/v1/empresas/auth/reset-password",
                         "/actuator/health")
                 .permitAll()
-                .requestMatchers("/api/v1/usuarios/**")
+                .requestMatchers(
+                        "/api/v1/usuarios/**", "/api/v1/produtos/**", "/api/v1/estante/**", "/api/v1/substancias/**")
                 .hasAuthority(USUARIO_PRINCIPAL)
                 .requestMatchers("/api/v1/empresas/me/**")
                 .hasAuthority(EMPRESA_PRINCIPAL)
@@ -65,17 +77,20 @@ public class SecurityConfig {
         http.addFilterBefore(csrf, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(jwt, UsernamePasswordAuthenticationFilter.class);
         http.exceptionHandling(handling -> handling
-                .authenticationEntryPoint((request, response, error) -> {
-                    response.setStatus(401);
-                    response.setContentType("application/problem+json");
-                    response.getWriter().write("{\"title\":\"Unauthorized\",\"status\":401}");
-                })
-                .accessDeniedHandler((request, response, error) -> {
-                    response.setStatus(403);
-                    response.setContentType("application/problem+json");
-                    response.getWriter().write("{\"title\":\"Forbidden\",\"status\":403}");
-                }));
+                .authenticationEntryPoint((request, response, error) ->
+                        RespostaProblema.escrever(request, response, HttpStatus.UNAUTHORIZED, "nao_autenticado"))
+                .accessDeniedHandler((request, response, error) ->
+                        RespostaProblema.escrever(request, response, HttpStatus.FORBIDDEN, "acesso_negado")));
         return http.build();
+    }
+
+    /** Caminhos recusados pelo StrictHttpFirewall (`;`, `//`, `%2e`...) também respondem no formato do contrato. */
+    @Bean
+    RequestRejectedHandler requisicaoRejeitada() {
+        return (request, response, error) -> {
+            log.debug("requisição recusada pelo firewall: {}", error.getMessage());
+            RespostaProblema.escrever(request, response, HttpStatus.BAD_REQUEST, "requisicao_rejeitada");
+        };
     }
 
     @Bean
@@ -97,7 +112,7 @@ public class SecurityConfig {
                 .toList();
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowed);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-CSRF-Token"));
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:quimia;MODE=PostgreSQL;DATABASE_TO_UPPER=false
+    url: "jdbc:h2:mem:quimia;MODE=PostgreSQL;DATABASE_TO_UPPER=false;INIT=CREATE ALIAS IF NOT EXISTS unaccent FOR 'com.api.quimia.H2Functions.unaccent'\\;CREATE ALIAS IF NOT EXISTS pg_advisory_xact_lock FOR 'com.api.quimia.H2Functions.pgAdvisoryXactLock'"
     driver-class-name: org.h2.Driver
     username: sa
     password:

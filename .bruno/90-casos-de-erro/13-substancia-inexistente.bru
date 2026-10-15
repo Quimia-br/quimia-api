@@ -1,0 +1,28 @@
+meta {
+  name: 13 - Substância inexistente
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/api/v1/substancias/999999
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("404 substancia_nao_encontrada", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().detail).to.equal("substancia_nao_encontrada");
+  });
+}
+
+docs {
+  Antes: `00 / 02`.
+  Respostas: ver o teste da requisição.
+}

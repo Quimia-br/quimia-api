@@ -1,0 +1,29 @@
+meta {
+  name: 01 - Produtos cadastrados
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos?page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("lista os produtos com vínculo ativo", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("totalItens");
+  });
+}
+
+docs {
+  Produtos com vínculo ativo da empresa. Mesmos filtros do catálogo (`q`, `tipo`, `codBarras`, `page`, `size`).
+  Antes: `00 / 04`.
+  Respostas: 200, 403 empresa_inativa.
+}

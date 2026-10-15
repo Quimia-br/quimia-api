@@ -1,0 +1,29 @@
+meta {
+  name: 01 - Meu perfil
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/empresas/me
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("retorna o perfil da empresa", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().ativo).to.equal(true);
+  });
+}
+
+docs {
+  Perfil da empresa logada.
+  Antes: `00 / 04`.
+  Respostas: 200, 401, 403 (token de usuário).
+}

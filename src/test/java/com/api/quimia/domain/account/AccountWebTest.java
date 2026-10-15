@@ -14,6 +14,7 @@ import com.api.quimia.domain.account.internal.persistence.EmpresaRepository;
 import com.api.quimia.domain.account.internal.persistence.LocalizacaoUsuarioRepository;
 import com.api.quimia.domain.account.internal.persistence.UsuarioRepository;
 import jakarta.servlet.http.Cookie;
+import java.net.URI;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -155,6 +156,26 @@ class AccountWebTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    /** `""` em campo opcional continua vazio; texto no lugar de número não é convertido. */
+    @Test
+    void campoOpcionalVazioViraNuloMasTextoNaoViraNumero() throws Exception {
+        mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Campos Vazios","email":"vazios@example.com","senha":"senhaVazia1",
+                                 "dataNasc":"","localizacao":{"cep":"06000-000","numero":""}}
+                                """))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Numero Texto","email":"numtexto@example.com","senha":"senhaTexto1",
+                                 "localizacao":{"cep":"06000-000","numero":"1"}}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+    }
+
     @Test
     void empresaWebFlowUsesCookiesCsrfAndSeparateProfile() throws Exception {
         mvc.perform(post("/api/v1/empresas/auth/register")
@@ -221,6 +242,45 @@ class AccountWebTest {
                 .andExpect(status().isNoContent())
                 .andExpect(cookie().maxAge("quimia_rt", 0))
                 .andExpect(cookie().maxAge("quimia_csrf", 0));
+    }
+
+    @Test
+    void empresaCsrfCoversPercentEncodedPaths() throws Exception {
+        mvc.perform(post("/api/v1/empresas/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Omo","cnpj":"11.222.333/0001-81","email":"omo@example.com","senha":"senhaOmo123"}
+                                """))
+                .andExpect(status().isCreated());
+        MvcResult login = mvc.perform(post("/api/v1/empresas/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"omo@example.com\",\"senha\":\"senhaOmo123\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        Cookie refresh = login.getResponse().getCookie("quimia_rt");
+        Cookie csrf = login.getResponse().getCookie("quimia_csrf");
+
+        mvc.perform(post(URI.create("/api/v1/empresas/auth/%72efresh")).cookie(refresh, csrf))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("csrf_required"));
+        mvc.perform(post(URI.create("/api/v1/empresas/auth/%6cogout")).cookie(refresh, csrf))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("csrf_required"));
+        mvc.perform(post(URI.create("/api/v1/empresas/auth/%72efresh"))
+                        .cookie(refresh, csrf)
+                        .header("X-CSRF-Token", csrf.getValue()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void mobileLoginTrimsEmailBeforeValidatingIt() throws Exception {
+        registerUsuario("trim@example.com", "senhaTrim123");
+
+        mvc.perform(post("/api/v1/auth/mobile/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\" trim@example.com \",\"senha\":\"senhaTrim123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.email").value("trim@example.com"));
     }
 
     @Test

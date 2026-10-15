@@ -1,0 +1,25 @@
+meta {
+  name: 06 - Sair
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/mobile/logout
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("responde 204", function () { expect(res.getStatus()).to.equal(204); });
+}
+
+docs {
+  Não revoga nada no servidor; o app descarta os tokens.
+  Antes: nada.
+  Respostas: 204.
+}

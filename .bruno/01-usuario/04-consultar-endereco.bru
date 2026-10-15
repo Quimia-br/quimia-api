@@ -1,0 +1,26 @@
+meta {
+  name: 04 - Consultar endereço
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/usuarios/me/localizacao
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("retorna o endereço", function () { expect(res.getStatus()).to.equal(200); });
+}
+
+docs {
+  Endereço do usuário.
+  Antes: 03.
+  Respostas: 200, 404 not_found (sem endereço).
+}

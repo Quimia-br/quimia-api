@@ -1,0 +1,29 @@
+meta {
+  name: 02 - Listar estante
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/estante/produtos?page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("lista a estante", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("totalItens");
+  });
+}
+
+docs {
+  Produtos guardados, inclusive os que saíram do catálogo. Aceita `q`, `page` e `size`.
+  Antes: 01.
+  Respostas: 200, 400.
+}

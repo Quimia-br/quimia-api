@@ -1,0 +1,35 @@
+meta {
+  name: 01 - Login com senha errada
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/mobile/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{userEmail}}",
+    "senha": "SenhaErrada123"
+  }
+}
+
+tests {
+  test("401 genérico", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().detail).to.equal("invalid_credentials");
+  });
+}
+
+docs {
+  Credencial inválida não revela se o email existe.
+  Respostas: ver o teste da requisição.
+}

@@ -1,0 +1,44 @@
+meta {
+  name: 02 - Entrar como usuário
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/mobile/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{userEmail}}",
+    "senha": "{{userPassword}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.refreshToken) {
+    bru.setVar("accessToken", body.accessToken);
+    bru.setVar("refreshToken", body.refreshToken);
+  }
+}
+
+tests {
+  test("devolve access e refresh no JSON", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().accessToken).to.be.a("string").and.not.be.empty;
+  });
+}
+
+docs {
+  Guarda `accessToken` e `refreshToken`: todas as rotas do app passam a funcionar.
+  Antes: 01.
+  Respostas: 200, 401 invalid_credentials, 423 blocked.
+}

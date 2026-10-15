@@ -1,0 +1,30 @@
+meta {
+  name: 04 - Alterar produto
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos/{{portalProdutoId}}
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  nome: Limpa Vidros Portal Alterado
+}
+
+tests {
+  test("altera o produto exclusivo da empresa", function () { expect(res.getStatus()).to.equal(200); });
+}
+
+docs {
+  Campos ausentes mantêm o valor. Só altera se a empresa for a única com vínculo ativo.
+  Antes: 02.
+  Respostas: 200, 404, 409 produto_compartilhado/cod_barras_em_uso.
+}

@@ -59,6 +59,9 @@ class EmpresaFlowTest {
     private JdbcTemplate jdbc;
 
     @Autowired
+    private AccountGateway gateway;
+
+    @Autowired
     private ApplicationEvents applicationEvents;
 
     @BeforeEach
@@ -82,6 +85,16 @@ class EmpresaFlowTest {
         assertThat(updated.nome()).isEqualTo("Omo Brasil");
         assertThat(updated.email()).isEqualTo("novo@omo.com");
         assertThat(updated.ativo()).isTrue();
+    }
+
+    @Test
+    void gatewayExpoeEmpresaParaOutrosModulos() {
+        var created = registrar.execute(new EmpresaRegisterRequest("Gateway", VALID_CNPJ, "gateway@example.com", "senhaGateway1"));
+
+        var view = gateway.findEmpresaById(created.id()).orElseThrow();
+        assertThat(view.nome()).isEqualTo("Gateway");
+        assertThat(view.ativo()).isTrue();
+        assertThat(gateway.findEmpresaById(-1)).isEmpty();
     }
 
     @Test

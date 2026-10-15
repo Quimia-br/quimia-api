@@ -1,0 +1,40 @@
+meta {
+  name: 07 - Entrar com Firebase (Google ou Microsoft)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/firebase
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "idToken": "{{firebaseIdToken}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.refreshToken) {
+    bru.setVar("accessToken", body.accessToken);
+    bru.setVar("refreshToken", body.refreshToken);
+  }
+}
+
+tests {
+  test("autentica via Firebase", function () { expect(res.getStatus()).to.equal(200); });
+}
+
+docs {
+  Precisa de um ID token real do Firebase Auth do app, colado em `firebaseIdToken` no ambiente, e de `FIREBASE_PROJECT_ID` na API.
+  Antes: token do app.
+  Respostas: 200, 401 invalid_firebase_token, 403 email_not_verified, 503 firebase_disabled.
+}

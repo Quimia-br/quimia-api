@@ -1,0 +1,32 @@
+meta {
+  name: 05 - Pedir link (empresa)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/forgot-password
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{empresaEmail}}"
+  }
+}
+
+tests {
+  test("responde 202 genérico", function () { expect(res.getStatus()).to.equal(202); });
+}
+
+docs {
+  Envia um link `APP_AUTH_EMPRESA_RESET_URL?token=...` válido por 24 h. Para receber, `empresaEmail` precisa ser um email seu (troque no ambiente e registre a empresa de novo). Copie o `token` do link para `empresaResetToken`.
+  Antes: configurar o envio de email na API.
+  Respostas: 202, 400.
+}

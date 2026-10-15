@@ -1,0 +1,28 @@
+meta {
+  name: 14 - Renovar sessão da empresa sem CSRF
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/refresh
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Cookie: quimia_rt={{empresaRefreshToken}}
+}
+
+tests {
+  test("403 csrf_required", function () {
+    expect(res.getStatus()).to.equal(403);
+    expect(res.getBody().detail).to.equal("csrf_required");
+  });
+}
+
+docs {
+  Envia só o cookie de refresh, sem o cabeçalho CSRF. Antes: `00 / 04`.
+  Respostas: ver o teste da requisição.
+}

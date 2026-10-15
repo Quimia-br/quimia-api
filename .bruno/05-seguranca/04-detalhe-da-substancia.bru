@@ -1,0 +1,30 @@
+meta {
+  name: 04 - Detalhe da substância
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/substancias/{{substanciaId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("traz sinônimos e classes", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("sinonimos");
+    expect(res.getBody()).to.have.property("classes");
+  });
+}
+
+docs {
+  Substância com sinônimos e classes químicas.
+  Antes: 02 (preenche `substanciaId`).
+  Respostas: 200, 404 substancia_nao_encontrada.
+}

@@ -1,0 +1,37 @@
+meta {
+  name: 04 - Cadastro de empresa com CNPJ inválido
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "nome": "X",
+    "cnpj": "4i84329",
+    "email": "cnpj.invalido@example.com",
+    "senha": "{{empresaPassword}}"
+  }
+}
+
+tests {
+  test("422 invalid_cnpj", function () {
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().detail).to.equal("invalid_cnpj");
+  });
+}
+
+docs {
+  O CNPJ passa pela validação dos dígitos.
+  Respostas: ver o teste da requisição.
+}

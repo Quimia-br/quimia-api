@@ -1,7 +1,9 @@
 package com.api.quimia.domain.account.internal.persistence;
 
 import com.api.quimia.domain.account.AccountGateway;
+import com.api.quimia.domain.account.dto.EmpresaView;
 import com.api.quimia.domain.account.dto.UserView;
+import com.api.quimia.domain.account.internal.model.Empresa;
 import com.api.quimia.domain.account.internal.model.Usuario;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,9 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JpaAccountGateway implements AccountGateway {
     private final UsuarioRepository users;
+    private final EmpresaRepository empresas;
 
-    public JpaAccountGateway(UsuarioRepository users) {
+    public JpaAccountGateway(UsuarioRepository users, EmpresaRepository empresas) {
         this.users = users;
+        this.empresas = empresas;
     }
 
     @Override
@@ -32,6 +36,11 @@ public class JpaAccountGateway implements AccountGateway {
         return users.existsByEmail(normalize(email));
     }
 
+    @Override
+    public Optional<EmpresaView> findEmpresaById(Integer id) {
+        return empresas.findById(id).map(JpaAccountGateway::view);
+    }
+
     private static String normalize(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }
@@ -45,5 +54,15 @@ public class JpaAccountGateway implements AccountGateway {
                 user.getFotoUrl(),
                 user.getNivelAcesso(),
                 user.getUltimaSessao());
+    }
+
+    private static EmpresaView view(Empresa empresa) {
+        return new EmpresaView(
+                empresa.getId(),
+                empresa.getNome(),
+                empresa.getEmail(),
+                empresa.getCnpj(),
+                empresa.getFotoUrl(),
+                empresa.isAtiva());
     }
 }

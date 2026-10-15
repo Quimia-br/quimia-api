@@ -1,0 +1,35 @@
+meta {
+  name: 15 - Imagem que não é imagem
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  nome: Falso Png
+  tipo: outro
+  imagem: @file(fixtures/nao-e-imagem.txt)
+}
+
+tests {
+  test("415 imagem_invalida", function () {
+    expect(res.getStatus()).to.equal(415);
+    expect(res.getBody().detail).to.equal("imagem_invalida");
+  });
+}
+
+docs {
+  Arquivo de texto enviado como imagem: a API confere os bytes, não a extensão. Não precisa do Cloudinary.
+  Antes: `00 / 04`.
+  Respostas: 415 imagem_invalida.
+}

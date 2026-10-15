@@ -1,0 +1,33 @@
+meta {
+  name: 06 - Redefinir senha (empresa)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/auth/reset-password
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "resetToken": "{{empresaResetToken}}",
+    "novaSenha": "{{empresaPassword}}"
+  }
+}
+
+tests {
+  test("redefine a senha", function () { expect(res.getStatus()).to.equal(204); });
+}
+
+docs {
+  Define a nova senha da empresa (a mesma `empresaPassword`, para o login seguir valendo).
+  Antes: 05.
+  Respostas: 204, 400 invalid_reset_token, 422 weak_password.
+}

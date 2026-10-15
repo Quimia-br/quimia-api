@@ -1,0 +1,51 @@
+meta {
+  name: 02 - Cadastrar produto
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  nome: Limpa Vidros Portal
+  tipo: limpeza_geral
+  descricao: Cadastrado pelo Bruno
+  codBarras: {{portalCodBarras}}
+}
+
+script:pre-request {
+  bru.setVar("portalCodBarras", `789${Date.now()}`.slice(0, 13));
+}
+
+script:post-response {
+  if (res.getStatus() === 201 || res.getStatus() === 200) {
+    const produto = res.getBody().produto;
+    bru.setVar("portalProdutoId", produto.id);
+    bru.setVar("produtoId", produto.id);
+    if (produto.codBarras) { bru.setVar("codBarras", produto.codBarras); }
+  }
+}
+
+tests {
+  test("cria (201) ou vincula/reativa (200)", function () {
+    expect([200, 201]).to.include(res.getStatus());
+    expect(["criado", "vinculado", "reativado"]).to.include(res.getBody().situacao);
+  });
+}
+
+docs {
+  Cadastra um produto novo com a marca da empresa (a API usa o nome da empresa; não há campo de marca). Gera um código de barras novo a cada envio. Guarda `portalProdutoId` e `produtoId`.
+  `tipo`: limpeza_geral, desinfetante, desincrustante, desengraxante, alvejante, aromatizante ou outro.
+  Se o código já existir no catálogo, a empresa só é vinculada (`vinculado`, 200).
+  Antes: `00 / 04`.
+  Respostas: 201 criado, 200 vinculado/reativado, 400, 409 produto_ja_cadastrado, 422 codigo_barras_invalido.
+}

@@ -1,0 +1,33 @@
+meta {
+  name: 05 - Trocar imagem do produto
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos/{{portalProdutoId}}
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  imagem: @file(fixtures/imagem-produto.png)
+}
+
+tests {
+  test("troca a imagem (exige Cloudinary configurado)", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().fotoUrl).to.be.a("string").and.not.be.empty;
+  });
+}
+
+docs {
+  Envia só a imagem. A antiga é apagada do Cloudinary depois que a alteração é confirmada; se falhar, a nova é descartada.
+  Antes: 02.
+  Respostas: 200, 404, 409, 413, 415, 502, 503.
+}

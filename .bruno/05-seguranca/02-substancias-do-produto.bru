@@ -1,0 +1,36 @@
+meta {
+  name: 02 - Substâncias do produto
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produtos/{{produtoId}}/substancias
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+script:post-response {
+  const itens = res.getBody();
+  if (res.getStatus() === 200 && itens.length > 0) {
+    bru.setVar("substanciaId", itens[0].substanciaId);
+  }
+}
+
+tests {
+  test("lista a composição", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.be.an("array");
+  });
+}
+
+docs {
+  Composição da FDS ativa mais recente: substância, CAS, concentração, unidade e classes. Guarda `substanciaId` da primeira.
+  Antes: `03 - Catálogo / 01`.
+  Respostas: 200 (lista vazia sem FDS), 404 produto_nao_encontrado.
+}

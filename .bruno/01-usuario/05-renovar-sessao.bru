@@ -1,0 +1,43 @@
+meta {
+  name: 05 - Renovar sessão
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/mobile/refresh
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body && body.refreshToken) {
+    bru.setVar("accessToken", body.accessToken);
+    bru.setVar("refreshToken", body.refreshToken);
+  }
+}
+
+tests {
+  test("emite novos tokens", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().accessToken).to.be.a("string").and.not.be.empty;
+  });
+}
+
+docs {
+  Troca o refresh por novos tokens e os guarda. A sessão não tem estado: o refresh anterior vale até expirar ou até a senha mudar.
+  Antes: `00 / 02`.
+  Respostas: 200, 401 invalid_refresh.
+}

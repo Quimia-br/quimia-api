@@ -1,0 +1,35 @@
+meta {
+  name: 11 - Código de barras inválido
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/produtos/busca-por-codigo-barras
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "codBarras": "abc-123"
+  }
+}
+
+tests {
+  test("422 codigo_barras_invalido", function () {
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().detail).to.equal("codigo_barras_invalido");
+  });
+}
+
+docs {
+  O código só aceita dígitos. Antes: `00 / 02`.
+  Respostas: ver o teste da requisição.
+}

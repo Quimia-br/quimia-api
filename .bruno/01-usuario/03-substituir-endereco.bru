@@ -1,0 +1,40 @@
+meta {
+  name: 03 - Substituir endereço
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/v1/usuarios/me/localizacao
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "cep": "01310100",
+    "estado": "sp",
+    "rua": "Av. Paulista",
+    "numero": 1000
+  }
+}
+
+tests {
+  test("substitui o endereço e normaliza CEP e UF", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().cep).to.equal("01310-100");
+    expect(res.getBody().estado).to.equal("SP");
+  });
+}
+
+docs {
+  Substitui o endereço inteiro. O schema não tem cidade.
+  Antes: `00 / 02`.
+  Respostas: 200, 400, 422 invalid_cep.
+}
