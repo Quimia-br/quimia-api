@@ -15,11 +15,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Cadastro pelo portal. A marca é sempre a da empresa (sem campo no formulário). Se o código de
  * barras já existe no catálogo, a empresa é vinculada ao produto existente em vez de duplicá-lo.
+ *
+ * A FDS (PDF) só é lida quando o produto vai ser criado: vincular a um produto existente mantém a FDS dele. O
+ * extrator é chamado antes da transação (pode levar até um minuto); a gravação do produto, do vínculo e da FDS
+ * acontece numa transação só.
  */
 @Service
 public class CadastrarProdutoEmpresaUseCase {
@@ -33,21 +38,26 @@ public class CadastrarProdutoEmpresaUseCase {
     private final MarcaRepository marcas;
     private final EmpresaProdutoRepository vinculos;
     private final ImagemDoProduto imagens;
+    private final FdsDoProduto fds;
+    private final TransactionTemplate transacao;
 
     public CadastrarProdutoEmpresaUseCase(
             EmpresaDoPortal portal,
             ProdutoRepository produtos,
             MarcaRepository marcas,
             EmpresaProdutoRepository vinculos,
-            ImagemDoProduto imagens) {
+            ImagemDoProduto imagens,
+            FdsDoProduto fds,
+            PlatformTransactionManager transacoes) {
         this.portal = portal;
         this.produtos = produtos;
         this.marcas = marcas;
         this.vinculos = vinculos;
         this.imagens = imagens;
+        this.fds = fds;
+        this.transacao = new TransactionTemplate(transacoes);
     }
 
-    @Transactional
     public CadastroProdutoResponse execute(Integer empresaId, CadastroProdutoForm form) {
         EmpresaView empresa = portal.exigirAtiva(empresaId);
         String nome = form.nome().trim();
@@ -57,16 +67,53 @@ public class CadastrarProdutoEmpresaUseCase {
         String tipo = EmpresaDoPortal.tipoValido(form.tipo());
         String codBarras = CatalogException.codigoBarras(form.codBarras());
         byte[] imagem = imagens.ler(form.imagem());
+        String fdsExtraida = codigoJaCadastrado(codBarras) ? null : fdsDoProdutoNovo(fds.ler(form.fds()));
+        return transacao.execute(
+                status -> gravar(empresaId, empresa, nome, tipo, codBarras, form.descricao(), imagem, fdsExtraida));
+    }
+
+    /** Leitura sem bloqueio, só para decidir se o extrator será chamado; a transação confere de novo. */
+    private boolean codigoJaCadastrado(String codBarras) {
+        return codBarras != null && !produtos.findByCodBarrasIn(CodigoBarras.equivalentes(codBarras)).isEmpty();
+    }
+
+    private String fdsDoProdutoNovo(byte[] pdf) {
+        if (pdf == null) {
+            if (fds.obrigatoria()) {
+                throw new CatalogException("fds_obrigatoria", 422);
+            }
+            return null;
+        }
+        return fds.extrair(pdf);
+    }
+
+    /**
+     * Se outro cadastro criou o mesmo código enquanto o extrator respondia, a empresa é vinculada a ele e a FDS
+     * extraída é descartada, como no vínculo comum. Se o produto já existente sumiu nesse intervalo (código trocado),
+     * a regra da FDS obrigatória vale de novo aqui.
+     */
+    private CadastroProdutoResponse gravar(
+            Integer empresaId,
+            EmpresaView empresa,
+            String nome,
+            String tipo,
+            String codBarras,
+            String descricao,
+            byte[] imagem,
+            String fdsExtraida) {
         if (codBarras != null) {
             Optional<Produto> existente = equivalente(produtos, codBarras);
             if (existente.isPresent()) {
                 return vincular(empresaId, existente.get());
             }
         }
+        if (fdsExtraida == null && fds.obrigatoria()) {
+            throw new CatalogException("fds_obrigatoria", 422);
+        }
         Produto produto = new Produto();
         produto.setNome(nome);
         produto.setTipo(tipo);
-        produto.setDescricao(textoOuNulo(form.descricao()));
+        produto.setDescricao(textoOuNulo(descricao));
         produto.setCodBarras(codBarras);
         produto.setMarca(marcaDa(empresa));
         if (imagem != null) {
@@ -74,6 +121,9 @@ public class CadastrarProdutoEmpresaUseCase {
         }
         produtos.save(produto);
         vinculos.save(novoVinculo(empresaId, produto.getId()));
+        if (fdsExtraida != null) {
+            fds.registrar(produto.getId(), fdsExtraida);
+        }
         return new CadastroProdutoResponse(ProdutoMapper.view(produto), CRIADO);
     }
 

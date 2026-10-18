@@ -1,0 +1,50 @@
+meta {
+  name: 09 - Cadastrar produto com FDS
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  nome: Desinfetante Com FDS
+  tipo: desinfetante
+  descricao: Cadastrado pelo Bruno com a ficha de segurança
+  codBarras: {{portalCodBarras}}
+  fds: @file(fixtures/fds-exemplo.pdf)
+}
+
+script:pre-request {
+  bru.setVar("portalCodBarras", `789${Date.now()}`.slice(0, 13));
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("portalProdutoId", res.getBody().produto.id);
+    bru.setVar("produtoId", res.getBody().produto.id);
+  }
+}
+
+tests {
+  test("cria o produto com a FDS lida pelo extrator (exige QUIMIA_EXTRATOR_URL)", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().situacao).to.equal("criado");
+  });
+}
+
+docs {
+  Envia o PDF da Ficha de Dados de Segurança (campo `fds`, até 15 MB) junto com o cadastro. A API manda o PDF ao quimia-extractor-ai e grava a resposta como FDS ativa do produto; o banco materializa a composição e as incompatibilidades.
+  Só produto novo usa a FDS: se o código já existir no catálogo, a empresa é vinculada e a FDS do produto não muda.
+  Sem `QUIMIA_EXTRATOR_URL` configurada, responde 503 extrator_indisponivel. Com `QUIMIA_FDS_OBRIGATORIA=true`, produto novo sem `fds` responde 422 fds_obrigatoria.
+  Antes: `00 / 04`. Depois: `05 / 02 - Substâncias do produto` com o `produtoId` mostra a composição.
+  Respostas: 201, 200 vinculado/reativado, 413 pdf_muito_grande/arquivo_muito_grande, 415 pdf_invalido, 422 fds_invalida/fds_obrigatoria, 502 extrator_falhou, 503 extrator_indisponivel.
+}

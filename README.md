@@ -83,7 +83,11 @@ dos secrets do Actions: `SPRING_DATASOURCE_URL`,
 `QUIMIA_JWT_PUBLIC_KEY_BASE64`, `APP_AUTH_HMAC_SECRET` (32 bytes ou mais; o
 nome legado `APP_AUTH_RECOVERY_CODE_PEPPER` continua aceito),
 `FIREBASE_PROJECT_ID` (login social), `APP_AUTH_EMPRESA_RESET_URL` e
-`SERVER_PORT=8080`. Para enviar os emails de recuperação pelo Gmail, configure
+`SERVER_PORT=8080`. A leitura do PDF da FDS no cadastro de produto usa o
+`quimia-extractor-ai`: `QUIMIA_EXTRATOR_URL`, `QUIMIA_EXTRATOR_TOKEN` (obrigatório
+quando há URL) e `QUIMIA_EXTRATOR_TIMEOUT_SEGUNDOS` (padrão 60). Sem URL, enviar
+`fds` responde 503; `QUIMIA_FDS_OBRIGATORIA=true` exige a FDS em produto novo e
+fica `false` até o extrator estar no ar. Para enviar os emails de recuperação pelo Gmail, configure
 `APP_EMAIL_SENDER_MODE=smtp`, `APP_EMAIL_FROM`, `SPRING_MAIL_USERNAME` e
 `SPRING_MAIL_PASSWORD` (senha de app do Google). Não coloque os valores
 no repositório ou no pacote. O PostgreSQL administra o schema: a API não roda

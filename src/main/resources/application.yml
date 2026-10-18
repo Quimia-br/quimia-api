@@ -28,8 +28,9 @@ spring:
       accept-float-as-int: false
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 6MB
+      # O maior arquivo é o PDF da FDS (15 MB); a imagem (5 MB) é conferida pelo caso de uso. O pedido leva os dois.
+      max-file-size: 15MB
+      max-request-size: 21MB
 server:
   port: ${SERVER_PORT:8080}
 
@@ -48,6 +49,14 @@ quimia:
     cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     api-key: ${CLOUDINARY_API_KEY:}
     api-secret: ${CLOUDINARY_API_SECRET:}
+  # Leitura do PDF da FDS pelo quimia-extractor-ai (POST {url}/extracoes). Sem URL, enviar `fds` responde 503.
+  extrator:
+    url: ${QUIMIA_EXTRATOR_URL:}
+    token: ${QUIMIA_EXTRATOR_TOKEN:}
+    timeout-segundos: ${QUIMIA_EXTRATOR_TIMEOUT_SEGUNDOS:60}
+  fds:
+    # Com true, produto novo só é criado com o PDF da FDS. Fica false até o extrator estar no ar.
+    obrigatoria: ${QUIMIA_FDS_OBRIGATORIA:false}
 
 app:
   cors:

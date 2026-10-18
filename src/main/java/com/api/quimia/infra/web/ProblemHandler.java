@@ -110,10 +110,13 @@ public class ProblemHandler {
         return resposta.body(problem(405, "Method Not Allowed", "metodo_nao_permitido", request));
     }
 
-    /** Imagem acima do limite do multipart (spring.servlet.multipart), recusada antes de chegar ao controller. */
+    /**
+     * Arquivo acima do limite do multipart (spring.servlet.multipart: 15 MB, o do PDF da FDS), recusado antes de
+     * chegar ao controller. Imagem acima de 5 MB e abaixo desse limite responde `imagem_muito_grande` pelo caso de uso.
+     */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ProblemDetail uploadGrande(MaxUploadSizeExceededException error, HttpServletRequest request) {
-        return problem(413, "Payload Too Large", "imagem_muito_grande", request);
+        return problem(413, "Payload Too Large", "arquivo_muito_grande", request);
     }
 
     /** JSON malformado, corpo ausente ou campo com tipo errado (ex.: objeto no lugar de texto, 1.9 como id). */
@@ -183,6 +186,8 @@ public class ProblemHandler {
             case "agente_falhou" -> "Bad Gateway";
             case "agente_indisponivel" -> "Service Unavailable";
             case "agente_timeout" -> "Gateway Timeout";
+            case "extrator_falhou" -> "Bad Gateway";
+            case "extrator_indisponivel" -> "Service Unavailable";
             default -> "Error";
         };
     }
