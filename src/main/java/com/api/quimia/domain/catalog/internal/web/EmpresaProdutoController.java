@@ -12,6 +12,7 @@ import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosEmpresaUseCa
 import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.RemoverProdutoEmpresaUseCase;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -51,13 +52,14 @@ public class EmpresaProdutoController {
     public Pagina<ProdutoView> listar(
             @AuthenticationPrincipal AccountPrincipal principal,
             @RequestParam(name = "q", required = false) String termo,
+            @RequestParam(required = false) List<String> fields,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String codBarras,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String direcao,
             @RequestParam(name = "page", defaultValue = "0") int pagina,
             @RequestParam(name = "size", defaultValue = "" + ListarProdutosUseCase.TAMANHO_PADRAO) int tamanho) {
-        return listar.execute(principal.empresaId(), termo, tipo, codBarras, sort, direcao, pagina, tamanho);
+        return listar.execute(principal.empresaId(), termo, fields, tipo, codBarras, sort, direcao, pagina, tamanho);
     }
 
     /** `201` quando o produto foi criado; `200` quando a empresa foi vinculada ou reativada. */

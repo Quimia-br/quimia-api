@@ -164,7 +164,7 @@ public class ProblemHandler {
             case "not_found", "produto_nao_encontrado", "usuario_nao_encontrado", "empresa_nao_encontrada",
                     "produto_nao_esta_na_estante", "substancia_nao_encontrada" -> "Not Found";
             case "codigo_barras_invalido" -> "Unprocessable";
-            case "paginacao_invalida", "tipo_invalido", "termo_muito_longo", "nome_invalido" -> "Bad Request";
+            case "paginacao_invalida", "tipo_invalido", "termo_muito_longo", "nome_invalido", "campo_busca_invalido" -> "Bad Request";
             case "imagem_invalida" -> "Unsupported Media Type";
             case "imagem_muito_grande" -> "Payload Too Large";
             case "armazenamento_imagem_falhou" -> "Bad Gateway";
