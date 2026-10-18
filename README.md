@@ -83,9 +83,15 @@ dos secrets do Actions: `SPRING_DATASOURCE_URL`,
 `QUIMIA_JWT_PUBLIC_KEY_BASE64`, `APP_AUTH_HMAC_SECRET` (32 bytes ou mais; o
 nome legado `APP_AUTH_RECOVERY_CODE_PEPPER` continua aceito),
 `FIREBASE_PROJECT_ID` (login social), `APP_AUTH_EMPRESA_RESET_URL` e
-`SERVER_PORT=8080`. Para enviar os emails de recuperação pelo Gmail, configure
-`APP_EMAIL_SENDER_MODE=smtp`, `APP_EMAIL_FROM`, `SPRING_MAIL_USERNAME` e
-`SPRING_MAIL_PASSWORD` (senha de app do Google). Não coloque os valores
+`SERVER_PORT=8080`. Para enviar os emails de recuperação pelo Resend (padrão
+de produção, com o domínio `quimia.app` verificado no painel do Resend), configure
+`APP_EMAIL_SENDER_MODE=resend`, `RESEND_API_KEY` (chave com permissão de envio) e
+`APP_EMAIL_FROM=Quimia <nao-responda@quimia.app>`; o remetente precisa ser do
+domínio verificado. A alternativa pelo Gmail usa `APP_EMAIL_SENDER_MODE=smtp`,
+`APP_EMAIL_FROM`, `SPRING_MAIL_USERNAME` e `SPRING_MAIL_PASSWORD` (senha de app do
+Google). Faltando variável do modo escolhido, a API não sobe. As imagens de
+produto e o logo da empresa usam `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` e
+`CLOUDINARY_API_SECRET`; sem elas, enviar imagem responde 503. Não coloque os valores
 no repositório ou no pacote. O PostgreSQL administra o schema: a API não roda
 migrations nem DDL e mantém `ddl-auto: validate`. Antes de publicar, confira
 colunas, tipos, constraints e índices em consultas somente leitura conforme
