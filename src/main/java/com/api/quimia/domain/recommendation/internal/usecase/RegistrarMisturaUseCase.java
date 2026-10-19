@@ -7,12 +7,16 @@ import com.api.quimia.domain.safety.CompatibilidadeGateway;
 import com.api.quimia.domain.safety.dto.AvaliacaoParView;
 import com.api.quimia.domain.storage.EstanteGateway;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Cada chamada é uma consulta nova: grava uma linha em `historico_match` com o par normalizado. */
+/**
+ * Cada chamada é uma consulta nova: grava uma linha em `historico_match` com o par normalizado. Os dois produtos ficam
+ * travados na estante até o commit: se o usuário os remover ao mesmo tempo, a remoção espera e apaga a mistura junto.
+ */
 @Service
 public class RegistrarMisturaUseCase {
     private final EstanteGateway estante;
@@ -36,7 +40,7 @@ public class RegistrarMisturaUseCase {
         if (produtoIdA.equals(produtoIdB)) {
             throw new RecommendationException("produtos_iguais", 422);
         }
-        Set<Integer> naEstante = Set.copyOf(estante.produtoIdsDoUsuario(usuarioId));
+        Set<Integer> naEstante = estante.travarNaEstante(usuarioId, List.of(produtoIdA, produtoIdB));
         if (!naEstante.contains(produtoIdA) || !naEstante.contains(produtoIdB)) {
             throw new RecommendationException("produto_nao_esta_na_estante", 404);
         }
