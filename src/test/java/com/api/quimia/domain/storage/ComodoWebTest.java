@@ -132,6 +132,28 @@ class ComodoWebTest {
                 .andExpect(jsonPath("$.detail").value("comodo_produtos_insuficientes"));
     }
 
+    private int[] produtosNaEstante(String prefixo, int quantidade) {
+        int outraMarca = catalogo.marca(prefixo, null);
+        int[] ids = new int[quantidade];
+        for (int i = 0; i < quantidade; i++) {
+            ids[i] = catalogo.produto(prefixo + " " + i, outraMarca, "outro", null, null);
+            catalogo.guardar(usuarioA, ids[i]);
+        }
+        return ids;
+    }
+
+    private static String lista(int... ids) {
+        return Arrays.stream(ids).mapToObj(String::valueOf).collect(Collectors.joining(","));
+    }
+
+    @Test
+    void vinteProdutosNaCriacaoEhOLimiteAceito() throws Exception {
+        criar(tokenA, "Despensa", "caixa", produtosNaEstante("Vinte", 20))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.produtos.length()").value(20))
+                .andExpect(jsonPath("$.avaliacao.totalProdutos").value(20));
+    }
+
     @Test
     void maisDeVinteProdutosEhRecusado() throws Exception {
         int[] muitos = new int[21];
@@ -276,6 +298,19 @@ class ComodoWebTest {
     }
 
     @Test
+    void produtosDoComodoSaemPorNomeSemAcentoENaoPorId() throws Exception {
+        int zeta = produtoCom("Zeta", agua);
+        int alfa = produtoCom("Água sanitária", agua);
+        catalogo.guardar(usuarioA, zeta);
+        catalogo.guardar(usuarioA, alfa);
+        int id = criarEObterId(tokenA, "Lavanderia", zeta, alfa);
+
+        mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.produtos[0].nome").value("Água sanitária"))
+                .andExpect(jsonPath("$.produtos[1].nome").value("Zeta"));
+    }
+
+    @Test
     void detalheDeOutroUsuarioEInexistenteDa404IgualEIdInvalidoDa400() throws Exception {
         int id = criarEObterId(tokenA, "Banheiro", p1, p2);
 
@@ -372,6 +407,106 @@ class ComodoWebTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"produtoIds\":[" + p3 + "]}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("comodo_nao_encontrado"));
+    }
+
+    @Test
+    void adicionarAteVinteEhAceitoEUmAMaisNao() throws Exception {
+        int id = criarEObterId(tokenA, "Despensa", p1, p2);
+        int[] extras = produtosNaEstante("Extra", 19);
+
+        mvc.perform(post("/api/v1/comodos/" + id + "/produtos").header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"produtoIds\":[" + lista(Arrays.copyOf(extras, 18)) + "]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.produtos.length()").value(20));
+        mvc.perform(post("/api/v1/comodos/" + id + "/produtos").header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"produtoIds\":[" + extras[18] + "]}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("comodo_produtos_demais"));
+        Integer noComodo = jdbc.queryForObject(
+                "SELECT count(*) FROM estante_produto WHERE id_comodo = ?", Integer.class, id);
+        assertThat(noComodo).isEqualTo(20);
+    }
+
+    @Test
+    void adicionarListaVaziaNaoMudaNada() throws Exception {
+        int id = criarEObterId(tokenA, "Banheiro", p1, p2);
+
+        mvc.perform(post("/api/v1/comodos/" + id + "/produtos").header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"produtoIds\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.produtos.length()").value(2));
+    }
+
+    @Test
+    void comodoQueFicouVazioContinuaConsultavel() throws Exception {
+        int id = criarEObterId(tokenA, "Banheiro", p1, p2);
+        for (int produto : new int[] {p1, p2}) {
+            mvc.perform(delete("/api/v1/comodos/" + id + "/produtos/" + produto).header("Authorization", "Bearer " + tokenA))
+                    .andExpect(status().isNoContent());
+        }
+
+        mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.produtos.length()").value(0))
+                .andExpect(jsonPath("$.avaliacao.status").value("nao_avaliado"))
+                .andExpect(jsonPath("$.avaliacao.totalProdutos").value(0));
+        mvc.perform(get("/api/v1/comodos").header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.itens[0].totalProdutos").value(0))
+                .andExpect(jsonPath("$.itens[0].status").value("nao_avaliado"));
+    }
+
+    @Test
+    void paginasDaListaDeComodosNosLimites() throws Exception {
+        criarEObterId(tokenA, "A", p1, p2);
+        int[] outros = produtosNaEstante("Pagina", 4);
+        criarEObterId(tokenA, "B", outros[0], outros[1]);
+        criarEObterId(tokenA, "C", outros[2], outros[3]);
+
+        mvc.perform(get("/api/v1/comodos").param("page", "1").param("size", "2").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(1))
+                .andExpect(jsonPath("$.itens[0].nome").value("C"))
+                .andExpect(jsonPath("$.totalItens").value(3))
+                .andExpect(jsonPath("$.totalPaginas").value(2));
+        for (String tamanho : new String[] {"1", "50"}) {
+            mvc.perform(get("/api/v1/comodos").param("size", tamanho).header("Authorization", "Bearer " + tokenA))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(get("/api/v1/comodos").param("page", "42949672").param("size", "50")
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(0));
+        mvc.perform(get("/api/v1/comodos").param("page", "2147483647").param("size", "1")
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(0));
+        mvc.perform(get("/api/v1/comodos").param("page", "42949673").param("size", "50")
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("paginacao_invalida"));
+        mvc.perform(get("/api/v1/comodos").param("q", "a".repeat(100)).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(0));
+    }
+
+    /** R5: o banco não impede `id_comodo` de outro usuário; a API não pode revelar esse cômodo. */
+    @Test
+    void comodoDeOutroUsuarioGravadoNaLinhaNaoVaza() throws Exception {
+        int marcaB = catalogo.marca("Marca B", null);
+        int x = catalogo.produto("X", marcaB, "outro", null, null);
+        int y = catalogo.produto("Y", marcaB, "outro", null, null);
+        catalogo.guardar(usuarioB, x);
+        catalogo.guardar(usuarioB, y);
+        int comodoDeB = criarEObterId(tokenB, "Quarto de B", x, y);
+        jdbc.update("UPDATE estante_produto SET id_comodo = ? WHERE id_usuario = ? AND id_produto = ?",
+                comodoDeB, usuarioA, p1);
+
+        mvc.perform(get("/api/v1/estante/produtos/" + p1 + "/comodo").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("produto_sem_comodo"));
+        mvc.perform(get("/api/v1/comodos/" + comodoDeB).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNotFound());
     }
 
     @Test

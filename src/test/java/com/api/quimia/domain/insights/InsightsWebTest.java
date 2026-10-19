@@ -173,6 +173,16 @@ class InsightsWebTest {
                 .andExpect(jsonPath("$.detail").value("empresa_inativa"));
     }
 
+    @Test
+    void empresaApagadaComTokenAindaValidoDa404() throws Exception {
+        String token = TestLogins.empresa(mvc, "Apagada", "apagada@insights.test", "30000021000178");
+        jdbc.update("DELETE FROM empresa WHERE email = 'apagada@insights.test'");
+
+        resumo(token)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("empresa_nao_encontrada"));
+    }
+
     // --- GET /empresas/me/estatisticas ---
 
     @Test
@@ -210,6 +220,7 @@ class InsightsWebTest {
 
     @Test
     void termoMuitoLongoDa400() throws Exception {
+        estatisticas(tokenEmpresa, "a".repeat(100)).andExpect(status().isOk());
         estatisticas(tokenEmpresa, "a".repeat(101))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("termo_muito_longo"));

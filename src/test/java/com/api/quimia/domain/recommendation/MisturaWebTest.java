@@ -291,6 +291,35 @@ class MisturaWebTest {
     }
 
     @Test
+    void paginacaoNosLimites() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            catalogo.historicoMatch(usuarioA, alvejante, limpaVidros, "compativel", null, null, null);
+        }
+
+        mvc.perform(get("/api/v1/misturas").param("page", "1").param("size", "2").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(1))
+                .andExpect(jsonPath("$.totalItens").value(3))
+                .andExpect(jsonPath("$.totalPaginas").value(2));
+        for (String tamanho : new String[] {"1", "50"}) {
+            mvc.perform(get("/api/v1/misturas").param("size", tamanho).header("Authorization", "Bearer " + tokenA))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(get("/api/v1/misturas").param("page", "42949672").param("size", "50")
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(0));
+        mvc.perform(get("/api/v1/misturas").param("page", "2147483647").param("size", "1")
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(0));
+        mvc.perform(get("/api/v1/misturas").param("page", "42949673").param("size", "50")
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("paginacao_invalida"));
+    }
+
+    @Test
     void consultaPorIdEIsolaUsuarios() throws Exception {
         int id = catalogo.historicoMatch(usuarioA, alvejante, limpaVidros, "incompativel", "alta", "Risco", null);
 
