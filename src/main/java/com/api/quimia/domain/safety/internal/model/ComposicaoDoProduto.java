@@ -9,6 +9,11 @@ import java.util.Set;
 public record ComposicaoDoProduto(Set<Integer> substancias, Set<Integer> classes, boolean temCompostoNaoResolvido) {
     public static final ComposicaoDoProduto VAZIA = new ComposicaoDoProduto(Set.of(), Set.of(), false);
 
+    public ComposicaoDoProduto {
+        substancias = Set.copyOf(substancias);
+        classes = Set.copyOf(classes);
+    }
+
     public boolean semSubstanciaResolvida() {
         return substancias.isEmpty();
     }
