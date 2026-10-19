@@ -28,9 +28,10 @@ spring:
       accept-float-as-int: false
   servlet:
     multipart:
-      # O maior arquivo é o PDF da FDS (15 MB); a imagem (5 MB) é conferida pelo caso de uso. O pedido leva os dois.
-      max-file-size: 15MB
-      max-request-size: 21MB
+      # O maior arquivo é o PDF da FDS (10 MB, o limite de arquivo raw do Cloudinary); a imagem (5 MB) é conferida
+      # pelo caso de uso. O pedido leva os dois.
+      max-file-size: 10MB
+      max-request-size: 16MB
 server:
   port: ${SERVER_PORT:8080}
 

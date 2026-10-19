@@ -29,7 +29,7 @@ public class RegistroDeFdsRecebida {
         em.createNativeQuery("UPDATE fds SET ativo = FALSE WHERE id_produto = :produto AND ativo = TRUE")
                 .setParameter("produto", evento.produtoId())
                 .executeUpdate();
-        em.persist(new NovaFds(evento.produtoId(), evento.rawJson(), LocalDate.now(FUSO)));
+        em.persist(new NovaFds(evento.produtoId(), evento.rawJson(), evento.fonteUrl(), LocalDate.now(FUSO)));
         em.flush();
     }
 }

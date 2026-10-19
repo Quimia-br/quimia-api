@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("test")
 @ContextConfiguration(initializers = TestJwtKeys.class)
 @TestPropertySource(properties = "quimia.fds.obrigatoria=true")
+@Import(FdsDoProdutoWebTest.ArmazenamentoFalso.class)
 class FdsObrigatoriaWebTest {
     /** Substitui a definição do bean: a fábrica real recusaria subir com a flag ligada e sem URL do extrator. */
     @TestBean

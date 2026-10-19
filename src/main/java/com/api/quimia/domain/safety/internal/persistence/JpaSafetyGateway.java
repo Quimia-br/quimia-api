@@ -3,6 +3,7 @@ package com.api.quimia.domain.safety.internal.persistence;
 import com.api.quimia.domain.safety.SafetyGateway;
 import com.api.quimia.domain.safety.dto.ClasseQuimicaView;
 import com.api.quimia.domain.safety.dto.ComposicaoView;
+import com.api.quimia.domain.safety.dto.FdsDocumentoView;
 import com.api.quimia.domain.safety.dto.ResumoSimplificadoView;
 import com.api.quimia.domain.safety.dto.SubstanciaNaEstanteView;
 import com.api.quimia.domain.safety.dto.SubstanciaView;
@@ -21,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +31,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @Transactional(readOnly = true)
 public class JpaSafetyGateway implements SafetyGateway {
+    private static final String HTTPS = "https://";
+    private static final Pattern NOME_DO_PDF_DO_PORTAL =
+            Pattern.compile("/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/([A-Za-z0-9._-]+\\.pdf)$");
+
     @PersistenceContext
     private EntityManager em;
 
@@ -39,6 +46,29 @@ public class JpaSafetyGateway implements SafetyGateway {
         }
         return new ResumoSimplificadoView(
                 produtoId, textoOuNulo(fds.getResumoSimplificado()), fds.getVersao(), fds.getDataAtualizacao());
+    }
+
+    @Override
+    public Optional<FdsDocumentoView> documentoDaFds(Integer produtoId) {
+        Fds fds = fdsAtivasMaisRecentes(List.of(produtoId)).get(produtoId);
+        if (fds == null) {
+            return Optional.empty();
+        }
+        String url = textoOuNulo(fds.getFonteUrl());
+        if (url == null || !url.startsWith(HTTPS)) {
+            return Optional.of(new FdsDocumentoView(produtoId, null, null, fds.getVersao(), fds.getDataAtualizacao()));
+        }
+        return Optional.of(new FdsDocumentoView(
+                produtoId, url, nomeDoArquivo(url), fds.getVersao(), fds.getDataAtualizacao()));
+    }
+
+    /**
+     * O nome do PDF é o último trecho da URL que a API grava (`.../{uuid}/{nome}.pdf`). `fonte_url` preenchida por
+     * outro meio (ex.: a procedure de cadastro do banco) não tem esse formato: o link vai, sem nome.
+     */
+    private static String nomeDoArquivo(String url) {
+        Matcher nome = NOME_DO_PDF_DO_PORTAL.matcher(url);
+        return nome.find() ? nome.group(1) : null;
     }
 
     @Override

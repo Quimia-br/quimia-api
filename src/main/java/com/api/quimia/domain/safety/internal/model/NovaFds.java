@@ -34,12 +34,19 @@ public class NovaFds {
     @Column(name = "raw_json")
     private String rawJson;
 
+    @Column(name = "fonte_url", columnDefinition = "text")
+    private String fonteUrl;
+
     protected NovaFds() {}
 
-    /** FDS ativa recebida pelo portal: sem versão nem resumo (o extrator não os devolve), datada de hoje. */
-    public NovaFds(Integer produtoId, String rawJson, LocalDate hoje) {
+    /**
+     * FDS ativa recebida pelo portal: sem versão nem resumo (o extrator não os devolve), datada de hoje, com o PDF
+     * guardado em `fonteUrl`.
+     */
+    public NovaFds(Integer produtoId, String rawJson, String fonteUrl, LocalDate hoje) {
         this.produtoId = produtoId;
         this.rawJson = rawJson;
+        this.fonteUrl = fonteUrl;
         this.dataAtualizacao = hoje;
         this.ativo = true;
     }

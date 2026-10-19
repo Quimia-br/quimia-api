@@ -111,7 +111,7 @@ public class ProblemHandler {
     }
 
     /**
-     * Arquivo acima do limite do multipart (spring.servlet.multipart: 15 MB, o do PDF da FDS), recusado antes de
+     * Arquivo acima do limite do multipart (spring.servlet.multipart: 10 MB, o do PDF da FDS), recusado antes de
      * chegar ao controller. Imagem acima de 5 MB e abaixo desse limite responde `imagem_muito_grande` pelo caso de uso.
      */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -188,6 +188,9 @@ public class ProblemHandler {
             case "agente_timeout" -> "Gateway Timeout";
             case "extrator_falhou" -> "Bad Gateway";
             case "extrator_indisponivel" -> "Service Unavailable";
+            case "fds_nao_encontrada" -> "Not Found";
+            case "armazenamento_fds_falhou" -> "Bad Gateway";
+            case "armazenamento_fds_indisponivel" -> "Service Unavailable";
             default -> "Error";
         };
     }

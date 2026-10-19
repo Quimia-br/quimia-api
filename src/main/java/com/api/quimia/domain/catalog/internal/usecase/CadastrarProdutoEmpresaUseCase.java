@@ -22,9 +22,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Cadastro pelo portal. A marca é sempre a da empresa (sem campo no formulário). Se o código de
  * barras já existe no catálogo, a empresa é vinculada ao produto existente em vez de duplicá-lo.
  *
- * A FDS (PDF) só é lida quando o produto vai ser criado: vincular a um produto existente mantém a FDS dele. O
- * extrator é chamado antes da transação (pode levar até um minuto); a gravação do produto, do vínculo e da FDS
- * acontece numa transação só.
+ * A FDS (PDF) só é lida quando o produto vai ser criado: vincular a um produto existente mantém a FDS dele. O PDF é
+ * guardado e passa pelo extrator antes da transação (pode levar até um minuto); a gravação do produto, do vínculo e
+ * da FDS acontece numa transação só, e o PDF é apagado se ela falhar ou terminar em vínculo.
  */
 @Service
 public class CadastrarProdutoEmpresaUseCase {
@@ -67,9 +67,27 @@ public class CadastrarProdutoEmpresaUseCase {
         String tipo = EmpresaDoPortal.tipoValido(form.tipo());
         String codBarras = CatalogException.codigoBarras(form.codBarras());
         byte[] imagem = imagens.ler(form.imagem());
-        String fdsExtraida = codigoJaCadastrado(codBarras) ? null : fdsDoProdutoNovo(fds.ler(form.fds()));
-        return transacao.execute(
-                status -> gravar(empresaId, empresa, nome, tipo, codBarras, form.descricao(), imagem, fdsExtraida));
+        FdsDoProduto.FdsPreparada fdsPreparada =
+                codigoJaCadastrado(codBarras) ? null : fdsDoProdutoNovo(empresaId, fds.ler(form.fds()));
+        CadastroProdutoResponse resposta;
+        try {
+            resposta = transacao.execute(
+                    status -> gravar(empresaId, empresa, nome, tipo, codBarras, form.descricao(), imagem, fdsPreparada));
+        } catch (RuntimeException falha) {
+            descartar(fdsPreparada);
+            throw falha;
+        }
+        if (!CRIADO.equals(resposta.situacao())) {
+            descartar(fdsPreparada);
+        }
+        return resposta;
+    }
+
+    /** O PDF guardado antes da transação sai do armazenamento se a FDS não foi gravada. */
+    private void descartar(FdsDoProduto.FdsPreparada fdsPreparada) {
+        if (fdsPreparada != null) {
+            fds.descartar(fdsPreparada);
+        }
     }
 
     /** Leitura sem bloqueio, só para decidir se o extrator será chamado; a transação confere de novo. */
@@ -77,19 +95,19 @@ public class CadastrarProdutoEmpresaUseCase {
         return codBarras != null && !produtos.findByCodBarrasIn(CodigoBarras.equivalentes(codBarras)).isEmpty();
     }
 
-    private String fdsDoProdutoNovo(byte[] pdf) {
+    private FdsDoProduto.FdsPreparada fdsDoProdutoNovo(Integer empresaId, FdsDoProduto.PdfDaFds pdf) {
         if (pdf == null) {
             if (fds.obrigatoria()) {
                 throw new CatalogException("fds_obrigatoria", 422);
             }
             return null;
         }
-        return fds.extrair(pdf);
+        return fds.preparar(empresaId, pdf);
     }
 
     /**
      * Se outro cadastro criou o mesmo código enquanto o extrator respondia, a empresa é vinculada a ele e a FDS
-     * extraída é descartada, como no vínculo comum. Se o produto já existente sumiu nesse intervalo (código trocado),
+     * preparada é descartada, como no vínculo comum. Se o produto já existente sumiu nesse intervalo (código trocado),
      * a regra da FDS obrigatória vale de novo aqui.
      */
     private CadastroProdutoResponse gravar(
@@ -100,14 +118,14 @@ public class CadastrarProdutoEmpresaUseCase {
             String codBarras,
             String descricao,
             byte[] imagem,
-            String fdsExtraida) {
+            FdsDoProduto.FdsPreparada fdsPreparada) {
         if (codBarras != null) {
             Optional<Produto> existente = equivalente(produtos, codBarras);
             if (existente.isPresent()) {
                 return vincular(empresaId, existente.get());
             }
         }
-        if (fdsExtraida == null && fds.obrigatoria()) {
+        if (fdsPreparada == null && fds.obrigatoria()) {
             throw new CatalogException("fds_obrigatoria", 422);
         }
         Produto produto = new Produto();
@@ -121,8 +139,8 @@ public class CadastrarProdutoEmpresaUseCase {
         }
         produtos.save(produto);
         vinculos.save(novoVinculo(empresaId, produto.getId()));
-        if (fdsExtraida != null) {
-            fds.registrar(produto.getId(), fdsExtraida);
+        if (fdsPreparada != null) {
+            fds.registrar(produto.getId(), fdsPreparada);
         }
         return new CadastroProdutoResponse(ProdutoMapper.view(produto), CRIADO);
     }

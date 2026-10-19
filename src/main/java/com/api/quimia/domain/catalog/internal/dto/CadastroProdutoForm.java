@@ -7,7 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * Campos do formulário "Cadastrar novo produto" (multipart/form-data). Não há marca: a API usa
  * o nome da empresa. A imagem (JPEG, PNG ou WebP, até 5 MB) é opcional. `fds` é o PDF da Ficha de Dados de
- * Segurança (até 15 MB): obrigatório para produto novo quando `quimia.fds.obrigatoria` está ligada.
+ * Segurança (até 10 MB): obrigatório para produto novo quando `quimia.fds.obrigatoria` está ligada.
  */
 public record CadastroProdutoForm(
         @NotBlank @Size(min = 2, max = 255) String nome,

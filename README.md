@@ -87,7 +87,10 @@ nome legado `APP_AUTH_RECOVERY_CODE_PEPPER` continua aceito),
 `quimia-extractor-ai`: `QUIMIA_EXTRATOR_URL`, `QUIMIA_EXTRATOR_TOKEN` (obrigatório
 quando há URL) e `QUIMIA_EXTRATOR_TIMEOUT_SEGUNDOS` (padrão 60). Sem URL, enviar
 `fds` responde 503; `QUIMIA_FDS_OBRIGATORIA=true` exige a FDS em produto novo e
-fica `false` até o extrator estar no ar. Para enviar os emails de recuperação pelo Gmail, configure
+fica `false` até o extrator estar no ar. O PDF da FDS é guardado no Cloudinary para
+download (mesmas variáveis `CLOUDINARY_*` das imagens; sem elas, enviar `fds` responde 503). A conta
+precisa ter a entrega de PDF liberada (Settings › Security); o limite de 10 MB do PDF é o de arquivo `raw`
+do plano atual. Para enviar os emails de recuperação pelo Gmail, configure
 `APP_EMAIL_SENDER_MODE=smtp`, `APP_EMAIL_FROM`, `SPRING_MAIL_USERNAME` e
 `SPRING_MAIL_PASSWORD` (senha de app do Google). Não coloque os valores
 no repositório ou no pacote. O PostgreSQL administra o schema: a API não roda

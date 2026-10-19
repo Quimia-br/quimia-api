@@ -2,6 +2,7 @@ package com.api.quimia.domain.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,7 +12,10 @@ import com.api.quimia.TestJwtKeys;
 import com.api.quimia.TestLogins;
 import com.api.quimia.domain.catalog.internal.fds.ExtratorFds;
 import com.api.quimia.domain.catalog.internal.fds.ExtratorFdsException;
+import com.api.quimia.domain.catalog.internal.image.DocumentoStorage;
+import com.api.quimia.domain.catalog.internal.image.ImageStorageException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,10 +46,10 @@ import tools.jackson.databind.json.JsonMapper;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @ContextConfiguration(initializers = TestJwtKeys.class)
-@Import(FdsDoProdutoWebTest.ExtratorFalso.class)
+@Import({FdsDoProdutoWebTest.ExtratorFalso.class, FdsDoProdutoWebTest.ArmazenamentoFalso.class})
 class FdsDoProdutoWebTest {
     static final byte[] PDF = "%PDF-1.7\n1 0 obj\n<<>>\nendobj\n".getBytes(StandardCharsets.US_ASCII);
-    private static final int LIMITE_DO_PDF = 15 * 1024 * 1024;
+    private static final int LIMITE_DO_PDF = 10 * 1024 * 1024;
     private static final int ALTERACOES_SIMULTANEAS = 6;
 
     @TestConfiguration
@@ -57,8 +61,23 @@ class FdsDoProdutoWebTest {
         }
     }
 
+    /** PDFs das FDS: o armazenamento real fica desligado nos testes (sem `CLOUDINARY_*`). */
+    @TestConfiguration
+    public static class ArmazenamentoFalso {
+        @Bean
+        @Primary
+        FakeDocumentoStorage fakeDocumentoStorage() {
+            return new FakeDocumentoStorage();
+        }
+    }
+
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private DocumentoStorage documentosBean;
+
+    private FakeDocumentoStorage documentos;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -76,6 +95,8 @@ class FdsDoProdutoWebTest {
     void seed() throws Exception {
         extrator = (FakeExtratorFds) extratorBean;
         extrator.limpar();
+        documentos = (FakeDocumentoStorage) documentosBean;
+        documentos.limpar();
         catalogo = new TestCatalogo(jdbc);
         catalogo.limpar();
         jdbc.update("DELETE FROM empresa WHERE email LIKE '%@fds.test'");
@@ -125,7 +146,8 @@ class FdsDoProdutoWebTest {
     private List<Map<String, Object>> fdsDo(int produto) {
         String json = catalogo.postgres() ? "raw_json::text" : "CAST(raw_json AS VARCHAR)";
         return jdbc.queryForList(
-                "SELECT id, ativo, data_atualizacao, " + json + " AS json FROM fds WHERE id_produto = ? ORDER BY id", produto);
+                "SELECT id, ativo, data_atualizacao, fonte_url, " + json + " AS json FROM fds WHERE id_produto = ? ORDER BY id",
+                produto);
     }
 
     private int produtosDaEmpresa() {
@@ -144,6 +166,100 @@ class FdsDoProdutoWebTest {
         assertThat(fds.get(0).get("ativo")).isEqualTo(true);
         assertThat(fds.get(0).get("data_atualizacao")).isNotNull();
         assertThat((String) fds.get(0).get("json")).contains("Etanol", "Agentes oxidantes fortes");
+        assertThat(documentos.enviados()).hasSize(1);
+        assertThat(fds.get(0).get("fonte_url")).isEqualTo(documentos.enviados().get(0));
+        assertThat(documentos.enviados().get(0)).startsWith(FakeDocumentoStorage.BASE + "fds/" + empresa + "/")
+                .endsWith("/ficha.pdf");
+    }
+
+    /** O detalhe do produto no portal mostra a ficha com download (Figma: "Ficha de dados de segurança"). */
+    @Test
+    void empresaBaixaAFdsAtivaDoProduto() throws Exception {
+        int produto = idDe(cadastrar("7896660000141", pdf(PDF)).andExpect(status().isCreated()));
+
+        fdsParaDownload(token, produto)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.produtoId").value(produto))
+                .andExpect(jsonPath("$.url").value(documentos.enviados().get(0)))
+                .andExpect(jsonPath("$.nomeArquivo").value("ficha.pdf"))
+                .andExpect(jsonPath("$.dataAtualizacao").isNotEmpty());
+
+        alterar(token, produto, new MockMultipartFile("fds", "Ficha Nova (v2).PDF", "application/pdf", PDF))
+                .andExpect(status().isOk());
+        fdsParaDownload(token, produto)
+                .andExpect(jsonPath("$.url").value(documentos.enviados().get(1)))
+                .andExpect(jsonPath("$.nomeArquivo").value("Ficha-Nova-v2.pdf"));
+        assertThat(documentos.apagados()).isEmpty();
+    }
+
+    @Test
+    void downloadSoParaAEmpresaDoProdutoAtivaENaoParaOApp() throws Exception {
+        int produto = idDe(cadastrar("7896660000158", pdf(PDF)).andExpect(status().isCreated()));
+        int semFds = idDe(cadastrar("7896660000165").andExpect(status().isCreated()));
+
+        fdsParaDownload(tokenOutra, produto).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("produto_nao_encontrado"));
+        fdsParaDownload(token, semFds).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("fds_nao_encontrada"));
+        fdsParaDownload(TestLogins.usuario(mvc, "u@fds.test"), produto).andExpect(status().isForbidden());
+        jdbc.update("UPDATE empresa SET ativo = FALSE WHERE id = ?", empresa);
+        fdsParaDownload(token, produto).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("empresa_inativa"));
+    }
+
+    /** FDS carregada por outro meio (sem PDF enviado pelo portal) aparece sem link. */
+    @Test
+    void fdsSemArquivoVemSemLink() throws Exception {
+        int produto = idDe(cadastrar("7896660000172").andExpect(status().isCreated()));
+        catalogo.fds(produto, "v1", LocalDate.of(2026, 1, 10), true, null);
+
+        fdsParaDownload(token, produto).andExpect(status().isOk())
+                .andExpect(jsonPath("$.url").doesNotExist())
+                .andExpect(jsonPath("$.nomeArquivo").doesNotExist())
+                .andExpect(jsonPath("$.versao").value("v1"));
+    }
+
+    @Test
+    void armazenamentoForaDoArNaoCriaProduto() throws Exception {
+        documentos.falharComo(ImageStorageException.Motivo.INDISPONIVEL);
+        cadastrar("7896660000189", pdf(PDF)).andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.detail").value("armazenamento_fds_indisponivel"));
+        documentos.falharComo(ImageStorageException.Motivo.FALHOU);
+        cadastrar("7896660000189", pdf(PDF)).andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.detail").value("armazenamento_fds_falhou"));
+
+        assertThat(produtosDaEmpresa()).isZero();
+        assertThat(extrator.chamadas()).isZero();
+    }
+
+    @Test
+    void downloadComVinculoDesativadoDaPropriaEmpresaEh404() throws Exception {
+        int produto = idDe(cadastrar("7896660000196", pdf(PDF)).andExpect(status().isCreated()));
+        jdbc.update("UPDATE empresa_produto SET ativo = FALSE WHERE id_empresa = ? AND id_produto = ?", empresa, produto);
+
+        fdsParaDownload(token, produto).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("produto_nao_encontrado"));
+    }
+
+    /** `fonte_url` gravada por outro meio: link https vai sem nome; o que não é https não vira link. */
+    @Test
+    void fonteUrlQueNaoVeioDoPortal() throws Exception {
+        int produto = idDe(cadastrar("7896660000202").andExpect(status().isCreated()));
+        int fds = catalogo.fds(produto, "v2", LocalDate.of(2026, 2, 1), true, null);
+
+        jdbc.update("UPDATE fds SET fonte_url = 'https://fornecedor.example.com/fichas/limpa%2Gvidros' WHERE id = ?", fds);
+        fdsParaDownload(token, produto).andExpect(status().isOk())
+                .andExpect(jsonPath("$.url").value("https://fornecedor.example.com/fichas/limpa%2Gvidros"))
+                .andExpect(jsonPath("$.nomeArquivo").doesNotExist());
+
+        jdbc.update("UPDATE fds SET fonte_url = 'javascript:alert(1)' WHERE id = ?", fds);
+        fdsParaDownload(token, produto).andExpect(status().isOk())
+                .andExpect(jsonPath("$.url").doesNotExist());
+    }
+
+    private ResultActions fdsParaDownload(String tokenDeQuem, int produto) throws Exception {
+        return mvc.perform(get("/api/v1/empresas/me/produtos/" + produto + "/fds")
+                .header("Authorization", "Bearer " + tokenDeQuem));
     }
 
     @Test
@@ -205,6 +321,8 @@ class FdsDoProdutoWebTest {
                     .andExpect(jsonPath("$.detail").value(caso[2]));
         }
         assertThat(produtosDaEmpresa()).isZero();
+        assertThat(documentos.enviados()).hasSize(casos.length);
+        assertThat(documentos.apagados()).containsExactlyElementsOf(documentos.enviados());
     }
 
     @Test
@@ -216,6 +334,7 @@ class FdsDoProdutoWebTest {
                 .andExpect(jsonPath("$.detail").value("extrator_falhou"));
 
         assertThat(produtosDaEmpresa()).isZero();
+        assertThat(documentos.apagados()).containsExactlyElementsOf(documentos.enviados());
     }
 
     @Test
@@ -332,6 +451,7 @@ class FdsDoProdutoWebTest {
             assertThat(jdbc.queryForObject(
                             "SELECT count(*) FROM produto WHERE cod_barras = '7896660000134'", Integer.class))
                     .isZero();
+            assertThat(documentos.apagados()).containsExactlyElementsOf(documentos.enviados());
         } finally {
             jdbc.execute("DROP TRIGGER IF EXISTS trg_teste_recusa_fds ON fds");
             jdbc.execute("DROP FUNCTION IF EXISTS fn_teste_recusa_fds()");

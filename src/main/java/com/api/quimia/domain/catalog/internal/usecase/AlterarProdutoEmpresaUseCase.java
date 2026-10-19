@@ -15,8 +15,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * O produto é compartilhado (estantes e outras empresas), então só pode ser alterado pela empresa
  * que tem o único vínculo ativo com ele.
  *
- * Uma FDS nova (PDF) passa pelo extrator antes da transação, depois de validar os campos e conferir que o produto
- * pode ser alterado; ela vira a FDS ativa do produto na mesma transação da alteração.
+ * Uma FDS nova (PDF) é guardada e passa pelo extrator antes da transação, depois de validar os campos e conferir que
+ * o produto pode ser alterado; ela vira a FDS ativa do produto na mesma transação da alteração. Se a alteração
+ * falhar, o PDF guardado é apagado.
  */
 @Service
 public class AlterarProdutoEmpresaUseCase {
@@ -49,8 +50,15 @@ public class AlterarProdutoEmpresaUseCase {
         portal.exigirAtiva(empresaId);
         Alteracao alteracao = validar(form);
         byte[] imagem = imagens.ler(form.imagem());
-        String fdsExtraida = fdsNova(empresaId, produtoId, fds.ler(form.fds()));
-        return transacao.execute(status -> gravar(empresaId, produtoId, alteracao, imagem, fdsExtraida));
+        FdsDoProduto.FdsPreparada fdsPreparada = fdsNova(empresaId, produtoId, fds.ler(form.fds()));
+        try {
+            return transacao.execute(status -> gravar(empresaId, produtoId, alteracao, imagem, fdsPreparada));
+        } catch (RuntimeException falha) {
+            if (fdsPreparada != null) {
+                fds.descartar(fdsPreparada);
+            }
+            throw falha;
+        }
     }
 
     /** O que não depende do banco é recusado antes de qualquer chamada lenta (extrator) ou escrita. */
@@ -67,17 +75,21 @@ public class AlterarProdutoEmpresaUseCase {
                 CatalogException.codigoBarras(form.codBarras()));
     }
 
-    /** `null` sem PDF; com PDF, confere que o produto pode ser alterado antes de chamar o extrator. */
-    private String fdsNova(Integer empresaId, Integer produtoId, byte[] pdf) {
+    /** `null` sem PDF; com PDF, confere que o produto pode ser alterado antes de guardar o PDF e chamar o extrator. */
+    private FdsDoProduto.FdsPreparada fdsNova(Integer empresaId, Integer produtoId, FdsDoProduto.PdfDaFds pdf) {
         if (pdf == null) {
             return null;
         }
         exigirAlteravel(produtos.findDaEmpresa(produtoId, empresaId), produtoId);
-        return fds.extrair(pdf);
+        return fds.preparar(empresaId, pdf);
     }
 
     private ProdutoView gravar(
-            Integer empresaId, Integer produtoId, Alteracao alteracao, byte[] imagem, String fdsExtraida) {
+            Integer empresaId,
+            Integer produtoId,
+            Alteracao alteracao,
+            byte[] imagem,
+            FdsDoProduto.FdsPreparada fdsPreparada) {
         Produto produto = exigirAlteravel(produtos.findDaEmpresaParaAlterar(produtoId, empresaId), produtoId);
         if (alteracao.nome() != null) {
             produto.setNome(alteracao.nome());
@@ -101,8 +113,8 @@ public class AlterarProdutoEmpresaUseCase {
         if (imagem != null) {
             produto.setFotoUrl(imagens.enviar(imagem, ImagemDoProduto.PASTA_PRODUTOS, produto.getFotoUrl()));
         }
-        if (fdsExtraida != null) {
-            fds.registrar(produto.getId(), fdsExtraida);
+        if (fdsPreparada != null) {
+            fds.registrar(produto.getId(), fdsPreparada);
         }
         return ProdutoMapper.view(produto);
     }

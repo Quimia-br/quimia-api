@@ -1,6 +1,7 @@
 package com.api.quimia.domain.safety;
 
 import com.api.quimia.domain.safety.dto.ComposicaoView;
+import com.api.quimia.domain.safety.dto.FdsDocumentoView;
 import com.api.quimia.domain.safety.dto.ResumoSimplificadoView;
 import com.api.quimia.domain.safety.dto.SubstanciaNaEstanteView;
 import com.api.quimia.domain.safety.dto.SubstanciaView;
@@ -20,4 +21,7 @@ public interface SafetyGateway {
     List<SubstanciaNaEstanteView> substanciasDosProdutos(Collection<Integer> produtoIds);
 
     Optional<SubstanciaView> substancia(Integer substanciaId);
+
+    /** Arquivo da FDS ativa mais recente; vazio quando o produto não tem FDS ativa. */
+    Optional<FdsDocumentoView> documentoDaFds(Integer produtoId);
 }
