@@ -48,6 +48,12 @@ quimia:
     cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     api-key: ${CLOUDINARY_API_KEY:}
     api-secret: ${CLOUDINARY_API_SECRET:}
+  # Kemi (app) e WebKemi (portal): quimia-agent. Sem URL o chat responde 503 agente_indisponivel.
+  agente:
+    url: ${QUIMIA_AGENTE_URL:}
+    token: ${QUIMIA_AGENTE_TOKEN:}
+    timeout-segundos: ${QUIMIA_AGENTE_TIMEOUT_SEGUNDOS:120}
+    mensagens-por-hora: ${QUIMIA_AGENTE_MENSAGENS_POR_HORA:20}
 
 app:
   cors:

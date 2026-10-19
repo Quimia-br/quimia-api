@@ -1,6 +1,7 @@
 package com.api.quimia.infra.web;
 
 import com.api.quimia.domain.account.internal.usecase.AccountException;
+import com.api.quimia.domain.assistant.internal.usecase.AssistantException;
 import com.api.quimia.domain.catalog.internal.usecase.CatalogException;
 import com.api.quimia.domain.insights.internal.usecase.InsightsException;
 import com.api.quimia.domain.partner.internal.usecase.PartnerException;
@@ -69,6 +70,11 @@ public class ProblemHandler {
 
     @ExceptionHandler(InsightsException.class)
     ProblemDetail insights(InsightsException error, HttpServletRequest request) {
+        return problem(error.status(), codeTitle(error.code()), error.code(), request);
+    }
+
+    @ExceptionHandler(AssistantException.class)
+    ProblemDetail assistant(AssistantException error, HttpServletRequest request) {
         return problem(error.status(), codeTitle(error.code()), error.code(), request);
     }
 
