@@ -1,8 +1,10 @@
 package com.api.quimia.domain.storage.internal.web;
 
 import com.api.quimia.domain.account.AccountPrincipal;
+import com.api.quimia.domain.safety.dto.PrimeirosSocorrosView;
 import com.api.quimia.domain.safety.dto.ResumoSimplificadoView;
 import com.api.quimia.domain.storage.internal.dto.SubstanciasDaEstanteResponse;
+import com.api.quimia.domain.storage.internal.usecase.ConsultarPrimeirosSocorrosDaEstanteUseCase;
 import com.api.quimia.domain.storage.internal.usecase.ConsultarResumoDaEstanteUseCase;
 import com.api.quimia.domain.storage.internal.usecase.ListarSubstanciasDaEstanteUseCase;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,11 +19,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/estante")
 public class EstanteSegurancaController {
     private final ConsultarResumoDaEstanteUseCase resumo;
+    private final ConsultarPrimeirosSocorrosDaEstanteUseCase primeirosSocorros;
     private final ListarSubstanciasDaEstanteUseCase substancias;
 
     public EstanteSegurancaController(
-            ConsultarResumoDaEstanteUseCase resumo, ListarSubstanciasDaEstanteUseCase substancias) {
+            ConsultarResumoDaEstanteUseCase resumo,
+            ConsultarPrimeirosSocorrosDaEstanteUseCase primeirosSocorros,
+            ListarSubstanciasDaEstanteUseCase substancias) {
         this.resumo = resumo;
+        this.primeirosSocorros = primeirosSocorros;
         this.substancias = substancias;
     }
 
@@ -29,6 +35,13 @@ public class EstanteSegurancaController {
     public ResumoSimplificadoView resumo(
             @AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer produtoId) {
         return resumo.execute(principal.usuarioId(), produtoId);
+    }
+
+    /** "Como se proteger?": primeiros socorros da FDS do produto. */
+    @GetMapping("/produtos/{produtoId}/primeiros-socorros")
+    public PrimeirosSocorrosView primeirosSocorros(
+            @AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer produtoId) {
+        return primeirosSocorros.execute(principal.usuarioId(), produtoId);
     }
 
     @GetMapping("/substancias")

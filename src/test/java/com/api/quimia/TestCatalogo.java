@@ -72,6 +72,14 @@ public final class TestCatalogo {
                 produto, versao, dataAtualizacao, ativo, resumo);
     }
 
+    /** FDS com o JSON do extrator em `raw_json`; no PostgreSQL o trigger do banco processa o JSON. */
+    public int fdsComConteudo(int produto, String versao, LocalDate dataAtualizacao, boolean ativo, String rawJson) {
+        String json = postgres() ? "CAST(? AS jsonb)" : "? FORMAT JSON";
+        return insert(
+                "INSERT INTO fds (id_produto, versao, data_atualizacao, ativo, raw_json) VALUES (?, ?, ?, ?, " + json + ")",
+                produto, versao, dataAtualizacao, ativo, rawJson);
+    }
+
     /** `substancia` nulo cria o composto não resolvido pelo parser. */
     public int composto(int fds, Integer substancia, String min, String max, String unidade) {
         return insert(

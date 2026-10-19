@@ -218,7 +218,7 @@
         <profile>
             <id>mutacao</id>
             <properties>
-                <mutacao.classes>com.api.quimia.domain.safety.internal.persistence.JpaCompatibilidadeGateway*,com.api.quimia.domain.safety.internal.model.ComposicaoDoProduto*,com.api.quimia.domain.recommendation.internal.*,com.api.quimia.domain.storage.internal.usecase.*Comodo*,com.api.quimia.domain.insights.internal.*,com.api.quimia.domain.assistant.internal.*</mutacao.classes>
+                <mutacao.classes>com.api.quimia.domain.safety.internal.persistence.JpaCompatibilidadeGateway*,com.api.quimia.domain.safety.internal.model.MotorDeCompatibilidade*,com.api.quimia.domain.safety.internal.model.RegraDeIncompatibilidade*,com.api.quimia.domain.safety.internal.model.Severidade*,com.api.quimia.domain.safety.internal.model.ComposicaoDoProduto*,com.api.quimia.domain.safety.internal.model.LeituraDosPrimeirosSocorros*,com.api.quimia.domain.recommendation.internal.*,com.api.quimia.domain.storage.internal.usecase.*Comodo*,com.api.quimia.domain.insights.internal.*,com.api.quimia.domain.assistant.internal.*</mutacao.classes>
                 <mutacao.testes>com.api.quimia.domain.safety.*,com.api.quimia.domain.recommendation.*,com.api.quimia.domain.storage.*,com.api.quimia.domain.insights.*,com.api.quimia.domain.assistant.*</mutacao.testes>
             </properties>
             <build>
