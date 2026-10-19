@@ -1,0 +1,30 @@
+meta {
+  name: 03 - Detalhe do cômodo
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/comodos/{{comodoId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("traz produtos e avaliação", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("produtos");
+    expect(res.getBody()).to.have.property("avaliacao");
+  });
+}
+
+docs {
+  Produtos do cômodo (por nome) e a avaliação de risco recalculada na hora.
+  Antes: 01.
+  Respostas: 200, 400 parametro_invalido, 404 comodo_nao_encontrado (inclusive de outro usuário).
+}

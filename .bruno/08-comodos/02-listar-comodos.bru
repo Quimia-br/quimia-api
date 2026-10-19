@@ -1,0 +1,29 @@
+meta {
+  name: 02 - Listar cômodos
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/comodos?page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("lista os cômodos com o status de cada um", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("totalItens");
+  });
+}
+
+docs {
+  Cômodos do usuário por nome (sem acento), com total de produtos e status de risco. Aceita `q`
+  (até 100 caracteres), `page` e `size` (1 a 50).
+  Respostas: 200, 400 paginacao_invalida ou termo_muito_longo.
+}

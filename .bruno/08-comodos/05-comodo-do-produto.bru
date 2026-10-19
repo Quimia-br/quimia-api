@@ -1,0 +1,29 @@
+meta {
+  name: 05 - Cômodo do produto
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/estante/produtos/{{produtoId}}/comodo
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("traz o resumo do cômodo", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("status");
+  });
+}
+
+docs {
+  Em que cômodo o produto da estante está.
+  Antes: 01.
+  Respostas: 200, 404 produto_nao_esta_na_estante ou produto_sem_comodo.
+}

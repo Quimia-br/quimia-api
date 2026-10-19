@@ -1,0 +1,28 @@
+meta {
+  name: 03 - Detalhe da mistura
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/misturas/{{misturaId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("traz a mistura", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("resultado");
+  });
+}
+
+docs {
+  Antes: 01.
+  Respostas: 200, 400 parametro_invalido, 404 mistura_nao_encontrada (inclusive de outro usuário).
+}

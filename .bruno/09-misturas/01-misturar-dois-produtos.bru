@@ -1,0 +1,45 @@
+meta {
+  name: 01 - Misturar dois produtos
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/misturas
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "produtoIdA": {{produtoId}},
+    "produtoIdB": {{outroProdutoId}}
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("misturaId", res.getBody().id);
+  }
+}
+
+tests {
+  test("registra a consulta com o resultado", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(["compativel", "incompativel", "nao_avaliado"]).to.include(res.getBody().resultado);
+  });
+}
+
+docs {
+  Avalia o par pelas regras de incompatibilidade e grava no histórico (cada chamada é uma consulta nova).
+  `incompativel` traz a severidade e a descrição da regra mais grave; `nao_avaliado` traz o motivo
+  (produto sem composição ou com composto não identificado). `dosagem` é sempre nula nesta versão.
+  Antes: `04 - Estante / 01` com dois produtos e `04 / 02`.
+  Respostas: 201, 400, 404 produto_nao_esta_na_estante, 422 produtos_iguais.
+}

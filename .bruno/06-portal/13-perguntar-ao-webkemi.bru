@@ -1,0 +1,36 @@
+meta {
+  name: 13 - Perguntar ao WebKemi
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/chat/mensagens
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:json {
+  {
+    "texto": "Como cadastro um produto com FDS?"
+  }
+}
+
+tests {
+  test("responde com a sessão", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("texto");
+  });
+}
+
+docs {
+  Mesmo chat do Kemi, para a empresa (autor no agente: UUID fixo derivado do id da empresa).
+  Precisa de `QUIMIA_AGENTE_URL` na API.
+  Respostas: 200, 400 validation, 403 empresa_inativa, 429 limite_excedido, 502, 503, 504.
+}

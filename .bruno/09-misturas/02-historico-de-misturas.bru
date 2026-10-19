@@ -1,0 +1,29 @@
+meta {
+  name: 02 - Histórico de misturas
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/misturas?page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("lista o histórico", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("totalItens");
+  });
+}
+
+docs {
+  Misturas do usuário, da mais recente para a mais antiga. `produtoId` filtra as que envolvem o produto
+  ("Ver misturas"). Remover um produto da estante apaga as misturas dele.
+  Respostas: 200, 400 paginacao_invalida ou parametro_invalido.
+}

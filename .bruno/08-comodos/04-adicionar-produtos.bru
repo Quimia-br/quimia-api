@@ -1,0 +1,37 @@
+meta {
+  name: 04 - Adicionar produtos ao cômodo
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/comodos/{{comodoId}}/produtos
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "produtoIds": [{{produtoId}}]
+  }
+}
+
+tests {
+  test("devolve o cômodo recalculado", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("avaliacao");
+  });
+}
+
+docs {
+  Adiciona produtos da estante ao cômodo (idempotente; o total não passa de 20). Edite a lista.
+  Antes: 01.
+  Respostas: 200, 404 comodo_nao_encontrado, 409 produto_em_outro_comodo,
+  422 comodo_produtos_demais ou produto_fora_da_estante.
+}

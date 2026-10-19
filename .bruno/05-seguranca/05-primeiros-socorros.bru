@@ -1,0 +1,32 @@
+meta {
+  name: 05 - Como se proteger (primeiros socorros)
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/estante/produtos/{{produtoId}}/primeiros-socorros
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("lê a seção 4 da FDS", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("encontrada");
+    expect(res.getBody()).to.have.property("porExposicao");
+  });
+}
+
+docs {
+  Seção 4 (primeiros socorros) da FDS ativa mais recente, lida do JSON do extrator. Um registro por rota
+  de exposição (inalacao, pele, olhos, ingestao), mais orientações gerais e notas ao médico.
+  `encontrada` false: produto sem FDS, FDS sem a seção ou JSON fora do contrato (listas vazias, nunca 500).
+  Antes: `04 - Estante / 01` (o produto precisa estar na estante).
+  Respostas: 200, 400 parametro_invalido, 404 produto_nao_esta_na_estante.
+}

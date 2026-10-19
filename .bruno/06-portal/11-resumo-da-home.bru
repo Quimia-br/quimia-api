@@ -1,0 +1,30 @@
+meta {
+  name: 11 - Resumo da Home
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/v1/empresas/me/resumo
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("traz os agregados da empresa", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("produtosEmEstantes");
+    expect(res.getBody()).to.have.property("misturas");
+  });
+}
+
+docs {
+  Produtos da empresa guardados em estantes, resumo das misturas com esses produtos (taxa de sucesso
+  ignora as não avaliadas) e o produto cadastrado mais recente. Só agregados: nenhum dado de usuário.
+  Respostas: 200, 403 empresa_inativa, 404 empresa_nao_encontrada.
+}
