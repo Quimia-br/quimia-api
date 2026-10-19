@@ -10,13 +10,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.api.quimia.TestCatalogo;
 import com.api.quimia.TestJwtKeys;
 import com.api.quimia.TestLogins;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -28,7 +28,6 @@ import org.springframework.test.web.servlet.ResultActions;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @ContextConfiguration(initializers = TestJwtKeys.class)
-@Import(RecommendationDoubles.class)
 class MisturaWebTest {
     @Autowired
     private MockMvc mvc;
@@ -44,7 +43,10 @@ class MisturaWebTest {
     private int alvejante;
     private int limpaVidros;
     private int desengordurante;
+    private int sabao;
+    private int semFds;
     private int doOutro;
+    private int regraCloroAmonia;
 
     @BeforeEach
     void seed() throws Exception {
@@ -57,15 +59,30 @@ class MisturaWebTest {
         usuarioA = catalogo.usuarioId("a@mistura.test");
         usuarioB = catalogo.usuarioId("b@mistura.test");
         int marca = catalogo.marca("Marca", null);
-        alvejante = catalogo.produto("Alvejante", marca, "alvejante", null, null);
-        limpaVidros = catalogo.produto("Limpa vidros", marca, "limpeza_geral", null, null);
-        desengordurante = catalogo.produto("Desengordurante", marca, "desengraxante", null, null);
-        doOutro = catalogo.produto("Do outro", marca, "outro", null, null);
-        for (int produto : new int[] {alvejante, limpaVidros, desengordurante}) {
+        int hipoclorito = catalogo.substancia("Hipoclorito de sódio", "7681-52-9", null);
+        int amonia = catalogo.substancia("Amônia", "7664-41-7", null);
+        int agua = catalogo.substancia("Água", "7732-18-5", null);
+        regraCloroAmonia = catalogo.regra(hipoclorito, null, amonia, null, "critica", "Libera gás tóxico", true);
+        alvejante = produtoCom(marca, "Alvejante", hipoclorito);
+        limpaVidros = produtoCom(marca, "Limpa vidros", amonia);
+        desengordurante = produtoCom(marca, "Desengordurante", agua, null);
+        sabao = produtoCom(marca, "Sabão", agua);
+        semFds = catalogo.produto("Sem FDS", marca, "outro", null, null);
+        doOutro = produtoCom(marca, "Do outro", agua);
+        for (int produto : new int[] {alvejante, limpaVidros, desengordurante, sabao, semFds}) {
             catalogo.guardar(usuarioA, produto);
         }
         catalogo.guardar(usuarioB, doOutro);
-        RecommendationDoubles.programar("compativel", null, null, null);
+    }
+
+    /** Produto com FDS ativa; `null` entre as substâncias é um composto não identificado. */
+    private int produtoCom(int marca, String nome, Integer... substancias) {
+        int produto = catalogo.produto(nome, marca, "limpeza_geral", null, null);
+        int fds = catalogo.fds(produto, "1", LocalDate.of(2026, 1, 1), true, null);
+        for (Integer substancia : substancias) {
+            catalogo.composto(fds, substancia, "1.00", "5.00", "%");
+        }
+        return produto;
     }
 
     private ResultActions misturar(String token, Object a, Object b) throws Exception {
@@ -79,8 +96,6 @@ class MisturaWebTest {
 
     @Test
     void misturaIncompativelGravaOHistoricoEDevolveOResultado() throws Exception {
-        RecommendationDoubles.programar("incompativel", "critica", "Libera gás tóxico", null);
-
         misturar(tokenA, limpaVidros, alvejante)
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.matchesPattern("/api/v1/misturas/\\d+")))
@@ -91,14 +106,33 @@ class MisturaWebTest {
                 .andExpect(jsonPath("$.produtoB.id").value(Math.max(alvejante, limpaVidros)))
                 .andExpect(jsonPath("$.consultadoEm").exists())
                 .andExpect(jsonPath("$.dosagem").doesNotExist());
-        Integer linhas = jdbc.queryForObject(
-                "SELECT count(*) FROM historico_match WHERE id_usuario = ? AND id_produto_a < id_produto_b", Integer.class, usuarioA);
-        assertThat(linhas).isEqualTo(1);
+        var linha = jdbc.queryForMap(
+                "SELECT id_produto_a, id_produto_b, resultado, severidade, id_regra, descricao_risco FROM historico_match"
+                        + " WHERE id_usuario = ?",
+                usuarioA);
+        assertThat(((Number) linha.get("id_produto_a")).intValue()).isEqualTo(Math.min(alvejante, limpaVidros));
+        assertThat(((Number) linha.get("id_produto_b")).intValue()).isEqualTo(Math.max(alvejante, limpaVidros));
+        assertThat(linha.get("resultado")).isEqualTo("incompativel");
+        assertThat(linha.get("severidade")).isEqualTo("critica");
+        assertThat(((Number) linha.get("id_regra")).intValue()).isEqualTo(regraCloroAmonia);
+        assertThat(linha.get("descricao_risco")).isEqualTo("Libera gás tóxico");
+    }
+
+    @Test
+    void historicoGuardaOResultadoDoMomentoDaConsulta() throws Exception {
+        misturar(tokenA, alvejante, limpaVidros).andExpect(jsonPath("$.resultado").value("incompativel"));
+        jdbc.update("UPDATE incompatibilidade_regra SET ativo = FALSE WHERE id = ?", regraCloroAmonia);
+
+        misturar(tokenA, alvejante, limpaVidros).andExpect(jsonPath("$.resultado").value("compativel"));
+
+        assertThat(jdbc.queryForList(
+                        "SELECT resultado FROM historico_match WHERE id_usuario = ? ORDER BY id", String.class, usuarioA))
+                .containsExactly("incompativel", "compativel");
     }
 
     @Test
     void misturaCompativelNaoTemSeveridadeNemDescricao() throws Exception {
-        misturar(tokenA, alvejante, limpaVidros)
+        misturar(tokenA, alvejante, sabao)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.resultado").value("compativel"))
                 .andExpect(jsonPath("$.severidade").doesNotExist())
@@ -107,18 +141,37 @@ class MisturaWebTest {
 
     @Test
     void naoAvaliadoGravaADescricaoDoMotivo() throws Exception {
-        RecommendationDoubles.programar("nao_avaliado", null, "Composição incompleta: há compostos não identificados", null);
-
-        misturar(tokenA, alvejante, limpaVidros)
+        misturar(tokenA, limpaVidros, desengordurante)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.resultado").value("nao_avaliado"))
+                .andExpect(jsonPath("$.severidade").doesNotExist())
                 .andExpect(jsonPath("$.descricaoRisco").value("Composição incompleta: há compostos não identificados"));
+        misturar(tokenA, alvejante, semFds)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultado").value("nao_avaliado"))
+                .andExpect(jsonPath("$.descricaoRisco").value("Produto sem composição resolvida"));
+    }
+
+    @Test
+    void compostoNaoIdentificadoNaoEscondeRegraQueCasa() throws Exception {
+        misturar(tokenA, alvejante, desengordurante).andExpect(jsonPath("$.resultado").value("nao_avaliado"));
+        int hipoclorito = jdbc.queryForObject("SELECT id FROM substancia WHERE cas_numero = '7681-52-9'", Integer.class);
+        int agua = jdbc.queryForObject("SELECT id FROM substancia WHERE cas_numero = '7732-18-5'", Integer.class);
+        catalogo.regra(agua, null, hipoclorito, null, "baixa", "Dilui", true);
+
+        misturar(tokenA, alvejante, desengordurante)
+                .andExpect(jsonPath("$.resultado").value("incompativel"))
+                .andExpect(jsonPath("$.severidade").value("baixa"));
     }
 
     @Test
     void repetirCriaOutraLinhaENaoImportaAOrdem() throws Exception {
         misturar(tokenA, alvejante, limpaVidros).andExpect(status().isCreated());
         misturar(tokenA, limpaVidros, alvejante).andExpect(status().isCreated());
+
+        assertThat(jdbc.queryForList(
+                        "SELECT DISTINCT id_produto_a FROM historico_match WHERE id_usuario = ?", Integer.class, usuarioA))
+                .containsExactly(Math.min(alvejante, limpaVidros));
 
         Integer linhas = jdbc.queryForObject("SELECT count(*) FROM historico_match WHERE id_usuario = ?", Integer.class, usuarioA);
         assertThat(linhas).isEqualTo(2);
@@ -133,7 +186,7 @@ class MisturaWebTest {
 
     @Test
     void produtoForaDaEstanteInexistenteOuDeOutroUsuarioDa404() throws Exception {
-        for (int fora : new int[] {doOutro, 999999}) {
+        for (int fora : new int[] {doOutro, 999999, -1, 0, Integer.MAX_VALUE, Integer.MIN_VALUE}) {
             misturar(tokenA, alvejante, fora)
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.detail").value("produto_nao_esta_na_estante"));
@@ -165,6 +218,12 @@ class MisturaWebTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("corpo_invalido"));
         misturar(tokenA, "\"abc\"", alvejante).andExpect(status().isBadRequest());
+        misturar(tokenA, "2147483648", alvejante)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+        misturar(tokenA, "null", alvejante)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("validation"));
         mvc.perform(post("/api/v1/misturas").header("Authorization", "Bearer " + tokenA)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"produtoIdA\":"))
                 .andExpect(status().isBadRequest())

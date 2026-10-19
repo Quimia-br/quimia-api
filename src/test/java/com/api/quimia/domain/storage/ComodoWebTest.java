@@ -12,6 +12,7 @@ import com.api.quimia.TestCatalogo;
 import com.api.quimia.TestJwtKeys;
 import com.api.quimia.TestLogins;
 import com.jayway.jsonpath.JsonPath;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -20,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -32,7 +32,6 @@ import org.springframework.test.web.servlet.ResultActions;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @ContextConfiguration(initializers = TestJwtKeys.class)
-@Import(CompatibilidadeDuble.class)
 class ComodoWebTest {
     @Autowired
     private MockMvc mvc;
@@ -49,6 +48,8 @@ class ComodoWebTest {
     private int p2;
     private int p3;
     private int doOutro;
+    private int marca;
+    private int agua;
 
     @BeforeEach
     void seed() throws Exception {
@@ -60,16 +61,29 @@ class ComodoWebTest {
         tokenB = TestLogins.usuario(mvc, "b@comodo.test");
         usuarioA = catalogo.usuarioId("a@comodo.test");
         usuarioB = catalogo.usuarioId("b@comodo.test");
-        int marca = catalogo.marca("Marca", null);
-        p1 = catalogo.produto("Alvejante", marca, "alvejante", null, null);
-        p2 = catalogo.produto("Limpa vidros", marca, "limpeza_geral", null, null);
-        p3 = catalogo.produto("Desengordurante", marca, "desengraxante", null, null);
-        doOutro = catalogo.produto("Do outro usuário", marca, "limpeza_geral", null, null);
+        marca = catalogo.marca("Marca", null);
+        int hipoclorito = catalogo.substancia("Hipoclorito de sódio", "7681-52-9", null);
+        int amonia = catalogo.substancia("Amônia", "7664-41-7", null);
+        agua = catalogo.substancia("Água", "7732-18-5", null);
+        catalogo.regra(hipoclorito, null, amonia, null, "critica", "Libera gás tóxico", true);
+        p1 = produtoCom("Alvejante", hipoclorito);
+        p2 = produtoCom("Limpa vidros", amonia);
+        p3 = produtoCom("Desengordurante", agua);
+        doOutro = produtoCom("Do outro usuário", agua);
         for (int produto : new int[] {p1, p2, p3}) {
             catalogo.guardar(usuarioA, produto);
         }
         catalogo.guardar(usuarioB, doOutro);
-        CompatibilidadeDuble.proximaAvaliacao = CompatibilidadeDuble.seguro(2);
+    }
+
+    /** Produto com FDS ativa e os compostos informados. */
+    private int produtoCom(String nome, int... substancias) {
+        int produto = catalogo.produto(nome, marca, "limpeza_geral", null, null);
+        int fds = catalogo.fds(produto, "1", LocalDate.of(2026, 1, 1), true, null);
+        for (int substancia : substancias) {
+            catalogo.composto(fds, substancia, "1.00", "5.00", "%");
+        }
+        return produto;
     }
 
     private ResultActions criar(String token, String nome, String icone, int... produtos) throws Exception {
@@ -89,8 +103,6 @@ class ComodoWebTest {
 
     @Test
     void criaComodoComDoisProdutosEDevolveAvaliacao() throws Exception {
-        CompatibilidadeDuble.proximaAvaliacao = CompatibilidadeDuble.critico(p1, p2);
-
         criar(tokenA, "Banheiro", "banheira", p1, p2)
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.matchesPattern("/api/v1/comodos/\\d+")))
@@ -99,9 +111,9 @@ class ComodoWebTest {
                 .andExpect(jsonPath("$.avaliacao.status").value("critico"))
                 .andExpect(jsonPath("$.avaliacao.paresIncompativeis").value(1))
                 .andExpect(jsonPath("$.avaliacao.incompatibilidades[0].severidade").value("critica"))
+                .andExpect(jsonPath("$.avaliacao.incompatibilidades[0].descricaoRisco").value("Libera gás tóxico"))
                 .andExpect(jsonPath("$.produtos.length()").value(2))
                 .andExpect(jsonPath("$.produtos[0].nome").value("Alvejante"));
-        assertThat(CompatibilidadeDuble.ultimosIds).containsExactlyInAnyOrder(p1, p2);
         Integer noComodo = jdbc.queryForObject(
                 "SELECT count(*) FROM estante_produto WHERE id_usuario = ? AND id_comodo IS NOT NULL", Integer.class, usuarioA);
         assertThat(noComodo).isEqualTo(2);
@@ -216,9 +228,8 @@ class ComodoWebTest {
     @Test
     void listaSoOsComodosDoUsuarioOrdenadosPorNomeSemAcento() throws Exception {
         criarEObterId(tokenA, "Quarto", p1, p2);
-        int marca = catalogo.marca("Outra", null);
-        int x = catalogo.produto("X", marca, "outro", null, null);
-        int y = catalogo.produto("Y", marca, "outro", null, null);
+        int x = produtoCom("X", agua);
+        int y = produtoCom("Y", agua);
         catalogo.guardar(usuarioA, x);
         catalogo.guardar(usuarioA, y);
         criarEObterId(tokenA, "Área de serviço", x, y);
@@ -229,7 +240,8 @@ class ComodoWebTest {
                 .andExpect(jsonPath("$.itens[0].nome").value("Área de serviço"))
                 .andExpect(jsonPath("$.itens[0].totalProdutos").value(2))
                 .andExpect(jsonPath("$.itens[0].status").value("seguro"))
-                .andExpect(jsonPath("$.itens[1].nome").value("Quarto"));
+                .andExpect(jsonPath("$.itens[1].nome").value("Quarto"))
+                .andExpect(jsonPath("$.itens[1].status").value("critico"));
         mvc.perform(get("/api/v1/comodos").header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.itens.length()").value(0));
@@ -255,7 +267,6 @@ class ComodoWebTest {
     @Test
     void detalheDevolveProdutosOrdenadosEAvaliacao() throws Exception {
         int id = criarEObterId(tokenA, "Banheiro", p2, p1);
-        CompatibilidadeDuble.proximaAvaliacao = CompatibilidadeDuble.critico(p1, p2);
 
         mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
                 .andExpect(status().isOk())
@@ -297,15 +308,36 @@ class ComodoWebTest {
 
     @Test
     void adicionaProdutoERecalcula() throws Exception {
-        int id = criarEObterId(tokenA, "Banheiro", p1, p2);
-        CompatibilidadeDuble.proximaAvaliacao = CompatibilidadeDuble.critico(p1, p3);
+        String corpo = criar(tokenA, "Banheiro", "icone", p1, p3)
+                .andExpect(jsonPath("$.avaliacao.status").value("seguro"))
+                .andReturn().getResponse().getContentAsString();
+        int id = JsonPath.read(corpo, "$.id");
 
         mvc.perform(post("/api/v1/comodos/" + id + "/produtos").header("Authorization", "Bearer " + tokenA)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"produtoIds\":[" + p3 + "]}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"produtoIds\":[" + p2 + "]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.produtos.length()").value(3))
-                .andExpect(jsonPath("$.avaliacao.status").value("critico"));
-        assertThat(CompatibilidadeDuble.ultimosIds).containsExactlyInAnyOrder(p1, p2, p3);
+                .andExpect(jsonPath("$.avaliacao.status").value("critico"))
+                .andExpect(jsonPath("$.avaliacao.totalProdutos").value(3))
+                .andExpect(jsonPath("$.avaliacao.paresAvaliados").value(3))
+                .andExpect(jsonPath("$.avaliacao.paresIncompativeis").value(1));
+        mvc.perform(delete("/api/v1/comodos/" + id + "/produtos/" + p2).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.avaliacao.status").value("seguro"));
+    }
+
+    @Test
+    void produtoSemFdsDeixaOComodoNaoAvaliadoEFdsNovaReavalia() throws Exception {
+        int semFds = catalogo.produto("Sem FDS", marca, "outro", null, null);
+        catalogo.guardar(usuarioA, semFds);
+        int id = criarEObterId(tokenA, "Lavanderia", p3, semFds);
+
+        mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.avaliacao.status").value("nao_avaliado"));
+        catalogo.composto(catalogo.fds(semFds, "1", LocalDate.of(2026, 2, 1), true, null), agua, "1.00", "2.00", "%");
+        mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.avaliacao.status").value("seguro"));
     }
 
     @Test
