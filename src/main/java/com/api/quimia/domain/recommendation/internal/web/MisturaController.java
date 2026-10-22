@@ -7,6 +7,11 @@ import com.api.quimia.domain.recommendation.internal.dto.MisturaView;
 import com.api.quimia.domain.recommendation.internal.usecase.ConsultarMisturaUseCase;
 import com.api.quimia.domain.recommendation.internal.usecase.ListarMisturasUseCase;
 import com.api.quimia.domain.recommendation.internal.usecase.RegistrarMisturaUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Misturas")
 @RestController
 @RequestMapping("/api/v1/misturas")
 public class MisturaController {
@@ -33,6 +39,20 @@ public class MisturaController {
         this.consultar = consultar;
     }
 
+    @Operation(
+            summary = "Misturar dois produtos",
+            description = "Avalia o par pelas regras de incompatibilidade e grava a consulta no histórico (cada "
+                    + "chamada é uma consulta nova). `incompativel` traz a severidade e a descrição da regra "
+                    + "mais grave; `nao_avaliado` traz o motivo (produto sem composição ou com composto não "
+                    + "identificado). `dosagem` é sempre nula nesta versão.")
+    @ApiResponse(
+            responseCode = "201",
+            description = "Consulta registrada.",
+            headers = @Header(name = "Location", description = "URL da mistura (`/api/v1/misturas/{id}`)."))
+    @ApiResponse(
+            responseCode = "404",
+            description = "Algum dos produtos fora da estante do usuário: `produto_nao_esta_na_estante`.")
+    @ApiResponse(responseCode = "422", description = "Os dois ids iguais: `produtos_iguais`.")
     @PostMapping
     public ResponseEntity<MisturaView> registrar(
             @AuthenticationPrincipal AccountPrincipal principal, @Valid @RequestBody MisturaRequest request) {
@@ -40,6 +60,21 @@ public class MisturaController {
         return ResponseEntity.created(URI.create("/api/v1/misturas/" + mistura.id())).body(mistura);
     }
 
+    @Operation(
+            summary = "Histórico de misturas",
+            description = "Misturas do usuário, da mais recente para a mais antiga. `produtoId` mostra só as que "
+                    + "envolvem o produto (\"Ver misturas\").")
+    @Parameter(
+            name = "produtoId",
+            description = "Só misturas com este produto, em qualquer lado do par.",
+            example = "42")
+    @Parameter(name = "page", description = "Página, a partir de 0.", example = "0")
+    @Parameter(name = "size", description = "Itens por página, de 1 a 50.", example = "20")
+    @ApiResponse(responseCode = "200", description = "Página de misturas.")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Paginação fora das regras (página negativa, tamanho fora de 1 a 50 ou página × tamanho "
+                    + "acima do maior int): `paginacao_invalida`.")
     @GetMapping
     public Pagina<MisturaView> listar(
             @AuthenticationPrincipal AccountPrincipal principal,
@@ -49,6 +84,12 @@ public class MisturaController {
         return listar.execute(principal.usuarioId(), produtoId, pagina, tamanho);
     }
 
+    @Operation(summary = "Detalhe da mistura", description = "Uma consulta do histórico.")
+    @Parameter(name = "id", description = "Id da mistura.", example = "15")
+    @ApiResponse(responseCode = "200", description = "Mistura.")
+    @ApiResponse(
+            responseCode = "404",
+            description = "Mistura inexistente ou de outro usuário: `mistura_nao_encontrada`.")
     @GetMapping("/{id}")
     public MisturaView consultar(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer id) {
         return consultar.execute(principal.usuarioId(), id);
