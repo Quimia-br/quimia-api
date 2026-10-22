@@ -40,6 +40,7 @@ class FirebaseIdentityVerifierTest {
                 .claim("email", "pessoa@example.com")
                 .claim("email_verified", true)
                 .claim("name", "Pessoa")
+                .claim("picture", "https://lh3.googleusercontent.com/a/foto")
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(60))
                 .build();
@@ -49,5 +50,6 @@ class FirebaseIdentityVerifierTest {
         assertThat(identity.email()).isEqualTo("pessoa@example.com");
         assertThat(identity.emailVerified()).isTrue();
         assertThat(identity.name()).isEqualTo("Pessoa");
+        assertThat(identity.picture()).isEqualTo("https://lh3.googleusercontent.com/a/foto");
     }
 }

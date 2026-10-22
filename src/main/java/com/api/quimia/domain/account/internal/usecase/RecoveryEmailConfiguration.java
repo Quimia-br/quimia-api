@@ -54,8 +54,11 @@ public class RecoveryEmailConfiguration {
             org.springframework.core.env.Environment environment, EmailTemplates templates) {
         String apiKey = environment.getProperty("app.email.resend.api-key", "");
         String from = environment.getProperty("app.email.from", "");
-        if (apiKey.isBlank() || from.isBlank()) {
-            throw new IllegalStateException("RESEND_API_KEY and APP_EMAIL_FROM are required when email sender mode is resend");
+        if (apiKey.isBlank()) {
+            throw new IllegalStateException("RESEND_API_KEY is required when email sender mode is resend");
+        }
+        if (from.isBlank()) {
+            throw new IllegalStateException("APP_EMAIL_FROM is required when email sender mode is resend");
         }
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(client);
@@ -118,13 +121,14 @@ public class RecoveryEmailConfiguration {
         }
     }
 
-    private static final class ResendAccountMailer implements AccountMailer {
+    /** Visível no pacote para o teste do payload enviado ao Resend. */
+    static final class ResendAccountMailer implements AccountMailer {
         private final RestClient client;
         private final String apiKey;
         private final String from;
         private final Map<String, Object> inlineLogo;
 
-        private ResendAccountMailer(RestClient client, String apiKey, String from, byte[] logo) {
+        ResendAccountMailer(RestClient client, String apiKey, String from, byte[] logo) {
             this.client = client;
             this.apiKey = apiKey;
             this.from = from;

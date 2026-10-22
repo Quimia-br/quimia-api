@@ -27,6 +27,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @ActiveProfiles("test")
 @ContextConfiguration(initializers = TestJwtKeys.class)
 class FirebaseLoginTest {
+    private static final String FOTO_GOOGLE = "https://lh3.googleusercontent.com/a/foto-do-google";
+    private static final String FOTO_ESCOLHIDA = "https://cdn.example.com/escolhida.png";
+
     @MockitoBean
     private ExternalIdentityVerifier verifier;
 
@@ -50,7 +53,7 @@ class FirebaseLoginTest {
     @Test
     void firstSocialLoginCreatesUserWithUnusablePasswordAndLaterLoginsReuseIt() {
         when(verifier.verify("google-token"))
-                .thenReturn(new ExternalIdentity("Social@Example.com", true, "Pessoa Social"));
+                .thenReturn(new ExternalIdentity("Social@Example.com", true, "Pessoa Social", null));
 
         var first = firebase.execute("google-token");
         var second = firebase.execute("google-token");
@@ -67,14 +70,62 @@ class FirebaseLoginTest {
     void verifiedEmailLinksToExistingPasswordAccount() {
         var existing = registrar.execute(new RegisterRequest(
                 "Conta Senha", "linked@example.com", "senhaForte1", LocalDate.of(1990, 1, 1), null));
-        when(verifier.verify("microsoft-token")).thenReturn(new ExternalIdentity("linked@example.com", true, null));
+        when(verifier.verify("microsoft-token")).thenReturn(new ExternalIdentity("linked@example.com", true, null, null));
 
         assertThat(firebase.execute("microsoft-token").user().id()).isEqualTo(existing.id());
     }
 
     @Test
+    void primeiroLoginSocialRegistraAUltimaSessao() {
+        when(verifier.verify("sessao")).thenReturn(new ExternalIdentity("sessao@example.com", true, "Sessao", null));
+
+        var sessao = firebase.execute("sessao");
+
+        assertThat(users.findById(sessao.user().id()).orElseThrow().getUltimaSessao()).isNotNull();
+    }
+
+    @Test
+    void primeiroLoginGravaAFotoDoProvedor() {
+        when(verifier.verify("com-foto")).thenReturn(new ExternalIdentity("foto@example.com", true, "Foto", FOTO_GOOGLE));
+
+        var sessao = firebase.execute("com-foto");
+
+        assertThat(users.findById(sessao.user().id()).orElseThrow().getFotoUrl()).isEqualTo(FOTO_GOOGLE);
+    }
+
+    @Test
+    void loginSeguintePreencheSoQuandoNaoHaFotoENaoSobrescreveAEscolhida() {
+        var conta = registrar.execute(new RegisterRequest(
+                "Sem Foto", "semfoto@example.com", "senhaForte1", LocalDate.of(1990, 1, 1), null));
+        when(verifier.verify("google")).thenReturn(new ExternalIdentity("semfoto@example.com", true, "Sem Foto", FOTO_GOOGLE));
+
+        firebase.execute("google");
+        assertThat(users.findById(conta.id()).orElseThrow().getFotoUrl()).isEqualTo(FOTO_GOOGLE);
+
+        var usuario = users.findById(conta.id()).orElseThrow();
+        usuario.setFotoUrl(FOTO_ESCOLHIDA);
+        users.saveAndFlush(usuario);
+        firebase.execute("google");
+        assertThat(users.findById(conta.id()).orElseThrow().getFotoUrl()).isEqualTo(FOTO_ESCOLHIDA);
+    }
+
+    @Test
+    void fotoQueNaoEhHttpsOuNaoCabeNaColunaEhIgnorada() {
+        for (String invalida : new String[] {"http://inseguro.example.com/f.png", "javascript:alert(1)", "https://",
+                "https://lh3.googleusercontent.com/a b",
+                "https://lh3.googleusercontent.com/" + "a".repeat(450)}) {
+            users.deleteAll();
+            when(verifier.verify("t")).thenReturn(new ExternalIdentity("ruim@example.com", true, "Ruim", invalida));
+
+            var sessao = firebase.execute("t");
+
+            assertThat(users.findById(sessao.user().id()).orElseThrow().getFotoUrl()).isNull();
+        }
+    }
+
+    @Test
     void unverifiedEmailIsRejected() {
-        when(verifier.verify("unverified-token")).thenReturn(new ExternalIdentity("x@example.com", false, "X"));
+        when(verifier.verify("unverified-token")).thenReturn(new ExternalIdentity("x@example.com", false, "X", null));
 
         assertThatThrownBy(() -> firebase.execute("unverified-token"))
                 .isInstanceOfSatisfying(AccountException.class, error -> {

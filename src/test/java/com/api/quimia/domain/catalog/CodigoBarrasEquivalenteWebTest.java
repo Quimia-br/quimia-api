@@ -85,6 +85,14 @@ class CodigoBarrasEquivalenteWebTest {
         app(UPC_A).andExpect(jsonPath("$.itens[0].id").value(upc));
     }
 
+    /** Mesma regra do escaneamento: só o espaço sai das pontas; TAB e NUL não são removidos em silêncio. */
+    @Test
+    void filtroDoAppSoIgnoraEspacoNasPontas() throws Exception {
+        app("  " + UPC_A + "  ").andExpect(jsonPath("$.totalItens").value(1)).andExpect(jsonPath("$.itens[0].id").value(upc));
+        app("\t" + UPC_A).andExpect(status().isOk()).andExpect(jsonPath("$.totalItens").value(0));
+        app(UPC_A + "\u0000").andExpect(status().isOk()).andExpect(jsonPath("$.totalItens").value(0));
+    }
+
     @Test
     void codigoDeOnzeDigitosNaoGanhaEquivalente() throws Exception {
         app("78920000000").andExpect(jsonPath("$.totalItens").value(0));
