@@ -21,22 +21,29 @@ import org.springframework.web.client.RestClientException;
 
 /**
  * Cloudinary pela API REST com requisição assinada (SHA-1 dos parâmetros + segredo), sem SDK e sem
- * upload preset aberto. O `public_id` é gerado aqui (`{pasta}/{uuid}`), nunca vem do cliente.
+ * upload preset aberto. O `public_id` é gerado aqui (`{pasta}/{uuid}`), nunca vem do cliente. Imagens vão como
+ * recurso `image`; os PDFs das FDS, como `raw` (`{pasta}/{uuid}/{nome}.pdf`, para o download sair com o nome).
  */
-public final class CloudinaryImageStorage implements ImageStorage {
+public final class CloudinaryImageStorage implements ArmazenamentoDeArquivos {
     private static final Logger log = LoggerFactory.getLogger(CloudinaryImageStorage.class);
     private static final String API = "https://api.cloudinary.com/v1_1/";
+    private static final String IMAGEM = "image";
+    private static final String DOCUMENTO = "raw";
     private static final ParameterizedTypeReference<Map<String, Object>> RESPOSTA =
             new ParameterizedTypeReference<>() {};
 
-    private final RestClient client;
+    private final RestClient imagens;
+    private final RestClient documentos;
     private final Clock clock;
     private final String cloudName;
     private final String apiKey;
     private final String apiSecret;
 
-    public CloudinaryImageStorage(RestClient client, Clock clock, String cloudName, String apiKey, String apiSecret) {
-        this.client = client;
+    /** `documentos` tem prazo maior: o PDF da FDS chega a 10 MB, a imagem a 5 MB. */
+    public CloudinaryImageStorage(
+            RestClient imagens, RestClient documentos, Clock clock, String cloudName, String apiKey, String apiSecret) {
+        this.imagens = imagens;
+        this.documentos = documentos;
         this.clock = clock;
         this.cloudName = cloudName;
         this.apiKey = apiKey;
@@ -45,17 +52,58 @@ public final class CloudinaryImageStorage implements ImageStorage {
 
     @Override
     public String upload(byte[] conteudo, String pasta) {
-        MultiValueMap<String, Object> form = assinado(pasta + "/" + UUID.randomUUID());
+        return enviar(IMAGEM, pasta + "/" + UUID.randomUUID(), "imagem", conteudo);
+    }
+
+    @Override
+    public void delete(String url, String pasta) {
+        apagar(IMAGEM, publicIdDe(url, pasta));
+    }
+
+    @Override
+    public String enviarPdf(byte[] conteudo, String pasta, String nomeArquivo) {
+        return enviar(DOCUMENTO, pasta + "/" + UUID.randomUUID() + "/" + nomeArquivo, nomeArquivo, conteudo);
+    }
+
+    @Override
+    public void apagarPdf(String url, String pasta) {
+        apagar(DOCUMENTO, publicIdDoPdf(url, pasta));
+    }
+
+    /** Só reconhece imagens desta conta diretamente dentro de `pasta`; qualquer outra URL é ignorada. */
+    String publicIdDe(String url, String pasta) {
+        if (url == null || !url.contains("/" + cloudName + "/image/upload/")) {
+            return null;
+        }
+        Pattern publicIdNaPasta =
+                Pattern.compile("/image/upload/(?:v\\d+/)?(" + Pattern.quote(pasta + "/") + "[^/.]+)\\.?[A-Za-z0-9]*$");
+        Matcher achou = publicIdNaPasta.matcher(url);
+        return achou.find() ? achou.group(1) : null;
+    }
+
+    /** O `public_id` de um recurso `raw` inclui a extensão: `{pasta}/{uuid}/{nome}.pdf`. */
+    String publicIdDoPdf(String url, String pasta) {
+        if (url == null || !url.contains("/" + cloudName + "/raw/upload/")) {
+            return null;
+        }
+        Pattern publicIdNaPasta = Pattern.compile(
+                "/raw/upload/(?:v\\d+/)?(" + Pattern.quote(pasta + "/") + "[0-9a-f-]{36}/[A-Za-z0-9._-]+\\.pdf)$");
+        Matcher achou = publicIdNaPasta.matcher(url);
+        return achou.find() ? achou.group(1) : null;
+    }
+
+    private String enviar(String tipoDeRecurso, String publicId, String nomeDoArquivo, byte[] conteudo) {
+        MultiValueMap<String, Object> form = assinado(publicId);
         form.add("file", new ByteArrayResource(conteudo) {
             @Override
             public String getFilename() {
-                return "imagem";
+                return nomeDoArquivo;
             }
         });
         Map<String, Object> resposta;
         try {
-            resposta = client.post()
-                    .uri(API + cloudName + "/image/upload")
+            resposta = clienteDe(tipoDeRecurso).post()
+                    .uri(API + cloudName + "/" + tipoDeRecurso + "/upload")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(form)
                     .retrieve()
@@ -71,34 +119,25 @@ public final class CloudinaryImageStorage implements ImageStorage {
         return texto;
     }
 
-    @Override
-    public void delete(String url, String pasta) {
-        String publicId = publicIdDe(url, pasta);
+    private void apagar(String tipoDeRecurso, String publicId) {
         if (publicId == null) {
             return;
         }
         try {
-            client.post()
-                    .uri(API + cloudName + "/image/destroy")
+            clienteDe(tipoDeRecurso).post()
+                    .uri(API + cloudName + "/" + tipoDeRecurso + "/destroy")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(assinado(publicId))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException falha) {
-            // a compensação não pode derrubar a requisição; o aviso permite limpar a imagem órfã depois
+            // a compensação não pode derrubar a requisição; o aviso permite limpar o arquivo órfão depois
             log.warn("cloudinary delete failed for {}: {}", publicId, falha.getMessage());
         }
     }
 
-    /** Só reconhece imagens desta conta diretamente dentro de `pasta`; qualquer outra URL é ignorada. */
-    String publicIdDe(String url, String pasta) {
-        if (url == null || !url.contains("/" + cloudName + "/image/upload/")) {
-            return null;
-        }
-        Pattern publicIdNaPasta =
-                Pattern.compile("/image/upload/(?:v\\d+/)?(" + Pattern.quote(pasta + "/") + "[^/.]+)\\.?[A-Za-z0-9]*$");
-        Matcher achou = publicIdNaPasta.matcher(url);
-        return achou.find() ? achou.group(1) : null;
+    private RestClient clienteDe(String tipoDeRecurso) {
+        return DOCUMENTO.equals(tipoDeRecurso) ? documentos : imagens;
     }
 
     private MultiValueMap<String, Object> assinado(String publicId) {

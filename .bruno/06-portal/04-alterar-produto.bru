@@ -26,5 +26,6 @@ tests {
 docs {
   Campos ausentes mantêm o valor. Só altera se a empresa for a única com vínculo ativo.
   Antes: 02.
-  Respostas: 200, 404, 409 produto_compartilhado/cod_barras_em_uso.
+  Campo `fds` (PDF) opcional: a FDS lida vira a ativa do produto e a anterior é desativada.
+  Respostas: 200, 404, 409 produto_compartilhado/cod_barras_em_uso, 413, 415 pdf_invalido, 422 fds_invalida, 502 extrator_falhou, 503 extrator_indisponivel.
 }

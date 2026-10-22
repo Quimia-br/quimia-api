@@ -1,12 +1,14 @@
 package com.api.quimia.domain.catalog.internal.persistence;
 
 import com.api.quimia.domain.catalog.internal.model.Produto;
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -93,6 +95,14 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
 
     @Query("select p from Produto p join fetch p.marca where p.id = :id and " + DA_EMPRESA)
     Optional<Produto> findDaEmpresa(@Param("id") Integer id, @Param("empresa") Integer empresaId);
+
+    /**
+     * Como {@link #findDaEmpresa}, travando a linha do produto até o fim da transação: alterações simultâneas do
+     * mesmo produto (ex.: duas FDS novas) passam uma de cada vez. Sem `join fetch` para não travar a marca.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Produto p where p.id = :id and " + DA_EMPRESA)
+    Optional<Produto> findDaEmpresaParaAlterar(@Param("id") Integer id, @Param("empresa") Integer empresaId);
 
     Optional<Produto> findByCodBarras(String codBarras);
 

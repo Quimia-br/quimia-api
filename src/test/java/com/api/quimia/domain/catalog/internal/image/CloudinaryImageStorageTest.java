@@ -2,6 +2,7 @@ package com.api.quimia.domain.catalog.internal.image;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -44,7 +45,8 @@ class CloudinaryImageStorageTest {
         RestClient.Builder builder = RestClient.builder();
         servidor = MockRestServiceServer.bindTo(builder).build();
         Clock relogio = Clock.fixed(Instant.ofEpochSecond(AGORA), ZoneOffset.UTC);
-        storage = new CloudinaryImageStorage(builder.build(), relogio, CLOUD, KEY, SECRET);
+        RestClient client = builder.build();
+        storage = new CloudinaryImageStorage(client, client, relogio, CLOUD, KEY, SECRET);
     }
 
     @Test
@@ -89,7 +91,7 @@ class CloudinaryImageStorageTest {
     void apagaPeloPublicIdExtraidoDaUrl() {
         servidor.expect(requestTo(BASE + "/image/destroy"))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("produtos/abc-123")))
+                .andExpect(content().string(containsString("produtos/abc-123")))
                 .andRespond(withSuccess("{\"result\":\"ok\"}", MediaType.APPLICATION_JSON));
 
         storage.delete(URL_DA_CONTA, PRODUTOS);
@@ -123,7 +125,7 @@ class CloudinaryImageStorageTest {
     void apagaSoDentroDaPastaPedida() {
         String logoDaEmpresa7 = "https://res.cloudinary.com/" + CLOUD + "/image/upload/v1/empresas/7/logo-1.png";
         servidor.expect(requestTo(BASE + "/image/destroy"))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("empresas/7/logo-1")))
+                .andExpect(content().string(containsString("empresas/7/logo-1")))
                 .andRespond(withSuccess("{\"result\":\"ok\"}", MediaType.APPLICATION_JSON));
 
         storage.delete(URL_DA_CONTA, EMPRESA_7);
@@ -133,6 +135,70 @@ class CloudinaryImageStorageTest {
         storage.delete(logoDaEmpresa7, EMPRESA_7);
 
         servidor.verify();
+    }
+
+    @Test
+    void pdfVaiComoRecursoRawComONomeNoFimDoPublicId() {
+        AtomicReference<String> corpo = new AtomicReference<>();
+        String urlDoPdf = "https://res.cloudinary.com/" + CLOUD + "/raw/upload/v1/fds/12/x/ficha.pdf";
+        servidor.expect(requestTo(BASE + "/raw/upload"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> corpo.set(((MockClientHttpRequest) request).getBodyAsString()))
+                .andRespond(withSuccess("{\"secure_url\":\"" + urlDoPdf + "\"}", MediaType.APPLICATION_JSON));
+
+        String url = storage.enviarPdf(new byte[] {1}, "fds/12", "ficha.pdf");
+
+        assertThat(url).isEqualTo(urlDoPdf);
+        String publicId = campo(corpo.get(), "public_id");
+        assertThat(publicId).matches("fds/12/[0-9a-f-]{36}/ficha\\.pdf");
+        assertThat(campo(corpo.get(), "signature")).isEqualTo(sha1("public_id=" + publicId + "&timestamp=" + AGORA + SECRET));
+        servidor.verify();
+    }
+
+    /** A URL que o próprio upload devolve é a que a compensação consegue apagar. */
+    @Test
+    void urlDevolvidaPeloUploadDoPdfPodeSerApagada() {
+        AtomicReference<String> publicId = new AtomicReference<>();
+        servidor.expect(requestTo(BASE + "/raw/upload"))
+                .andRespond(request -> {
+                    publicId.set(campo(((MockClientHttpRequest) request).getBodyAsString(), "public_id"));
+                    return withSuccess("{\"secure_url\":\"https://res.cloudinary.com/" + CLOUD + "/raw/upload/v1700000000/"
+                            + publicId.get() + "\"}", MediaType.APPLICATION_JSON).createResponse(request);
+                });
+        servidor.expect(requestTo(BASE + "/raw/destroy"))
+                .andExpect(request -> assertThat(((MockClientHttpRequest) request).getBodyAsString()).contains(publicId.get()))
+                .andRespond(withSuccess("{\"result\":\"ok\"}", MediaType.APPLICATION_JSON));
+
+        String url = storage.enviarPdf(new byte[] {1}, "fds/7", "ficha.pdf");
+        storage.apagarPdf(url, "fds/7");
+
+        servidor.verify();
+    }
+
+    @Test
+    void apagaPdfSoDentroDaPastaPedida() {
+        String daPasta = "https://res.cloudinary.com/" + CLOUD
+                + "/raw/upload/v1/fds/12/0b6f2a52-6a7e-4c9a-9c1e-1f2a3b4c5d6e/ficha.pdf";
+        servidor.expect(requestTo(BASE + "/raw/destroy"))
+                .andExpect(content().string(containsString(
+                        "fds/12/0b6f2a52-6a7e-4c9a-9c1e-1f2a3b4c5d6e/ficha.pdf")))
+                .andRespond(withSuccess("{\"result\":\"ok\"}", MediaType.APPLICATION_JSON));
+
+        storage.apagarPdf(daPasta.replace("/fds/12/", "/fds/120/"), "fds/12");
+        storage.apagarPdf(daPasta.replace("/raw/", "/image/"), "fds/12");
+        storage.apagarPdf("https://res.cloudinary.com/outra-conta/raw/upload/v1/fds/12/x/ficha.pdf", "fds/12");
+        storage.apagarPdf(daPasta, "fds/12");
+
+        servidor.verify();
+    }
+
+    @Test
+    void semVariaveisPdfTambemFicaIndisponivel() {
+        DocumentoStorage desativado = new ImageStorageConfiguration().imageStorage("", "", "");
+
+        assertThatThrownBy(() -> desativado.enviarPdf(new byte[] {1}, "fds/1", "f.pdf"))
+                .isInstanceOfSatisfying(ImageStorageException.class,
+                        erro -> assertThat(erro.motivo()).isEqualTo(ImageStorageException.Motivo.INDISPONIVEL));
     }
 
     @Test

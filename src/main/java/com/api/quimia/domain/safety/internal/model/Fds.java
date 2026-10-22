@@ -33,6 +33,10 @@ public class Fds {
     @Column(name = "resumo_simplificado", columnDefinition = "text")
     private String resumoSimplificado;
 
+    /** PDF guardado quando a FDS veio do portal; nulo nas FDS carregadas por outros meios. */
+    @Column(name = "fonte_url", columnDefinition = "text")
+    private String fonteUrl;
+
     public Integer getId() {
         return id;
     }
@@ -55,5 +59,9 @@ public class Fds {
 
     public String getResumoSimplificado() {
         return resumoSimplificado;
+    }
+
+    public String getFonteUrl() {
+        return fonteUrl;
     }
 }
