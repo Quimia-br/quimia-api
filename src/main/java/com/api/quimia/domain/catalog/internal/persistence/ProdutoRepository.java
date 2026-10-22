@@ -31,7 +31,20 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
                   or lower(unaccent(p.marca.nome)) like :termo escape '!')
             """;
 
-    String FILTROS_CATALOGO = FILTRO_TERMO + """
+    /**
+     * O termo procurado só nos campos pedidos (`fields`). `:tiposDoTermo` são os códigos de tipo que contêm o termo,
+     * calculados por quem chama; o código de barras é comparado como texto, sem normalização.
+     */
+    String FILTRO_TERMO_POR_CAMPO = """
+             and (:termo is null
+                  or (:buscaNome = true and lower(unaccent(p.nome)) like :termo escape '!')
+                  or (:buscaDescricaoEMarca = true and lower(unaccent(p.descricao)) like :termo escape '!')
+                  or (:buscaDescricaoEMarca = true and lower(unaccent(p.marca.nome)) like :termo escape '!')
+                  or (:buscaTipo = true and p.tipo in :tiposDoTermo)
+                  or (:buscaCodigo = true and p.codBarras like :termo escape '!'))
+            """;
+
+    String FILTROS_CATALOGO = FILTRO_TERMO_POR_CAMPO + """
              and (:tipo is null or p.tipo = :tipo)
              and (:semCodigo = true or p.codBarras in :codigos)
             """;
@@ -40,6 +53,11 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
             countQuery = "select count(p) from Produto p where " + VISIVEL + FILTROS_CATALOGO)
     Page<Produto> buscarVisiveis(
             @Param("termo") String termoLike,
+            @Param("buscaNome") boolean buscaNome,
+            @Param("buscaDescricaoEMarca") boolean buscaDescricaoEMarca,
+            @Param("buscaTipo") boolean buscaTipo,
+            @Param("tiposDoTermo") Collection<String> tiposDoTermo,
+            @Param("buscaCodigo") boolean buscaCodigo,
             @Param("tipo") String tipo,
             @Param("semCodigo") boolean semCodigo,
             @Param("codigos") Collection<String> codigos,
@@ -56,6 +74,11 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
     Page<Produto> buscarDaEmpresa(
             @Param("empresa") Integer empresaId,
             @Param("termo") String termoLike,
+            @Param("buscaNome") boolean buscaNome,
+            @Param("buscaDescricaoEMarca") boolean buscaDescricaoEMarca,
+            @Param("buscaTipo") boolean buscaTipo,
+            @Param("tiposDoTermo") Collection<String> tiposDoTermo,
+            @Param("buscaCodigo") boolean buscaCodigo,
             @Param("tipo") String tipo,
             @Param("semCodigo") boolean semCodigo,
             @Param("codigos") Collection<String> codigos,

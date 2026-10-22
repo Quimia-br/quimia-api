@@ -1,7 +1,6 @@
 package com.api.quimia.domain.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
@@ -179,8 +178,8 @@ class EmpresaFotoWebTest {
         String antigo = armazenamento.enviadas().get(0);
         doThrow(new IllegalStateException("falha ao gravar a foto")).when(perfil).atualizarFoto(anyInt(), anyString());
 
-        // Sem handler para IllegalStateException, o MockMvc propaga a exceção em vez de devolver 500.
-        assertThatThrownBy(() -> enviar(token, imagem(PNG))).hasRootCauseInstanceOf(IllegalStateException.class);
+        enviar(token, imagem(PNG)).andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.detail").value("erro_interno"));
 
         assertThat(armazenamento.apagadas()).containsExactly(armazenamento.enviadas().get(1));
         assertThat(fotoNoBanco()).isEqualTo(antigo);
