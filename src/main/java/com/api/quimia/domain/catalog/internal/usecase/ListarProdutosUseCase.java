@@ -35,9 +35,15 @@ public class ListarProdutosUseCase {
         if (termo != null && termo.length() > TERMO_MAXIMO) {
             throw new CatalogException("termo_muito_longo", 400);
         }
-        String codigo = codBarras == null || codBarras.isBlank() ? null : codBarras.trim();
+        CamposDaBusca campos = CamposDaBusca.DO_APP;
+        String codigo = CodigoBarras.paraFiltroDoApp(codBarras);
         return ProdutoMapper.pagina(produtos.buscarVisiveis(
                 TermoBusca.like(termo),
+                campos.nome(),
+                campos.descricaoEMarca(),
+                campos.tipo(),
+                CamposDaBusca.tiposDoTermo(termo),
+                campos.codBarras(),
                 tipo,
                 codigo == null,
                 CodigoBarras.paraFiltro(codigo),

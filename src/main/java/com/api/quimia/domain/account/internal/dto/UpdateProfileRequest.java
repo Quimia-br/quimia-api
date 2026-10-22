@@ -8,4 +8,9 @@ import java.time.LocalDate;
 public record UpdateProfileRequest(
         @Size(min = 2, max = 255) String nome,
         @Past LocalDate dataNasc,
-        @Size(max = 450) @Pattern(regexp = "https://\\S+") String fotoUrl) {}
+        @Size(max = FOTO_URL_MAXIMA) @Pattern(regexp = FOTO_URL_REGEX) String fotoUrl) {
+    /** Tamanho de `usuario.foto_url`; também vale para a foto do login social. */
+    public static final int FOTO_URL_MAXIMA = 450;
+    /** URL https sem espaço; também vale para a foto do login social. */
+    public static final String FOTO_URL_REGEX = "https://\\S+";
+}
