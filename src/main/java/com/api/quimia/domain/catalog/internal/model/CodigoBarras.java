@@ -31,6 +31,18 @@ public final class CodigoBarras {
         return valor;
     }
 
+    /**
+     * Valor do filtro `codBarras` do app: sem os espaços das pontas, ou `null` quando vazio. Não valida dígitos (no
+     * app, valor inválido só não casa nada), mas também não apaga TAB ou NUL como `trim()` faria.
+     */
+    public static String paraFiltroDoApp(String codigo) {
+        if (codigo == null) {
+            return null;
+        }
+        String valor = semEspacosNasPontas(codigo);
+        return valor.isEmpty() ? null : valor;
+    }
+
     private static String semEspacosNasPontas(String texto) {
         int inicio = 0;
         int fim = texto.length();
@@ -61,10 +73,15 @@ public final class CodigoBarras {
 
     /**
      * Lista para o filtro `p.codBarras in :codigos` das listagens. Sem código, a consulta ignora a lista
-     * (`semCodigo`), mas `IN` não aceita lista vazia: vai um valor que nenhum código gravado tem.
+     * (`semCodigo`), mas `IN` não aceita lista vazia: vai um valor que nenhum código gravado tem. Valor que não é só
+     * dígitos (no app não há validação) também recebe esse valor: não casa nada e não chega ao banco, que recusaria
+     * um NUL com erro em vez de responder vazio.
      */
     public static Set<String> paraFiltro(String codigo) {
-        return codigo == null ? LISTA_SEM_FILTRO : equivalentes(codigo);
+        if (codigo == null || !SO_DIGITOS.matcher(codigo).matches()) {
+            return LISTA_SEM_FILTRO;
+        }
+        return equivalentes(codigo);
     }
 
     /** Representante único das formas equivalentes (UPC-A vira EAN-13). */

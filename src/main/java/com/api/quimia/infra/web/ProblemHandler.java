@@ -9,28 +9,42 @@ import com.api.quimia.domain.recommendation.internal.usecase.RecommendationExcep
 import com.api.quimia.domain.safety.internal.usecase.SafetyException;
 import com.api.quimia.domain.storage.internal.usecase.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.ErrorResponse;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 @RestControllerAdvice
 public class ProblemHandler {
+    private static final Logger log = LoggerFactory.getLogger(ProblemHandler.class);
     /**
      * SQLSTATEs de texto que o banco não consegue representar (22021: byte inválido para a codificação, como o
      * NUL; 22P05: caractere sem tradução). Vêm do texto enviado pelo cliente. Os demais erros de dado (ex.:
@@ -116,10 +130,13 @@ public class ProblemHandler {
         return resposta.body(problem(405, "Method Not Allowed", "metodo_nao_permitido", request));
     }
 
-    /** Imagem acima do limite do multipart (spring.servlet.multipart), recusada antes de chegar ao controller. */
+    /**
+     * Arquivo acima do limite do multipart (spring.servlet.multipart: 10 MB, o do PDF da FDS), recusado antes de
+     * chegar ao controller. Imagem acima de 5 MB e abaixo desse limite responde `imagem_muito_grande` pelo caso de uso.
+     */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ProblemDetail uploadGrande(MaxUploadSizeExceededException error, HttpServletRequest request) {
-        return problem(413, "Payload Too Large", "imagem_muito_grande", request);
+        return problem(413, "Payload Too Large", "arquivo_muito_grande", request);
     }
 
     /** JSON malformado, corpo ausente ou campo com tipo errado (ex.: objeto no lugar de texto, 1.9 como id). */
@@ -142,6 +159,51 @@ public class ProblemHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail constraint(ConstraintViolationException error, HttpServletRequest request) {
         return problem(400, "Validation failed", "validation", request);
+    }
+
+    @ExceptionHandler({MissingServletRequestParameterException.class, MissingServletRequestPartException.class})
+    ProblemDetail parametroObrigatorio(Exception error, HttpServletRequest request) {
+        return problem(400, "Bad Request", "parametro_obrigatorio", request);
+    }
+
+    /**
+     * O `Accept` do cliente não inclui nenhum formato que a rota produz. O `Content-Type` fixo faz o corpo sair
+     * mesmo assim, em vez de um 406 vazio.
+     */
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    ResponseEntity<ProblemDetail> formatoNaoAceito(HttpMediaTypeNotAcceptableException error, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem(406, "Not Acceptable", "formato_nao_aceito", request));
+    }
+
+    /**
+     * O que nenhum outro tratador cobre. Erro do Spring com status próprio mantém o status e os headers; o resto é
+     * 500, registrado no log com a pilha e respondido sem detalhe interno. Seguem adiante, como antes: 401 e 403 do
+     * Spring Security, cliente que desconectou e resposta já enviada (não há a quem responder).
+     */
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ProblemDetail> inesperado(Exception error, HttpServletRequest request, HttpServletResponse response)
+            throws Exception {
+        if (error instanceof AccessDeniedException
+                || error instanceof AuthenticationException
+                || response.isCommitted()
+                || DisconnectedClientHelper.isClientDisconnectedException(error)) {
+            throw error;
+        }
+        HttpStatusCode status = error instanceof ErrorResponse resposta
+                ? resposta.getStatusCode()
+                : HttpStatus.INTERNAL_SERVER_ERROR;
+        HttpHeaders headers = error instanceof ErrorResponse resposta ? resposta.getHeaders() : HttpHeaders.EMPTY;
+        String codigo = status.is5xxServerError() ? "erro_interno" : "requisicao_invalida";
+        if (status.is5xxServerError()) {
+            log.error("erro não previsto em {} {}", request.getMethod(), request.getRequestURI(), error);
+        }
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, codigo);
+        HttpStatus conhecido = HttpStatus.resolve(status.value());
+        detail.setTitle(conhecido == null ? "Error" : conhecido.getReasonPhrase());
+        detail.setInstance(URI.create(request.getRequestURI()));
+        return ResponseEntity.status(status).headers(headers).body(detail);
     }
 
     private static boolean textoRecusadoPeloBanco(Throwable error) {
@@ -170,7 +232,7 @@ public class ProblemHandler {
             case "not_found", "produto_nao_encontrado", "usuario_nao_encontrado", "empresa_nao_encontrada",
                     "produto_nao_esta_na_estante", "substancia_nao_encontrada" -> "Not Found";
             case "codigo_barras_invalido" -> "Unprocessable";
-            case "paginacao_invalida", "tipo_invalido", "termo_muito_longo", "nome_invalido" -> "Bad Request";
+            case "paginacao_invalida", "tipo_invalido", "termo_muito_longo", "nome_invalido", "campo_busca_invalido" -> "Bad Request";
             case "imagem_invalida" -> "Unsupported Media Type";
             case "imagem_muito_grande" -> "Payload Too Large";
             case "armazenamento_imagem_falhou" -> "Bad Gateway";
@@ -189,6 +251,11 @@ public class ProblemHandler {
             case "agente_falhou" -> "Bad Gateway";
             case "agente_indisponivel" -> "Service Unavailable";
             case "agente_timeout" -> "Gateway Timeout";
+            case "extrator_falhou" -> "Bad Gateway";
+            case "extrator_indisponivel" -> "Service Unavailable";
+            case "fds_nao_encontrada" -> "Not Found";
+            case "armazenamento_fds_falhou" -> "Bad Gateway";
+            case "armazenamento_fds_indisponivel" -> "Service Unavailable";
             default -> "Error";
         };
     }

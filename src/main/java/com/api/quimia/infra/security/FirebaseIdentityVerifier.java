@@ -53,7 +53,8 @@ public class FirebaseIdentityVerifier implements ExternalIdentityVerifier {
         return new ExternalIdentity(
                 jwt.getClaimAsString("email"),
                 Boolean.TRUE.equals(jwt.getClaimAsBoolean("email_verified")),
-                jwt.getClaimAsString("name"));
+                jwt.getClaimAsString("name"),
+                jwt.getClaimAsString("picture"));
     }
 
     private static JwtDecoder decoder(String projectId) {

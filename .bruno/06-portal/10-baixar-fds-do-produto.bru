@@ -1,0 +1,31 @@
+meta {
+  name: 10 - Baixar FDS do produto
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos/{{portalProdutoId}}/fds
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("traz o link do PDF da FDS ativa", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().url).to.be.a("string").and.not.be.empty;
+    expect(res.getBody().nomeArquivo).to.match(/\.pdf$/);
+  });
+}
+
+docs {
+  "Ficha de dados de segurança" no detalhe do produto do portal: o link do PDF da FDS ativa (guardado no Cloudinary quando a FDS foi enviada em `09`) e o nome do arquivo para o botão de download.
+  FDS carregada por outro meio, sem PDF enviado pelo portal, vem com `url` e `nomeArquivo` nulos.
+  Antes: `09`.
+  Respostas: 200, 403 empresa_inativa, 404 produto_nao_encontrado (produto de outra empresa) / fds_nao_encontrada.
+}
