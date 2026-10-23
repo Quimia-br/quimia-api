@@ -4,11 +4,14 @@ import com.api.quimia.domain.safety.SafetyGateway;
 import com.api.quimia.domain.safety.dto.ClasseQuimicaView;
 import com.api.quimia.domain.safety.dto.ComposicaoView;
 import com.api.quimia.domain.safety.dto.FdsDocumentoView;
+import com.api.quimia.domain.safety.dto.PrimeirosSocorrosView;
 import com.api.quimia.domain.safety.dto.ResumoSimplificadoView;
 import com.api.quimia.domain.safety.dto.SubstanciaNaEstanteView;
 import com.api.quimia.domain.safety.dto.SubstanciaView;
 import com.api.quimia.domain.safety.internal.model.ClasseQuimica;
 import com.api.quimia.domain.safety.internal.model.Fds;
+import com.api.quimia.domain.safety.internal.model.FdsConteudo;
+import com.api.quimia.domain.safety.internal.model.LeituraDosPrimeirosSocorros;
 import com.api.quimia.domain.safety.internal.model.FdsComposto;
 import com.api.quimia.domain.safety.internal.model.Substancia;
 import com.api.quimia.domain.safety.internal.model.SubstanciaSinonimo;
@@ -46,6 +49,22 @@ public class JpaSafetyGateway implements SafetyGateway {
         }
         return new ResumoSimplificadoView(
                 produtoId, textoOuNulo(fds.getResumoSimplificado()), fds.getVersao(), fds.getDataAtualizacao());
+    }
+
+    @Override
+    public PrimeirosSocorrosView primeirosSocorros(Integer produtoId) {
+        Fds fds = fdsAtivasMaisRecentes(List.of(produtoId)).get(produtoId);
+        if (fds == null) {
+            LeituraDosPrimeirosSocorros.Secao vazia = LeituraDosPrimeirosSocorros.Secao.AUSENTE;
+            return new PrimeirosSocorrosView(produtoId, false, vazia.porExposicao(), vazia.orientacoesGerais(),
+                    vazia.notasAoMedico(), null, null);
+        }
+        FdsConteudo conteudo = em.find(FdsConteudo.class, fds.getId());
+        LeituraDosPrimeirosSocorros.Secao secao =
+                LeituraDosPrimeirosSocorros.ler(conteudo == null ? null : conteudo.getRawJson());
+        return new PrimeirosSocorrosView(
+                produtoId, secao.encontrada(), secao.porExposicao(), secao.orientacoesGerais(), secao.notasAoMedico(),
+                fds.getVersao(), fds.getDataAtualizacao());
     }
 
     @Override

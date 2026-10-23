@@ -1,0 +1,30 @@
+meta {
+  name: 01 - Pontos de descarte
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pontos?tipo=descarte&usarLocalizacaoCadastrada=true
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("lista os pontos", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("itens");
+  });
+}
+
+docs {
+  Pontos parceiros por `tipo` (compra ou descarte), sem distância (o banco não tem coordenadas).
+  Filtra por `estado`, `bairro` ou `cep`; com `usarLocalizacaoCadastrada=true` usa o endereço do
+  usuário (`01 - Usuário`, endereço).
+  Respostas: 200, 400 tipo_invalido, estado_invalido ou cep_invalido, 422 localizacao_necessaria.
+}

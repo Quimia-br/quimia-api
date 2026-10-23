@@ -15,6 +15,14 @@ headers {
   Authorization: Bearer {{accessToken}}
 }
 
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body.itens.length > 1) {
+    bru.setVar("produtoId", body.itens[0].id);
+    bru.setVar("outroProdutoId", body.itens[1].id);
+  }
+}
+
 tests {
   test("lista a estante", function () {
     expect(res.getStatus()).to.equal(200);
@@ -25,5 +33,6 @@ tests {
 docs {
   Produtos guardados, inclusive os que saíram do catálogo. Aceita `q`, `page` e `size`.
   Antes: 01.
+  Com dois produtos ou mais, guarda `produtoId` e `outroProdutoId` (usados em 08 Cômodos e 09 Misturas).
   Respostas: 200, 400.
 }

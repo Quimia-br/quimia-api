@@ -1,0 +1,46 @@
+meta {
+  name: 01 - Perguntar ao Kemi
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/chat/mensagens
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "texto": "Posso misturar água sanitária com desinfetante?"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setVar("sessaoKemi", res.getBody().sessaoId);
+  }
+}
+
+tests {
+  test("responde com a sessão", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("texto");
+    expect(res.getBody()).to.have.property("sessaoId");
+  });
+}
+
+docs {
+  Repassa a mensagem ao quimia-agent e devolve a resposta. Sem `sessaoId` a API abre uma conversa nova;
+  a resposta traz o id para continuar a mesma conversa (guardado em `sessaoKemi`).
+  Limite: 20 mensagens por hora por usuário. Texto até 2.000 caracteres.
+  Precisa de `QUIMIA_AGENTE_URL` na API (sem ela: 503 agente_indisponivel).
+  Respostas: 200, 400 validation, 429 limite_excedido, 502 agente_falhou, 503 agente_indisponivel,
+  504 agente_timeout.
+}

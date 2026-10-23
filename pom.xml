@@ -27,6 +27,8 @@
         <jackson-bom.version>3.1.7</jackson-bom.version>
         <jacoco.version>0.8.11</jacoco.version>
         <dependency-check.version>10.0.4</dependency-check.version>
+        <pitest.version>1.30.0</pitest.version>
+        <pitest-junit5.version>1.2.3</pitest-junit5.version>
     </properties>
 
     <dependencies>
@@ -205,5 +207,50 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          Teste de mutação (PIT) da lógica de compatibilidade, misturas, cômodos e indicadores.
+          Fora do CI: `./mvnw -Pmutacao test-compile org.pitest:pitest-maven:mutationCoverage`.
+          Relatório em target/pit-reports. Para outra parte do código, sobrescreva
+          -Dmutacao.classes=... e -Dmutacao.testes=... (padrões globais do PIT).
+        -->
+        <profile>
+            <id>mutacao</id>
+            <properties>
+                <mutacao.classes>com.api.quimia.domain.safety.internal.persistence.JpaCompatibilidadeGateway*,com.api.quimia.domain.safety.internal.model.MotorDeCompatibilidade*,com.api.quimia.domain.safety.internal.model.RegraDeIncompatibilidade*,com.api.quimia.domain.safety.internal.model.Severidade*,com.api.quimia.domain.safety.internal.model.ComposicaoDoProduto*,com.api.quimia.domain.safety.internal.model.LeituraDosPrimeirosSocorros*,com.api.quimia.domain.recommendation.internal.*,com.api.quimia.domain.storage.internal.usecase.*Comodo*,com.api.quimia.domain.insights.internal.*,com.api.quimia.domain.assistant.internal.*</mutacao.classes>
+                <mutacao.testes>com.api.quimia.domain.safety.*,com.api.quimia.domain.recommendation.*,com.api.quimia.domain.storage.*,com.api.quimia.domain.insights.*,com.api.quimia.domain.assistant.*</mutacao.testes>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>${pitest.version}</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.pitest</groupId>
+                                <artifactId>pitest-junit5-plugin</artifactId>
+                                <version>${pitest-junit5.version}</version>
+                            </dependency>
+                        </dependencies>
+                        <configuration>
+                            <targetClasses>${mutacao.classes}</targetClasses>
+                            <targetTests>${mutacao.testes}</targetTests>
+                            <mutators>
+                                <mutator>STRONGER</mutator>
+                            </mutators>
+                            <outputFormats>
+                                <format>HTML</format>
+                                <format>XML</format>
+                            </outputFormats>
+                            <timestampedReports>false</timestampedReports>
+                            <threads>4</threads>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

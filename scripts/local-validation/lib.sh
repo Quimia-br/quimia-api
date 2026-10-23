@@ -10,6 +10,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCHEMA_DIR="$REPO_ROOT/src/test/resources/pg"
 PG_BIN="${PG_BIN:-/c/Program Files/PostgreSQL/18/bin}"
 PG_PORT="${PG_PORT:-55432}"
+PG_MAX_CONNECTIONS="${PG_MAX_CONNECTIONS:-300}"
 PG_DB="quimia"
 
 # Ordem de aplicação do DDL do quimia-bd.
@@ -43,7 +44,9 @@ start_cluster() {
   log "Criando PostgreSQL descartável em $dir (porta $PG_PORT)"
   "$PG_BIN/initdb" -D "$dir/data" -U postgres --auth=trust -E UTF8 --locale=C > "$dir/initdb.log" 2>&1
   # Saída redirecionada para o processo do servidor não prender o terminal.
-  "$PG_BIN/pg_ctl" -D "$dir/data" -o "-p $PG_PORT" -l "$dir/postgres.log" -w start > /dev/null 2>&1
+  # Cada contexto Spring dos testes guarda um pool de até 10 conexões; o padrão de 100 do PostgreSQL
+  # esgota com mais de 10 contextos ("too many clients already").
+  "$PG_BIN/pg_ctl" -D "$dir/data" -o "-p $PG_PORT -c max_connections=$PG_MAX_CONNECTIONS" -l "$dir/postgres.log" -w start > /dev/null 2>&1
   "$PG_BIN/createdb" -h localhost -p "$PG_PORT" -U postgres "$PG_DB"
 }
 

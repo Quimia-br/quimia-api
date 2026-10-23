@@ -2,6 +2,7 @@ package com.api.quimia.domain.safety;
 
 import com.api.quimia.domain.safety.dto.ComposicaoView;
 import com.api.quimia.domain.safety.dto.FdsDocumentoView;
+import com.api.quimia.domain.safety.dto.PrimeirosSocorrosView;
 import com.api.quimia.domain.safety.dto.ResumoSimplificadoView;
 import com.api.quimia.domain.safety.dto.SubstanciaNaEstanteView;
 import com.api.quimia.domain.safety.dto.SubstanciaView;
@@ -13,6 +14,9 @@ import java.util.Optional;
 public interface SafetyGateway {
     /** Resumo da FDS ativa mais recente; com campos nulos quando o produto não tem FDS ou texto. */
     ResumoSimplificadoView resumoSimplificado(Integer produtoId);
+
+    /** Primeiros socorros (seção 4) da FDS ativa mais recente; `encontrada` falso quando não há o que mostrar. */
+    PrimeirosSocorrosView primeirosSocorros(Integer produtoId);
 
     /** Substâncias da FDS ativa mais recente do produto, ordenadas por nome. */
     List<ComposicaoView> composicao(Integer produtoId);

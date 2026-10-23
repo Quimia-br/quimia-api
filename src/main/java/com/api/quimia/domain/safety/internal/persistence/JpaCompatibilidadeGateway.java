@@ -1,0 +1,123 @@
+package com.api.quimia.domain.safety.internal.persistence;
+
+import com.api.quimia.domain.safety.CompatibilidadeGateway;
+import com.api.quimia.domain.safety.dto.AvaliacaoConjuntoView;
+import com.api.quimia.domain.safety.dto.AvaliacaoParView;
+import com.api.quimia.domain.safety.internal.model.ComposicaoDoProduto;
+import com.api.quimia.domain.safety.internal.model.IncompatibilidadeRegra;
+import com.api.quimia.domain.safety.internal.model.MotorDeCompatibilidade;
+import com.api.quimia.domain.safety.internal.model.RegraDeIncompatibilidade;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Stream;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Carrega as composições e as regras que podem casar e entrega a decisão ao {@link MotorDeCompatibilidade}.
+ *
+ * <p>`@Component` e não `@Repository`: a tradução de exceções do `@Repository` converteria a
+ * `IllegalArgumentException("produtos_iguais")` do contrato em `InvalidDataAccessApiUsageException`.
+ */
+@Component
+@Transactional(readOnly = true)
+public class JpaCompatibilidadeGateway implements CompatibilidadeGateway {
+    @PersistenceContext
+    private EntityManager em;
+
+    @Override
+    public AvaliacaoParView avaliarPar(Integer produtoIdA, Integer produtoIdB) {
+        List<Integer> ids = Stream.of(produtoIdA, produtoIdB).filter(Objects::nonNull).distinct().toList();
+        return motor(ids).par(produtoIdA, produtoIdB);
+    }
+
+    @Override
+    public AvaliacaoConjuntoView avaliarConjunto(Collection<Integer> produtoIds) {
+        List<Integer> ids = produtoIds.stream().filter(Objects::nonNull).distinct().toList();
+        return motor(ids).conjunto(ids);
+    }
+
+    private MotorDeCompatibilidade motor(Collection<Integer> produtoIds) {
+        if (produtoIds.isEmpty()) {
+            return new MotorDeCompatibilidade(Map.of(), List.of());
+        }
+        Map<Integer, Set<Integer>> substanciasPorProduto = new HashMap<>();
+        Set<Integer> comNaoResolvido = new HashSet<>();
+        List<Object[]> compostos = em.createQuery(
+                        """
+                        select f.produtoId, c.substanciaId from Fds f, FdsComposto c
+                        where c.fdsId = f.id and f.ativo = true and f.produtoId in :produtos
+                        """,
+                        Object[].class)
+                .setParameter("produtos", produtoIds)
+                .getResultList();
+        for (Object[] linha : compostos) {
+            Integer produto = (Integer) linha[0];
+            Integer substancia = (Integer) linha[1];
+            if (substancia == null) {
+                comNaoResolvido.add(produto);
+            } else {
+                substanciasPorProduto.computeIfAbsent(produto, id -> new HashSet<>()).add(substancia);
+            }
+        }
+        Set<Integer> substancias = new HashSet<>();
+        substanciasPorProduto.values().forEach(substancias::addAll);
+        if (substancias.isEmpty()) {
+            // Sem substância identificada nenhum par é avaliável: classes e regras não são consultadas.
+            return new MotorDeCompatibilidade(Map.of(), List.of());
+        }
+        Map<Integer, Set<Integer>> classesPorSubstancia = classesPorSubstancia(substancias);
+
+        Map<Integer, ComposicaoDoProduto> composicoes = new HashMap<>();
+        Set<Integer> classes = new HashSet<>();
+        for (Integer produto : produtoIds) {
+            Set<Integer> doProduto = substanciasPorProduto.getOrDefault(produto, Set.of());
+            Set<Integer> classesDoProduto = new HashSet<>();
+            doProduto.forEach(substancia -> classesDoProduto.addAll(classesPorSubstancia.getOrDefault(substancia, Set.of())));
+            classes.addAll(classesDoProduto);
+            composicoes.put(produto, new ComposicaoDoProduto(doProduto, classesDoProduto, comNaoResolvido.contains(produto)));
+        }
+        return new MotorDeCompatibilidade(composicoes, regrasQuePodemCasar(substancias, classes));
+    }
+
+    /**
+     * Só as regras ativas com os dois lados presentes no conjunto: as outras não casam com nenhum par, e a tabela
+     * de regras pode crescer sem que cada avaliação a leia inteira.
+     */
+    private List<RegraDeIncompatibilidade> regrasQuePodemCasar(Set<Integer> substancias, Set<Integer> classes) {
+        String lado = classes.isEmpty()
+                ? "r.substancia%1$sId in :substancias"
+                : "(r.substancia%1$sId in :substancias or r.classe%1$sId in :classes)";
+        TypedQuery<IncompatibilidadeRegra> consulta = em.createQuery(
+                "select r from IncompatibilidadeRegra r where r.ativo = true and "
+                        + lado.formatted("A") + " and " + lado.formatted("B"),
+                IncompatibilidadeRegra.class)
+                .setParameter("substancias", substancias);
+        if (!classes.isEmpty()) {
+            consulta.setParameter("classes", classes);
+        }
+        return consulta.getResultList().stream().map(RegraDeIncompatibilidade::de).toList();
+    }
+
+    private Map<Integer, Set<Integer>> classesPorSubstancia(Collection<Integer> substanciaIds) {
+        Map<Integer, Set<Integer>> classes = new HashMap<>();
+        List<Object[]> linhas = em.createQuery(
+                        "select sc.substanciaId, sc.classeQuimicaId from SubstanciaClasseQuimica sc"
+                                + " where sc.substanciaId in :substancias",
+                        Object[].class)
+                .setParameter("substancias", substanciaIds)
+                .getResultList();
+        for (Object[] linha : linhas) {
+            classes.computeIfAbsent((Integer) linha[0], id -> new HashSet<>()).add((Integer) linha[1]);
+        }
+        return classes;
+    }
+}

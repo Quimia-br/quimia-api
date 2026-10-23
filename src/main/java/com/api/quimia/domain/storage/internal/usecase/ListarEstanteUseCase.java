@@ -24,7 +24,7 @@ public class ListarEstanteUseCase {
     }
 
     @Transactional(readOnly = true)
-    public Pagina<ProdutoView> execute(UUID usuarioId, String termo, int pagina, int tamanho) {
+    public Pagina<ProdutoView> execute(UUID usuarioId, String termo, String ordem, int pagina, int tamanho) {
         // O offset da consulta é um int: páginas além dele viravam 500 no Spring Data.
         if (pagina < 0 || tamanho < 1 || tamanho > TAMANHO_MAXIMO || (long) pagina * tamanho > Integer.MAX_VALUE) {
             throw new StorageException("paginacao_invalida", 400);
@@ -32,6 +32,7 @@ public class ListarEstanteUseCase {
         if (termo != null && termo.length() > TERMO_MAXIMO) {
             throw new StorageException("termo_muito_longo", 400);
         }
+        OrdemDaEstante.validar(ordem);
         return catalogo.listarPorIds(itens.produtoIds(usuarioId), termo, pagina, tamanho);
     }
 }

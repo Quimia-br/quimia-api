@@ -1,0 +1,29 @@
+meta {
+  name: 06 - Remover produto do cômodo
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/comodos/{{comodoId}}/produtos/{{outroProdutoId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("tira do cômodo sem tirar da estante", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Tira o produto do cômodo; ele continua na estante. Repetir não é erro. O cômodo pode ficar com menos
+  de 2 produtos (o mínimo vale só na criação).
+  Antes: 01.
+  Respostas: 204, 404 comodo_nao_encontrado.
+}
