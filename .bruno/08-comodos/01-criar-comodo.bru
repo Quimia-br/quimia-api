@@ -19,7 +19,7 @@ headers {
 body:json {
   {
     "nome": "Banheiro",
-    "icone": "banheira",
+    "icone": "toilet",
     "produtoIds": [{{produtoId}}, {{outroProdutoId}}]
   }
 }
@@ -40,8 +40,9 @@ tests {
 docs {
   Cria o cômodo com 2 a 20 produtos da estante e devolve a avaliação de risco de todos os pares
   (seguro, atencao, critico ou nao_avaliado) e os pares incompatíveis, do mais grave ao menos grave.
-  `icone`: letras minúsculas, dígitos, `_` e `-`. Um produto fica em no máximo um cômodo.
+  `icone`: um código de `07 - Listar ícones` (mirror, refrigerator, fence, laundry, double-bed, single-bed, toilet, sofa,
+  pool ou shelving). Um produto fica em no máximo um cômodo.
   Antes: `04 - Estante / 01` com dois produtos e `04 / 02` (guarda `produtoId` e `outroProdutoId`).
   Respostas: 201, 400 validation, 409 comodo_ja_existe ou produto_em_outro_comodo,
-  422 comodo_produtos_insuficientes, comodo_produtos_demais ou produto_fora_da_estante.
+  422 icone_invalido, comodo_produtos_insuficientes, comodo_produtos_demais ou produto_fora_da_estante.
 }

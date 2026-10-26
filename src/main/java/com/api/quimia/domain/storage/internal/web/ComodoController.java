@@ -5,7 +5,9 @@ import com.api.quimia.domain.catalog.dto.Pagina;
 import com.api.quimia.domain.storage.internal.dto.ComodoRequest;
 import com.api.quimia.domain.storage.internal.dto.ComodoResumo;
 import com.api.quimia.domain.storage.internal.dto.ComodoView;
+import com.api.quimia.domain.storage.internal.dto.IconeView;
 import com.api.quimia.domain.storage.internal.dto.ProdutosNoComodoRequest;
+import com.api.quimia.domain.storage.internal.model.IconeDeComodo;
 import com.api.quimia.domain.storage.internal.usecase.AdicionarProdutosAoComodoUseCase;
 import com.api.quimia.domain.storage.internal.usecase.ConsultarComodoDoProdutoUseCase;
 import com.api.quimia.domain.storage.internal.usecase.ConsultarComodoUseCase;
@@ -14,6 +16,7 @@ import com.api.quimia.domain.storage.internal.usecase.ListarComodosUseCase;
 import com.api.quimia.domain.storage.internal.usecase.RemoverProdutoDoComodoUseCase;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -57,6 +60,12 @@ public class ComodoController {
             @AuthenticationPrincipal AccountPrincipal principal, @Valid @RequestBody ComodoRequest request) {
         ComodoView comodo = criar.execute(principal.usuarioId(), request);
         return ResponseEntity.created(URI.create("/api/v1/comodos/" + comodo.id())).body(comodo);
+    }
+
+    /** Catálogo de ícones aceitos em `POST /comodos`. */
+    @GetMapping("/comodos/icones")
+    public List<IconeView> icones() {
+        return IconeDeComodo.todos().stream().map(IconeView::of).toList();
     }
 
     @GetMapping("/comodos")
