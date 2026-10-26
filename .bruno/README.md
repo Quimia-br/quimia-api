@@ -25,7 +25,7 @@ Para o portal: **06 Portal** (02) cadastra um produto e já deixa o `produtoId` 
 | `03-catalogo` | app | Listar, detalhe, busca por código de barras |
 | `04-estante` | app | Guardar, listar, remover |
 | `05-seguranca` | app | Resumo do rótulo, substâncias do produto e da estante, detalhe, "Como se proteger?" |
-| `06-portal` | portal | Listar, cadastrar (com e sem imagem), alterar, trocar imagem, remover, Home, Estatísticas, WebKemi, revisão das pendências da FDS (14 a 16) e novo chat (17) |
+| `06-portal` | portal | Listar, cadastrar (com e sem imagem), alterar, trocar imagem, remover, Home, Estatísticas, WebKemi, revisão das pendências da FDS (14 a 16) novo chat (17) e tipos de produto (18) |
 | `07-recuperacao-de-senha` | app e portal | Código por email (usuário) e link por email (empresa) |
 | `08-comodos` | app | Criar, listar, detalhar, adicionar e remover produtos, cômodo do produto |
 | `09-misturas` | app | Misturar dois produtos, histórico, detalhe |

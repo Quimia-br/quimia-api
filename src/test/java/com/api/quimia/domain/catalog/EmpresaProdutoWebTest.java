@@ -300,6 +300,40 @@ class EmpresaProdutoWebTest {
         return mvc.perform(delete(BASE + "/" + id).header("Authorization", "Bearer " + token));
     }
 
+    @Test
+    void tiposDeProdutoSaoOsDoEnumNaOrdemDoContrato() throws Exception {
+        mvc.perform(get(BASE + "/tipos").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", Matchers.startsWith("application/json")))
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(7))
+                .andExpect(jsonPath("$", Matchers.contains("limpeza_geral", "desinfetante", "desincrustante",
+                        "desengraxante", "alvejante", "aromatizante", "outro")));
+    }
+
+    /** Toda opção oferecida ao formulário é aceita pelo cadastro: a lista não diverge da validação. */
+    @Test
+    void todoTipoOferecidoEAceitoNoCadastro() throws Exception {
+        String corpo = mvc.perform(get(BASE + "/tipos").header("Authorization", "Bearer " + tokenA))
+                .andReturn().getResponse().getContentAsString();
+        List<String> tipos = JsonPath.read(corpo, "$");
+        for (String tipo : tipos) {
+            cadastrar(tokenA, "Produto " + tipo, tipo, null)
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.produto.tipo").value(tipo));
+        }
+        cadastrar(tokenA, "Produto inventado", "inventado", null).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("tipo_invalido"));
+    }
+
+    @Test
+    void tiposExigemLoginDeEmpresa() throws Exception {
+        mvc.perform(get(BASE + "/tipos")).andExpect(status().isUnauthorized());
+        mvc.perform(get(BASE + "/tipos").header("Authorization", "Bearer invalido")).andExpect(status().isUnauthorized());
+        String usuario = TestLogins.usuario(mvc, "u@portal.test");
+        mvc.perform(get(BASE + "/tipos").header("Authorization", "Bearer " + usuario)).andExpect(status().isForbidden());
+    }
+
     private static int idDe(ResultActions cadastro) throws Exception {
         return JsonPath.read(cadastro.andReturn().getResponse().getContentAsString(), "$.produto.id");
     }

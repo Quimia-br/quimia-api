@@ -10,6 +10,7 @@ import com.api.quimia.domain.catalog.internal.usecase.AlterarProdutoEmpresaUseCa
 import com.api.quimia.domain.catalog.internal.usecase.CadastrarProdutoEmpresaUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosEmpresaUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosUseCase;
+import com.api.quimia.domain.catalog.internal.usecase.ListarTiposDeProdutoUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.RemoverProdutoEmpresaUseCase;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -36,16 +37,19 @@ public class EmpresaProdutoController {
     private final CadastrarProdutoEmpresaUseCase cadastrar;
     private final AlterarProdutoEmpresaUseCase alterar;
     private final RemoverProdutoEmpresaUseCase remover;
+    private final ListarTiposDeProdutoUseCase listarTipos;
 
     public EmpresaProdutoController(
             ListarProdutosEmpresaUseCase listar,
             CadastrarProdutoEmpresaUseCase cadastrar,
             AlterarProdutoEmpresaUseCase alterar,
-            RemoverProdutoEmpresaUseCase remover) {
+            RemoverProdutoEmpresaUseCase remover,
+            ListarTiposDeProdutoUseCase listarTipos) {
         this.listar = listar;
         this.cadastrar = cadastrar;
         this.alterar = alterar;
         this.remover = remover;
+        this.listarTipos = listarTipos;
     }
 
     @GetMapping
@@ -60,6 +64,15 @@ public class EmpresaProdutoController {
             @RequestParam(name = "page", defaultValue = "0") int pagina,
             @RequestParam(name = "size", defaultValue = "" + ListarProdutosUseCase.TAMANHO_PADRAO) int tamanho) {
         return listar.execute(principal.empresaId(), termo, fields, tipo, codBarras, sort, direcao, pagina, tamanho);
+    }
+
+    /**
+     * Opções do campo "Tipo" do formulário de cadastro: array de códigos (`limpeza_geral`, `desinfetante`, ...), todos,
+     * sem paginação. O portal traduz os códigos para o texto exibido.
+     */
+    @GetMapping("/tipos")
+    public List<String> tipos() {
+        return listarTipos.execute();
     }
 
     /** `201` quando o produto foi criado; `200` quando a empresa foi vinculada ou reativada. */

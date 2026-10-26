@@ -1,0 +1,29 @@
+meta {
+  name: 18 - Tipos de produto
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos/tipos
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+tests {
+  test("devolve os sete tipos, sem paginação", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.be.an("array").with.lengthOf(7);
+    expect(res.getBody()).to.include("limpeza_geral");
+  });
+}
+
+docs {
+  Opções do campo "Tipo" do formulário de cadastro: array de códigos, todos, sem paginação. Vêm do mesmo enum que o cadastro valida (`tipo_invalido`), então toda opção é aceita. O portal traduz os códigos (`limpeza_geral` → "Limpeza geral").
+  Respostas: 200, 401 sem token ou token inválido, 403 conta que não é de empresa.
+}
