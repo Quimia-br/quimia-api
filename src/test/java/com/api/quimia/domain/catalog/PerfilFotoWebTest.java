@@ -1,4 +1,4 @@
-package com.api.quimia.domain.account;
+package com.api.quimia.domain.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.api.quimia.TestJwtKeys;
 import com.api.quimia.TestLogins;
-import com.api.quimia.domain.catalog.FakeImageStorage;
 import com.api.quimia.domain.catalog.internal.image.ImageStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
