@@ -1,0 +1,42 @@
+meta {
+  name: 14 - Analisar FDS (revisar pendências)
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos/fds/analises
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  fds: @file(fixtures/fds-exemplo.pdf)
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setVar("analiseFds", res.getBody().analiseId);
+  }
+}
+
+tests {
+  test("devolve a análise com as pendências, sem cadastrar nada (exige QUIMIA_EXTRATOR_URL)", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("analiseId");
+    expect(res.getBody()).to.have.property("pendencias");
+  });
+}
+
+docs {
+  Popup "Estamos analisando sua FDS": guarda o PDF, lê as seções 3, 4 e 10 pelo extrator (até 60 s) e devolve as pendências, sem cadastrar nada.
+  `pendencias[].corrigivel` = true quando a empresa pode preencher o valor (hoje, a unidade de concentração de `pendencias[].composto`); as demais são avisos.
+  O `analiseId` (assinado, vale 30 minutos) fica em `analiseFds`. Para "Substituir documento corrigido", envie o PDF novo com `analiseAnterior` = o `analiseId` antigo.
+  Depois: `15` cadastra com a análise; `16` descarta se a empresa fechar o popup.
+  Respostas: 200, 400 fds_ausente, 403 empresa_inativa, 413 pdf_muito_grande, 415 pdf_invalido, 422 fds_invalida, 502 extrator_falhou/armazenamento_fds_falhou, 503 extrator_indisponivel/armazenamento_fds_indisponivel.
+}

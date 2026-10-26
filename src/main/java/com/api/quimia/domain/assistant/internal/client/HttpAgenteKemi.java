@@ -7,7 +7,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -21,8 +23,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * `POST {url}/chat` do quimia-agent: `{session_id, user_id, pergunta}` → `{resposta}`. O conteúdo das mensagens
- * nunca vai para o log.
+ * `POST {url}/chat` do quimia-agent: `{session_id, user_id, pergunta}` → `{resposta}`; e
+ * `POST {url}/chat/sessions/close`: `{session_id, user_id}` → `{session_id, status}`. O conteúdo das mensagens nunca
+ * vai para o log.
  */
 public final class HttpAgenteKemi implements AgenteKemi {
     /** Maior corpo de resposta lido; acima disso a resposta é recusada sem carregar o resto. */
@@ -31,6 +34,7 @@ public final class HttpAgenteKemi implements AgenteKemi {
     static final int RESPOSTA_MAXIMA = 20_000;
 
     private static final Duration CONEXAO = Duration.ofSeconds(3);
+    private static final Set<String> SITUACOES = Set.of(RESUMIDA, JA_RESUMIDA, SEM_TURNOS);
     private static final Logger log = LoggerFactory.getLogger(HttpAgenteKemi.class);
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -62,9 +66,21 @@ public final class HttpAgenteKemi implements AgenteKemi {
         corpo.put("session_id", sessaoId);
         corpo.put("user_id", autorId.toString());
         corpo.put("pergunta", pergunta);
+        return chamar("/chat", corpo, HttpAgenteKemi::textoDaResposta);
+    }
+
+    @Override
+    public String encerrarSessao(UUID autorId, String sessaoId) {
+        Map<String, Object> corpo = new LinkedHashMap<>();
+        corpo.put("session_id", sessaoId);
+        corpo.put("user_id", autorId.toString());
+        return chamar("/chat/sessions/close", corpo, HttpAgenteKemi::situacaoDoEncerramento);
+    }
+
+    private String chamar(String caminho, Map<String, Object> corpo, Function<JsonNode, String> leitor) {
         try {
             return client.post()
-                    .uri(url + "/chat")
+                    .uri(url + caminho)
                     .headers(cabecalhos -> {
                         if (!token.isBlank()) {
                             cabecalhos.setBearerAuth(token);
@@ -73,7 +89,8 @@ public final class HttpAgenteKemi implements AgenteKemi {
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
                     .body(JSON.writeValueAsString(corpo))
-                    .exchange((pedido, resposta) -> respostaOuFalha(resposta.getStatusCode(), resposta.getBody()));
+                    .exchange((pedido, resposta) ->
+                            respostaOuFalha(resposta.getStatusCode(), resposta.getBody(), leitor));
         } catch (ResourceAccessException semResposta) {
             if (prazoEsgotado(semResposta)) {
                 log.warn("agente Kemi não respondeu no prazo");
@@ -84,7 +101,8 @@ public final class HttpAgenteKemi implements AgenteKemi {
         }
     }
 
-    private static String respostaOuFalha(HttpStatusCode status, InputStream corpo) throws IOException {
+    private static String respostaOuFalha(HttpStatusCode status, InputStream corpo, Function<JsonNode, String> leitor)
+            throws IOException {
         if (status.value() == HttpStatus.SERVICE_UNAVAILABLE.value()) {
             throw new AgenteKemiException(AgenteKemiException.Motivo.INDISPONIVEL);
         }
@@ -105,6 +123,10 @@ public final class HttpAgenteKemi implements AgenteKemi {
         } catch (JacksonException ilegivel) {
             throw foraDoContrato("JSON ilegível");
         }
+        return leitor.apply(raiz);
+    }
+
+    private static String textoDaResposta(JsonNode raiz) {
         JsonNode resposta = raiz.path("resposta");
         if (!resposta.isString() || resposta.asString().isBlank()) {
             throw foraDoContrato("sem o campo resposta");
@@ -114,6 +136,14 @@ public final class HttpAgenteKemi implements AgenteKemi {
             throw foraDoContrato("resposta acima de " + RESPOSTA_MAXIMA + " caracteres");
         }
         return texto;
+    }
+
+    private static String situacaoDoEncerramento(JsonNode raiz) {
+        JsonNode situacao = raiz.path("status");
+        if (!situacao.isString() || !SITUACOES.contains(situacao.asString())) {
+            throw foraDoContrato("status do encerramento fora da lista");
+        }
+        return situacao.asString();
     }
 
     private static AgenteKemiException foraDoContrato(String motivo) {

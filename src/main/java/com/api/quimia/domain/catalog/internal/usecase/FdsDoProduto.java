@@ -1,6 +1,10 @@
 package com.api.quimia.domain.catalog.internal.usecase;
 
 import com.api.quimia.domain.catalog.event.FdsRecebidaEvent;
+import com.api.quimia.domain.catalog.internal.fds.AnaliseDeFdsException;
+import com.api.quimia.domain.catalog.internal.fds.AnalisesDeFds;
+import com.api.quimia.domain.catalog.internal.fds.CorrecaoDaExtracao;
+import com.api.quimia.domain.catalog.internal.fds.CorrecaoDeComposto;
 import com.api.quimia.domain.catalog.internal.fds.ExtratorFds;
 import com.api.quimia.domain.catalog.internal.fds.ExtratorFdsException;
 import com.api.quimia.domain.catalog.internal.fds.ValidacaoDaExtracao;
@@ -11,6 +15,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Locale;
 import org.slf4j.Logger;
@@ -26,6 +31,10 @@ import org.springframework.web.multipart.MultipartFile;
  * PDF vai primeiro para o armazenamento (`fds.fonte_url`, para o download no detalhe do produto) e depois para o
  * extrator, que devolve o JSON gravado em `fds.raw_json`. Quem chama apaga o PDF ({@link #descartar}) se a gravação
  * não acontecer.
+ *
+ * O portal também pode separar a leitura da gravação: {@link #analisar} guarda o PDF e lê a FDS sem gravar nada, e a
+ * empresa revisa as pendências. A confirmação do cadastro devolve o `analiseId` ({@link #usarAnalise}), com as
+ * correções que a empresa fez. O PDF de uma análise só é apagado quando a FDS não será mais usada.
  */
 @Component
 public class FdsDoProduto {
@@ -40,6 +49,7 @@ public class FdsDoProduto {
     private static final int NOME_MAXIMO = 80;
 
     private final ExtratorFds extrator;
+    private final AnalisesDeFds analises;
     private final DocumentoStorage documentos;
     private final ApplicationEventPublisher eventos;
     private final boolean obrigatoria;
@@ -47,15 +57,23 @@ public class FdsDoProduto {
     /** PDF validado e o nome com que será guardado (já seguro para URL). */
     record PdfDaFds(byte[] conteudo, String nomeArquivo) {}
 
-    /** PDF já guardado (`url` na `pasta`) e a resposta validada do extrator. */
-    record FdsPreparada(String url, String pasta, String json) {}
+    /**
+     * PDF já guardado (`url` na `pasta`) e a resposta validada do extrator. `deAnalise` marca a FDS que o portal já
+     * revisou: se a gravação falhar, o PDF fica para a empresa tentar de novo com o mesmo `analiseId`.
+     */
+    record FdsPreparada(String url, String pasta, String json, boolean deAnalise) {}
+
+    /** Análise nova: o identificador assinado para o portal, até quando vale e a extração para montar a revisão. */
+    record AnaliseAberta(String analiseId, Instant expiraEm, String json) {}
 
     public FdsDoProduto(
             ExtratorFds extrator,
+            AnalisesDeFds analises,
             DocumentoStorage documentos,
             ApplicationEventPublisher eventos,
             @Value("${quimia.fds.obrigatoria:false}") boolean obrigatoria) {
         this.extrator = extrator;
+        this.analises = analises;
         this.documentos = documentos;
         this.eventos = eventos;
         this.obrigatoria = obrigatoria;
@@ -95,10 +113,62 @@ public class FdsDoProduto {
         String pasta = PASTA + empresaId;
         String url = enviarPdf(pdf, pasta);
         try {
-            return new FdsPreparada(url, pasta, extrair(pdf));
+            return new FdsPreparada(url, pasta, extrair(pdf), false);
         } catch (RuntimeException falha) {
             documentos.apagarPdf(url, pasta);
             throw falha;
+        }
+    }
+
+    /**
+     * Lê a FDS sem gravar nada e devolve o identificador da análise. Com `analiseAnterior` (a FDS que o portal está
+     * substituindo), o PDF dela é apagado depois que a nova análise deu certo.
+     */
+    AnaliseAberta analisar(Integer empresaId, PdfDaFds pdf, String analiseAnterior) {
+        if (pdf == null) {
+            throw new CatalogException("fds_ausente", 400);
+        }
+        FdsPreparada preparada = preparar(empresaId, pdf);
+        AnalisesDeFds.Emitida emitida = analises.emitir(empresaId, preparada.url(), preparada.pasta(), preparada.json());
+        if (analiseAnterior != null && !analiseAnterior.isBlank()) {
+            descartarAnalise(empresaId, analiseAnterior);
+        }
+        return new AnaliseAberta(emitida.analiseId(), emitida.expiraEm(), preparada.json());
+    }
+
+    /** A FDS de uma análise ainda válida, com as correções da empresa aplicadas. */
+    FdsPreparada usarAnalise(Integer empresaId, String analiseId, String correcoes) {
+        try {
+            AnalisesDeFds.Analise analise = analises.abrir(analiseId, empresaId);
+            String json = CorrecaoDaExtracao.aplicar(analise.json(), CorrecaoDeComposto.ler(correcoes));
+            return new FdsPreparada(analise.url(), analise.pasta(), json, true);
+        } catch (AnaliseDeFdsException recusada) {
+            throw switch (recusada.motivo()) {
+                case INVALIDA -> new CatalogException("analise_invalida", 422);
+                case EXPIRADA -> new CatalogException("analise_expirada", 410);
+                case CORRECAO_INVALIDA -> new CatalogException("correcao_invalida", 422);
+            };
+        }
+    }
+
+    /** Apaga o PDF de uma análise da empresa que não será usada; análise inválida de outra empresa é ignorada. */
+    void descartarAnalise(Integer empresaId, String analiseId) {
+        try {
+            AnalisesDeFds.Analise analise = analises.abrirMesmoExpirada(analiseId, empresaId);
+            documentos.apagarPdf(analise.url(), analise.pasta());
+        } catch (AnaliseDeFdsException invalida) {
+            log.warn("análise de FDS recusada ao descartar: {}", invalida.motivo());
+        }
+    }
+
+    /** O portal manda o PDF ou uma análise já feita, nunca os dois; correções só valem com análise. */
+    static void exigirUmaOrigem(PdfDaFds pdf, String analiseId, String correcoes) {
+        boolean temAnalise = analiseId != null && !analiseId.isBlank();
+        if (pdf != null && temAnalise) {
+            throw new CatalogException("fds_e_analise_juntas", 400);
+        }
+        if (!temAnalise && correcoes != null && !correcoes.isBlank()) {
+            throw new CatalogException("correcoes_sem_analise", 400);
         }
     }
 

@@ -4,12 +4,14 @@ import com.api.quimia.domain.account.AccountGateway;
 import com.api.quimia.domain.account.dto.EmpresaView;
 import com.api.quimia.domain.assistant.internal.client.AgenteKemi;
 import com.api.quimia.domain.assistant.internal.client.AgenteKemiException;
+import com.api.quimia.domain.assistant.internal.dto.EncerramentoView;
 import com.api.quimia.domain.assistant.internal.dto.MensagemRequest;
 import com.api.quimia.domain.assistant.internal.dto.RespostaView;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +21,9 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ConversarComKemiUseCase {
+    /** Mesma regra de `MensagemRequest.sessaoId`. */
+    private static final Pattern SESSAO = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+
     private final AgenteKemi agente;
     private final LimiteDeMensagens limite;
     private final AccountGateway contas;
@@ -46,13 +51,40 @@ public class ConversarComKemiUseCase {
      * id, que nunca coincide com o de um usuário (UUID v4).
      */
     public RespostaView daEmpresa(Integer empresaId, MensagemRequest mensagem) {
+        return conversar("empresa:" + empresaId, autorDaEmpresa(empresaId), mensagem);
+    }
+
+    /**
+     * "Novo chat" do Kemi: o agente resume a conversa anterior e guarda o resumo. Não conta no limite de mensagens, e
+     * repetir a chamada não gera outro resumo.
+     */
+    public EncerramentoView encerrarDoUsuario(UUID usuarioId, String sessaoId) {
+        return encerrar(usuarioId, sessaoId);
+    }
+
+    /** "Novo chat" do WebKemi. */
+    public EncerramentoView encerrarDaEmpresa(Integer empresaId, String sessaoId) {
+        return encerrar(autorDaEmpresa(empresaId), sessaoId);
+    }
+
+    private UUID autorDaEmpresa(Integer empresaId) {
         EmpresaView empresa = contas.findEmpresaById(empresaId)
                 .orElseThrow(() -> new AssistantException("empresa_nao_encontrada", 404));
         if (!empresa.ativo()) {
             throw new AssistantException("empresa_inativa", 403);
         }
-        UUID autor = UUID.nameUUIDFromBytes(("empresa:" + empresaId).getBytes(StandardCharsets.UTF_8));
-        return conversar("empresa:" + empresaId, autor, mensagem);
+        return UUID.nameUUIDFromBytes(("empresa:" + empresaId).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private EncerramentoView encerrar(UUID autor, String sessaoId) {
+        if (sessaoId == null || !SESSAO.matcher(sessaoId).matches()) {
+            throw new AssistantException("sessao_invalida", 400);
+        }
+        try {
+            return new EncerramentoView(sessaoId, agente.encerrarSessao(autor, sessaoId));
+        } catch (AgenteKemiException falha) {
+            throw erroDoAgente(falha);
+        }
     }
 
     private RespostaView conversar(String chaveDoLimite, UUID autor, MensagemRequest mensagem) {
@@ -64,11 +96,15 @@ public class ConversarComKemiUseCase {
             String texto = agente.perguntar(autor, sessaoId, mensagem.texto().strip());
             return new RespostaView(texto, sessaoId, OffsetDateTime.now(relogio));
         } catch (AgenteKemiException falha) {
-            throw switch (falha.motivo()) {
-                case INDISPONIVEL -> new AssistantException("agente_indisponivel", 503);
-                case TEMPO_ESGOTADO -> new AssistantException("agente_timeout", 504);
-                case FALHOU -> new AssistantException("agente_falhou", 502);
-            };
+            throw erroDoAgente(falha);
         }
+    }
+
+    private static AssistantException erroDoAgente(AgenteKemiException falha) {
+        return switch (falha.motivo()) {
+            case INDISPONIVEL -> new AssistantException("agente_indisponivel", 503);
+            case TEMPO_ESGOTADO -> new AssistantException("agente_timeout", 504);
+            case FALHOU -> new AssistantException("agente_falhou", 502);
+        };
     }
 }

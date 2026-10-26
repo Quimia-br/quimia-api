@@ -231,4 +231,109 @@ class ChatWebTest {
         assertThat(AGENTE.pedidos()).hasSize(antes);
         doApp(tokenB, "{\"texto\":\"outro usuário\"}").andExpect(status().isOk());
     }
+
+    private ResultActions encerrar(String rota, String token) throws Exception {
+        return mvc.perform(post(rota).header("Authorization", "Bearer " + token));
+    }
+
+    @Test
+    void novoChatDoAppEncerraASessaoDoUsuarioDoTokenNoAgente() throws Exception {
+        AGENTE.responder(200, "{\"session_id\":\"conversa-1\",\"status\":\"resumida\"}");
+        int antes = AGENTE.pedidos().size();
+
+        encerrar("/api/v1/chat/sessoes/conversa-1/encerrar", tokenA)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessaoId").value("conversa-1"))
+                .andExpect(jsonPath("$.situacao").value("resumida"));
+
+        assertThat(AGENTE.pedidos()).hasSize(antes + 1);
+        AgenteDeTeste.Pedido pedido = AGENTE.pedidos().get(antes);
+        assertThat(pedido.metodo()).isEqualTo("POST");
+        assertThat(pedido.caminho()).isEqualTo("/chat/sessions/close");
+        assertThat(pedido.autorizacao()).isEqualTo("Bearer token-do-agente");
+        JsonNode corpo = JSON.readTree(pedido.corpo());
+        assertThat(corpo.path("session_id").asString()).isEqualTo("conversa-1");
+        assertThat(corpo.path("user_id").asString()).isEqualTo(usuarioA.toString());
+        assertThat(corpo.size()).isEqualTo(2);
+    }
+
+    @Test
+    void novoChatDoPortalUsaOAutorDerivadoDaEmpresa() throws Exception {
+        AGENTE.responder(200, "{\"session_id\":\"s-1\",\"status\":\"ja_resumida\"}");
+        String empresa = TestLogins.empresa(mvc, "enc@chat.test", "30000023000167");
+        Integer empresaId = jdbc.queryForObject("SELECT id FROM empresa WHERE email = 'enc@chat.test'", Integer.class);
+
+        encerrar("/api/v1/empresas/me/chat/sessoes/s-1/encerrar", empresa)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.situacao").value("ja_resumida"));
+
+        UUID esperado = UUID.nameUUIDFromBytes(("empresa:" + empresaId).getBytes(StandardCharsets.UTF_8));
+        assertThat(ultimoPedidoAoAgente().path("user_id").asString()).isEqualTo(esperado.toString());
+    }
+
+    @Test
+    void sessaoSemMensagensEPassadaAdiante() throws Exception {
+        AGENTE.responder(200, "{\"session_id\":\"vazia\",\"status\":\"sem_turnos\"}");
+
+        encerrar("/api/v1/chat/sessoes/vazia/encerrar", tokenA)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.situacao").value("sem_turnos"));
+    }
+
+    @Test
+    void sessaoForaDoPadraoNemChegaAoAgente() throws Exception {
+        int antes = AGENTE.pedidos().size();
+
+        for (String sessao : new String[] {"a.b", "a@b", "s".repeat(65)}) {
+            encerrar("/api/v1/chat/sessoes/" + sessao + "/encerrar", tokenA)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.detail").value("sessao_invalida"));
+        }
+
+        assertThat(AGENTE.pedidos()).hasSize(antes);
+    }
+
+    @Test
+    void encerramentoNaoConsomeOLimiteDeMensagens() throws Exception {
+        AGENTE.responder(200, "{\"session_id\":\"x\",\"status\":\"resumida\"}");
+
+        for (int i = 0; i <= LIMITE_POR_HORA; i++) {
+            encerrar("/api/v1/chat/sessoes/x/encerrar", tokenB).andExpect(status().isOk());
+        }
+        AGENTE.responder(200, "{\"resposta\":\"ok\"}");
+        doApp(tokenB, "{\"texto\":\"ainda posso perguntar\"}").andExpect(status().isOk());
+    }
+
+    @Test
+    void falhasDoAgenteNoEncerramentoViramCodigosEstaveis() throws Exception {
+        Object[][] casos = {
+            {503, "{\"detail\":\"fora\"}", 503, "agente_indisponivel"},
+            {500, "{\"detail\":\"erro\"}", 502, "agente_falhou"},
+            {200, "{\"session_id\":\"x\",\"status\":\"qualquer\"}", 502, "agente_falhou"},
+            {200, "{\"session_id\":\"x\"}", 502, "agente_falhou"},
+            {200, "não é json", 502, "agente_falhou"},
+        };
+        for (Object[] caso : casos) {
+            AGENTE.responder((Integer) caso[0], (String) caso[1]);
+            encerrar("/api/v1/chat/sessoes/x/encerrar", tokenA)
+                    .andExpect(status().is((Integer) caso[2]))
+                    .andExpect(jsonPath("$.detail").value(caso[3]));
+        }
+    }
+
+    @Test
+    void encerramentoExigeLoginEOPerfilDeCadaRota() throws Exception {
+        int antes = AGENTE.pedidos().size();
+        String empresa = TestLogins.empresa(mvc, "perfil2@chat.test", "30000024000101");
+
+        mvc.perform(post("/api/v1/chat/sessoes/x/encerrar")).andExpect(status().isUnauthorized());
+        encerrar("/api/v1/chat/sessoes/x/encerrar", empresa).andExpect(status().isForbidden());
+        encerrar("/api/v1/empresas/me/chat/sessoes/x/encerrar", tokenA).andExpect(status().isForbidden());
+        jdbc.update("UPDATE empresa SET ativo = FALSE WHERE email = 'perfil2@chat.test'");
+        encerrar("/api/v1/empresas/me/chat/sessoes/x/encerrar", empresa)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("empresa_inativa"));
+
+        assertThat(AGENTE.pedidos()).hasSize(antes);
+    }
 }

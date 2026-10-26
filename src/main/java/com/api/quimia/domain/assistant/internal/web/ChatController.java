@@ -1,11 +1,13 @@
 package com.api.quimia.domain.assistant.internal.web;
 
 import com.api.quimia.domain.account.AccountPrincipal;
+import com.api.quimia.domain.assistant.internal.dto.EncerramentoView;
 import com.api.quimia.domain.assistant.internal.dto.MensagemRequest;
 import com.api.quimia.domain.assistant.internal.dto.RespostaView;
 import com.api.quimia.domain.assistant.internal.usecase.ConversarComKemiUseCase;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,5 +31,19 @@ public class ChatController {
     public RespostaView daEmpresa(
             @AuthenticationPrincipal AccountPrincipal principal, @Valid @RequestBody MensagemRequest mensagem) {
         return conversar.daEmpresa(principal.empresaId(), mensagem);
+    }
+
+    /** "Novo chat" do app: a conversa anterior é resumida e o próximo envio, sem `sessaoId`, abre outra. */
+    @PostMapping("/api/v1/chat/sessoes/{sessaoId}/encerrar")
+    public EncerramentoView encerrarDoUsuario(
+            @AuthenticationPrincipal AccountPrincipal principal, @PathVariable String sessaoId) {
+        return conversar.encerrarDoUsuario(principal.usuarioId(), sessaoId);
+    }
+
+    /** "Novo chat" do portal. */
+    @PostMapping("/api/v1/empresas/me/chat/sessoes/{sessaoId}/encerrar")
+    public EncerramentoView encerrarDaEmpresa(
+            @AuthenticationPrincipal AccountPrincipal principal, @PathVariable String sessaoId) {
+        return conversar.encerrarDaEmpresa(principal.empresaId(), sessaoId);
     }
 }

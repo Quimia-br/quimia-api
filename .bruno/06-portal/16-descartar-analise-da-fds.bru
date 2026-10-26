@@ -1,0 +1,33 @@
+meta {
+  name: 16 - Descartar análise da FDS
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos/fds/analises/descartar
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:json {
+  {
+    "analiseId": "{{analiseFds}}"
+  }
+}
+
+tests {
+  test("apaga o PDF da análise abandonada", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  A empresa fechou o popup sem cadastrar: apaga o PDF guardado pela `14`. Análise inválida, vencida ou de outra empresa responde 204 sem apagar o que não é dela (vencida da própria empresa apaga).
+  Respostas: 204, 400 validation, 403 empresa_inativa, 404 empresa_nao_encontrada.
+}

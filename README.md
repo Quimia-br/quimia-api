@@ -98,11 +98,16 @@ FDS no cadastro de produto usa o `quimia-extractor-ai`: `QUIMIA_EXTRATOR_URL`,
 FDS em produto novo e fica `false` até o extrator estar no ar. O PDF da FDS é guardado
 no Cloudinary para download (mesmas variáveis `CLOUDINARY_*`; sem elas, enviar `fds`
 responde 503). A conta precisa ter a entrega de PDF liberada (Settings › Security); o
-limite de 10 MB do PDF é o de arquivo `raw` do plano atual. O chat do app (Kemi) e do
+limite de 10 MB do PDF é o de arquivo `raw` do plano atual. A revisão das pendências da
+FDS (`POST /empresas/me/produtos/fds/analises`) devolve um `analiseId` assinado com HMAC, sem
+estado no servidor: `QUIMIA_FDS_ANALISE_SEGREDO` (mínimo 32 bytes; sem ele usa
+`APP_AUTH_HMAC_SECRET`) e `QUIMIA_FDS_ANALISE_VALIDADE_MINUTOS` (padrão 30). O PDF de uma
+análise abandonada fica no Cloudinary até ser descartado (`.../analises/descartar`). O chat do app (Kemi) e do
 portal (WebKemi) repassa as mensagens ao `quimia-agent`: `QUIMIA_AGENTE_URL` (sem ela o
 chat responde 503), `QUIMIA_AGENTE_TOKEN` (opcional, enviado como Bearer),
 `QUIMIA_AGENTE_TIMEOUT_SEGUNDOS` (padrão 120) e `QUIMIA_AGENTE_MENSAGENS_POR_HORA`
-(padrão 20 por autor). Não coloque os valores
+(padrão 20 por autor). "Novo chat" (`POST .../chat/sessoes/{id}/encerrar`) chama
+`/chat/sessions/close` do agente, que resume a conversa. Não coloque os valores
 no repositório ou no pacote. O PostgreSQL administra o schema: a API não roda
 migrations nem DDL e mantém `ddl-auto: validate`. Antes de publicar, confira
 colunas, tipos, constraints e índices em consultas somente leitura conforme
