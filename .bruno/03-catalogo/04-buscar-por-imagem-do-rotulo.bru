@@ -1,0 +1,37 @@
+meta {
+  name: 04 - Buscar por imagem do rótulo
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/produtos/busca-por-imagem
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:multipart-form {
+  imagem: @file(fixtures/imagem-produto.png)
+}
+
+tests {
+  test("devolve os produtos reconhecidos (exige o agente configurado)", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("produtos");
+    expect(res.getBody()).to.have.property("naoIdentificados");
+  });
+}
+
+docs {
+  Escanear o rótulo pela foto (JPEG, PNG ou WebP, até 5 MB, campo `imagem`). A API manda a imagem ao quimia-agent e procura no
+  catálogo cada produto que ele leu: pelo código de barras (UPC-A e EAN-13 com zero são o mesmo) e, sem código, pelo nome
+  (e a marca, se lida), igual sem acento nem caixa. `naoIdentificados` conta o que o agente leu e não casou com o catálogo.
+  Exige `QUIMIA_AGENTE_URL`; sem ela responde 503. A rota do agente (`POST /produtos/busca-por-imagem`) ainda não existe.
+  Respostas: 200, 400 imagem_obrigatoria, 413 imagem_muito_grande, 415 imagem_invalida, 502 agente_falhou,
+  503 agente_indisponivel, 504 agente_timeout.
+}

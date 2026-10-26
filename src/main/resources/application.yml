@@ -63,6 +63,8 @@ quimia:
     url: ${QUIMIA_AGENTE_URL:}
     token: ${QUIMIA_AGENTE_TOKEN:}
     timeout-segundos: ${QUIMIA_AGENTE_TIMEOUT_SEGUNDOS:120}
+    # Escanear rótulo pela foto (POST /produtos/busca-por-imagem): quem escaneia espera diante da câmera.
+    timeout-rotulo-segundos: ${QUIMIA_AGENTE_TIMEOUT_ROTULO_SEGUNDOS:30}
     mensagens-por-hora: ${QUIMIA_AGENTE_MENSAGENS_POR_HORA:20}
 
 app:
