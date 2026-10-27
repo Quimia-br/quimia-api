@@ -24,10 +24,10 @@ import org.springframework.test.context.ContextConfiguration;
 
 /**
  * Compara o gateway com um oráculo escrito só em SQL, independente do motor Java. O oráculo segue
- * `fn_match_produtos` com os dois defeitos do banco corrigidos (G20: `id_regra` ambíguo; precedência de `AND`/`OR`
- * que deixa regra inativa casar no sentido B→A) e com a decisão R4 da API (composição parcial sem regra é
- * `nao_avaliado`). Os cenários são gerados por semente e gravados no banco: FDS ativas e inativas, mais de uma FDS por
- * produto, compostos não identificados, regras ativas e inativas por substância e por classe. Roda no H2 e no
+ * `fn_match_produtos` (que desde 2026-10-27 também considera as incompatibilidades declaradas na seção 10 das FDS) e
+ * a decisão R4 da API (composição parcial sem regra nem declaração é `nao_avaliado`). Os cenários são gerados por
+ * semente e gravados no banco: FDS ativas e inativas, mais de uma FDS por produto, compostos não identificados, regras
+ * ativas e inativas por substância e por classe, e incompatibilidades declaradas pelas FDS. Roda no H2 e no
  * PostgreSQL.
  */
 @SpringBootTest(classes = com.api.quimia.Application.class)
@@ -49,6 +49,18 @@ class CompatibilidadeOraculoTest {
                        WHEN 'critica' THEN 1 WHEN 'alta' THEN 2 WHEN 'media' THEN 3 WHEN 'baixa' THEN 4 END,
                      r.id
             """.formatted(lado("a", "x"), lado("b", "y"), lado("a", "y"), lado("b", "x"));
+
+    private static final String RANK_SEVERIDADE =
+            "CASE %s WHEN 'critica' THEN 1 WHEN 'alta' THEN 2 WHEN 'media' THEN 3 WHEN 'baixa' THEN 4 END";
+    /** Incompatibilidade declarada por uma FDS ativa de `:x` ou `:y` que atinge o outro produto do par. */
+    private static final String PIOR_DECLARADA = """
+            SELECT i.severidade, i.descricao_risco
+            FROM fds f JOIN fds_incompatibilidade i ON i.id_fds = f.id
+            WHERE f.ativo = TRUE
+              AND ((f.id_produto = :x AND %1$s) OR (f.id_produto = :y AND %2$s))
+            ORDER BY %3$s, CASE WHEN i.descricao_risco IS NULL OR TRIM(i.descricao_risco) = '' THEN 1 ELSE 0 END,
+                     i.descricao_risco
+            """.formatted(atinge("y"), atinge("x"), RANK_SEVERIDADE.formatted("i.severidade"));
 
     @Autowired
     private CompatibilidadeGateway gateway;
@@ -73,6 +85,15 @@ class CompatibilidadeOraculoTest {
                 .replace("PRODUTO", produto);
     }
 
+    /** A declaração `i` casa com uma substância ou classe das FDS ativas do produto `:produto`. */
+    private static String atinge(String produto) {
+        String comClasse = COMPOSTO_ATIVO.replace(
+                " WHERE", " JOIN substancia_classe_quimica s ON s.id_substancia = c.id_substancia WHERE");
+        return ("(EXISTS (" + COMPOSTO_ATIVO + " AND c.id_substancia = i.id_substancia)"
+                        + " OR EXISTS (" + comClasse + " AND s.id_classe_quimica = i.id_classe_quimica))")
+                .replace("PRODUTO", produto);
+    }
+
     @BeforeEach
     void limpar() {
         catalogo = new TestCatalogo(jdbc);
@@ -94,16 +115,30 @@ class CompatibilidadeOraculoTest {
             return new AvaliacaoParView(a, b, "nao_avaliado", null, "Produto sem composição resolvida", null);
         }
         List<Map<String, Object>> regras = sql.queryForList(PIOR_REGRA, Map.of("x", a, "y", b));
-        if (!regras.isEmpty()) {
+        List<Map<String, Object>> declaradas = sql.queryForList(PIOR_DECLARADA, Map.of("x", a, "y", b));
+        // Gravidade igual: a regra curada vence (id_regra NULLS LAST na função do banco).
+        if (!regras.isEmpty() && (declaradas.isEmpty() || posicao(regras.get(0)) <= posicao(declaradas.get(0)))) {
             Map<String, Object> pior = regras.get(0);
             return new AvaliacaoParView(
                     a, b, "incompativel", (String) pior.get("severidade"), (String) pior.get("descricao_risco"),
                     ((Number) pior.get("id")).intValue());
         }
+        if (!declaradas.isEmpty()) {
+            Map<String, Object> pior = declaradas.get(0);
+            String descricao = (String) pior.get("descricao_risco");
+            return new AvaliacaoParView(
+                    a, b, "incompativel", (String) pior.get("severidade"),
+                    descricao == null || descricao.isBlank() ? "Incompatibilidade declarada na FDS do produto" : descricao,
+                    null);
+        }
         if (existe("c.id_substancia IS NULL", a) || existe("c.id_substancia IS NULL", b)) {
             return new AvaliacaoParView(a, b, "nao_avaliado", null, "Composição incompleta: há compostos não identificados", null);
         }
         return new AvaliacaoParView(a, b, "compativel", null, null, null);
+    }
+
+    private static int posicao(Map<String, Object> linha) {
+        return SEVERIDADES.size() - SEVERIDADES.indexOf((String) linha.get("severidade"));
     }
 
     /** Grava um cenário aleatório e devolve os produtos. */
@@ -142,6 +177,17 @@ class CompatibilidadeOraculoTest {
                             : substancias.get(aleatorio.nextInt(substancias.size()));
                     catalogo.composto(fds, substancia, "1.00", "5.00", "%");
                 }
+                int declaradas = aleatorio.nextInt(3);
+                for (int d = 0; d < declaradas; d++) {
+                    int escolha = aleatorio.nextInt(10);
+                    // 5 em 10 por substância, 3 por classe e 2 sem resolução (texto solto: não entra no match).
+                    Integer substanciaDeclarada = escolha < 5 ? substancias.get(aleatorio.nextInt(substancias.size())) : null;
+                    Integer classeDeclarada = escolha >= 5 && escolha < 8 ? classes.get(aleatorio.nextInt(classes.size())) : null;
+                    catalogo.incompatibilidadeDaFds(
+                            fds, substanciaDeclarada, classeDeclarada,
+                            SEVERIDADES.get(aleatorio.nextInt(SEVERIDADES.size())),
+                            aleatorio.nextInt(4) == 0 ? null : "Declarada " + produto + "/" + f + "/" + d);
+                }
             }
         }
         int totalRegras = aleatorio.nextInt(12);
@@ -175,6 +221,9 @@ class CompatibilidadeOraculoTest {
                     AvaliacaoParView esperado = oraculo(produtos.get(i), produtos.get(j));
                     esperados.add(esperado);
                     resultadosVistos.add(esperado.resultado());
+                    if ("incompativel".equals(esperado.resultado())) {
+                        resultadosVistos.add(esperado.regraId() == null ? "declarada" : "regra");
+                    }
                     assertThat(gateway.avaliarPar(produtos.get(j), produtos.get(i)))
                             .as("semente %d, par %d-%d", semente, produtos.get(i), produtos.get(j))
                             .isEqualTo(esperado);
@@ -189,7 +238,8 @@ class CompatibilidadeOraculoTest {
                     .as("semente %d", semente)
                     .isEqualTo((int) esperados.stream().filter(par -> "nao_avaliado".equals(par.resultado())).count());
         }
-        assertThat(resultadosVistos).containsExactlyInAnyOrder("compativel", "incompativel", "nao_avaliado");
+        assertThat(resultadosVistos)
+                .containsExactlyInAnyOrder("compativel", "incompativel", "nao_avaliado", "regra", "declarada");
     }
 
     @Test

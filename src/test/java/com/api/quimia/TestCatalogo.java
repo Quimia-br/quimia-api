@@ -28,6 +28,7 @@ public final class TestCatalogo {
         jdbc.update("DELETE FROM ponto_parceiro");
         jdbc.update("DELETE FROM incompatibilidade_regra");
         jdbc.update("DELETE FROM fds_composto");
+        jdbc.update("DELETE FROM fds_incompatibilidade");
         jdbc.update("DELETE FROM fds");
         jdbc.update("DELETE FROM substancia_classe_quimica");
         jdbc.update("DELETE FROM substancia_sinonimo");
@@ -87,6 +88,17 @@ public final class TestCatalogo {
                         + " unidade_concentracao) VALUES (?, ?, ?, ?, ?)",
                 fds, substancia, min == null ? null : new BigDecimal(min), max == null ? null : new BigDecimal(max),
                 unidade);
+    }
+
+    /**
+     * Incompatibilidade declarada na seção 10 de uma FDS, já resolvida para uma substância ou uma classe (`null` nos
+     * dois é o reagente que o banco não conseguiu resolver, que não entra no match).
+     */
+    public int incompatibilidadeDaFds(int fds, Integer substancia, Integer classe, String severidade, String descricao) {
+        return insert(
+                "INSERT INTO fds_incompatibilidade (id_fds, id_substancia, id_classe_quimica, substancia_reagente,"
+                        + " descricao_risco, severidade) VALUES (?, ?, ?, 'Reagente', ?, ?)",
+                fds, substancia, classe, descricao, severidade);
     }
 
     public int substancia(String nome, String cas, String descricao) {

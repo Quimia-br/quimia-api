@@ -52,7 +52,7 @@ class CompatibilidadeParidadeTest {
 
     private Map<String, Object> doBanco(int a, int b) {
         return jdbc.queryForMap(
-                "SELECT resultado, severidade FROM fn_match_produtos(?, ?) LIMIT 1", Math.min(a, b), Math.max(a, b));
+                "SELECT resultado, severidade, id_regra FROM fn_match_produtos(?, ?) LIMIT 1", Math.min(a, b), Math.max(a, b));
     }
 
     @Test
@@ -69,6 +69,46 @@ class CompatibilidadeParidadeTest {
 
         assertThat(api.resultado()).isEqualTo(banco.get("resultado"));
         assertThat(api.severidade()).isEqualTo(banco.get("severidade"));
+    }
+
+    /** Desde 2026-10-27 a função do banco também considera o que a seção 10 das FDS declara. */
+    @Test
+    void incompatibilidadeDeclaradaNaFdsCoincideComAFuncaoDoBanco() {
+        int hipoclorito = catalogo.substancia("Hipoclorito de sódio", "7681-52-9", null);
+        int amonia = catalogo.substancia("Amônia", "7664-41-7", null);
+        int a = produto("A", hipoclorito);
+        int b = produto("B", amonia);
+        int fdsA = jdbc.queryForObject("SELECT id FROM fds WHERE id_produto = ?", Integer.class, a);
+        catalogo.incompatibilidadeDaFds(fdsA, amonia, null, "alta", "Gases tóxicos");
+
+        AvaliacaoParView api = gateway.avaliarPar(b, a);
+        Map<String, Object> banco = doBanco(b, a);
+
+        assertThat(banco.get("resultado")).isEqualTo("incompativel");
+        assertThat(api.resultado()).isEqualTo(banco.get("resultado"));
+        assertThat(api.severidade()).isEqualTo(banco.get("severidade")).isEqualTo("alta");
+        assertThat(api.regraId()).isEqualTo(banco.get("id_regra")).isNull();
+    }
+
+    @Test
+    void declaradaPelaFdsContraRegraCuradaCoincideComAFuncaoDoBanco() {
+        int hipoclorito = catalogo.substancia("Hipoclorito de sódio", "7681-52-9", null);
+        int amonia = catalogo.substancia("Amônia", "7664-41-7", null);
+        int regra = catalogo.regra(hipoclorito, null, amonia, null, "alta", "Regra curada", true);
+        int a = produto("A", hipoclorito);
+        int b = produto("B", amonia);
+        int fdsB = jdbc.queryForObject("SELECT id FROM fds WHERE id_produto = ?", Integer.class, b);
+        catalogo.incompatibilidadeDaFds(fdsB, hipoclorito, null, "alta", "Declarada pela FDS");
+
+        AvaliacaoParView empate = gateway.avaliarPar(a, b);
+        Map<String, Object> bancoEmpate = doBanco(a, b);
+        assertThat(empate.regraId()).isEqualTo(bancoEmpate.get("id_regra")).isEqualTo(regra);
+
+        catalogo.incompatibilidadeDaFds(fdsB, hipoclorito, null, "critica", "Pior, pela FDS");
+        AvaliacaoParView pior = gateway.avaliarPar(a, b);
+        Map<String, Object> bancoPior = doBanco(a, b);
+        assertThat(pior.severidade()).isEqualTo(bancoPior.get("severidade")).isEqualTo("critica");
+        assertThat(pior.regraId()).isEqualTo(bancoPior.get("id_regra")).isNull();
     }
 
     @Test

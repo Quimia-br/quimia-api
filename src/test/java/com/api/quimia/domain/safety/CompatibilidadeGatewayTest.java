@@ -63,6 +63,75 @@ class CompatibilidadeGatewayTest {
         catalogo.composto(fds, null, "1.00", "2.00", "%");
     }
 
+    private int fdsDe(int produto) {
+        return jdbc.queryForObject("SELECT id FROM fds WHERE id_produto = ? ORDER BY id LIMIT 1", Integer.class, produto);
+    }
+
+    @Test
+    void incompatibilidadeDeclaradaNaFdsDeUmProdutoAtingeOOutroSemRegraCurada() {
+        int alvejante = produto("Alvejante", hipoclorito);
+        int limpaVidros = produto("Limpa vidros", amonia);
+        catalogo.incompatibilidadeDaFds(fdsDe(alvejante), amonia, null, "alta", "A mistura com amônia produz gases tóxicos.");
+
+        AvaliacaoParView par = gateway.avaliarPar(limpaVidros, alvejante);
+
+        assertThat(par.resultado()).isEqualTo("incompativel");
+        assertThat(par.severidade()).isEqualTo("alta");
+        assertThat(par.descricaoRisco()).isEqualTo("A mistura com amônia produz gases tóxicos.");
+        assertThat(par.regraId()).isNull();
+        assertThat(gateway.avaliarPar(alvejante, limpaVidros)).isEqualTo(par);
+    }
+
+    @Test
+    void declaracaoPorClasseSoAtingeQuemTemSubstanciaDaClasseEFdsInativaNaoDeclara() {
+        int oxidantes = catalogo.classe("Oxidantes", null);
+        catalogo.substanciaClasse(hipoclorito, oxidantes);
+        int limpaVidros = produto("Limpa vidros", amonia);
+        int alvejante = produto("Alvejante", hipoclorito);
+        int detergente = produto("Detergente", agua);
+        catalogo.incompatibilidadeDaFds(fdsDe(limpaVidros), null, oxidantes, "critica", null);
+
+        assertThat(gateway.avaliarPar(limpaVidros, alvejante).resultado()).isEqualTo("incompativel");
+        assertThat(gateway.avaliarPar(limpaVidros, detergente).resultado()).isEqualTo("compativel");
+
+        jdbc.update("UPDATE fds SET ativo = FALSE WHERE id_produto = ?", limpaVidros);
+        assertThat(gateway.avaliarPar(limpaVidros, alvejante).resultado()).isEqualTo("nao_avaliado");
+    }
+
+    @Test
+    void reagenteNaoResolvidoNaoEntraNoMatchEARegraCuradaVenceEmEmpate() {
+        int alvejante = produto("Alvejante", hipoclorito);
+        int limpaVidros = produto("Limpa vidros", amonia);
+        catalogo.incompatibilidadeDaFds(fdsDe(alvejante), null, null, "critica", "Temperaturas altas");
+
+        assertThat(gateway.avaliarPar(alvejante, limpaVidros).resultado()).isEqualTo("compativel");
+
+        int regra = catalogo.regra(hipoclorito, null, amonia, null, "alta", "Regra curada", true);
+        catalogo.incompatibilidadeDaFds(fdsDe(alvejante), amonia, null, "alta", "Declarada pela FDS");
+        AvaliacaoParView empate = gateway.avaliarPar(alvejante, limpaVidros);
+        assertThat(empate.regraId()).isEqualTo(regra);
+        assertThat(empate.descricaoRisco()).isEqualTo("Regra curada");
+
+        catalogo.incompatibilidadeDaFds(fdsDe(limpaVidros), hipoclorito, null, "critica", "Pior, declarada pela FDS");
+        AvaliacaoParView pior = gateway.avaliarPar(alvejante, limpaVidros);
+        assertThat(pior.severidade()).isEqualTo("critica");
+        assertThat(pior.regraId()).isNull();
+    }
+
+    @Test
+    void conjuntoConsideraAsDeclaradasPelasFds() {
+        int alvejante = produto("Alvejante", hipoclorito);
+        int limpaVidros = produto("Limpa vidros", amonia);
+        int detergente = produto("Detergente", agua);
+        catalogo.incompatibilidadeDaFds(fdsDe(alvejante), amonia, null, "alta", "Gases tóxicos");
+
+        var conjunto = gateway.avaliarConjunto(List.of(alvejante, limpaVidros, detergente));
+
+        assertThat(conjunto.status()).isEqualTo("critico");
+        assertThat(conjunto.paresIncompativeis()).isEqualTo(1);
+        assertThat(conjunto.incompatibilidades().get(0).regraId()).isNull();
+    }
+
     @Test
     void parSemRegraEhCompativel() {
         int a = produto("Detergente", agua);
