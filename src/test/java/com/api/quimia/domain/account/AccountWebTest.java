@@ -305,4 +305,101 @@ class AccountWebTest {
     private JsonNode json(MvcResult result) throws Exception {
         return mapper.readTree(result.getResponse().getContentAsString());
     }
+
+    private String accessToken(String email, String senha) throws Exception {
+        return json(mvc.perform(post("/api/v1/auth/mobile/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"senha\":\"" + senha + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn()).get("accessToken").asText();
+    }
+
+    private org.springframework.test.web.servlet.ResultActions patchPerfil(String access, String corpo) throws Exception {
+        return mvc.perform(patch("/api/v1/usuarios/me")
+                .header("Authorization", "Bearer " + access)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(corpo));
+    }
+
+    @Test
+    void profileCanClearTheBirthDateOnlyWithTheExplicitFlag() throws Exception {
+        mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Pessoa\",\"email\":\"nasc@example.com\",\"senha\":\"senhaNasc1\",\"dataNasc\":\"1990-05-05\"}"))
+                .andExpect(status().isCreated());
+        String access = accessToken("nasc@example.com", "senhaNasc1");
+
+        patchPerfil(access, "{\"dataNasc\":null,\"nome\":\"Outro Nome\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.dataNasc").value("1990-05-05"));
+        patchPerfil(access, "{\"removerDataNasc\":false}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.dataNasc").value("1990-05-05"));
+        patchPerfil(access, "{\"removerDataNasc\":true,\"dataNasc\":\"1991-01-01\"}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("data_nasc_conflict"));
+        assertThat(json(patchPerfil(access, "{\"removerDataNasc\":true}").andExpect(status().isOk()).andReturn())
+                        .path("dataNasc").isNull())
+                .isTrue();
+        assertThat(json(mvc.perform(get("/api/v1/usuarios/me").header("Authorization", "Bearer " + access))
+                                .andExpect(status().isOk()).andReturn())
+                        .path("dataNasc").isNull())
+                .isTrue();
+        patchPerfil(access, "{\"dataNasc\":\"1992-02-02\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.dataNasc").value("1992-02-02"));
+    }
+
+    @Test
+    void emailChangeNeedsTheCurrentPasswordAndMovesTheLogin() throws Exception {
+        registerUsuario("antigo@example.com", "senhaAntiga1");
+        registerUsuario("ocupado@example.com", "senhaOcupado1");
+        String access = accessToken("antigo@example.com", "senhaAntiga1");
+
+        patchPerfil(access, "{\"email\":\"novo@example.com\"}").andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("current_password_required"));
+        patchPerfil(access, "{\"email\":\"novo@example.com\",\"senhaAtual\":\"errada123\"}")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("invalid_current_password"));
+        patchPerfil(access, "{\"email\":\"ocupado@example.com\",\"senhaAtual\":\"senhaAntiga1\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("email_in_use"));
+        patchPerfil(access, "{\"email\":\"isso-nao-eh-email\",\"senhaAtual\":\"senhaAntiga1\"}")
+                .andExpect(status().isBadRequest());
+
+        patchPerfil(access, "{\"email\":\"NOVO@Example.com\",\"senhaAtual\":\"senhaAntiga1\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("novo@example.com"));
+
+        mvc.perform(post("/api/v1/auth/mobile/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"antigo@example.com\",\"senha\":\"senhaAntiga1\"}"))
+                .andExpect(status().isUnauthorized());
+        assertThat(accessToken("novo@example.com", "senhaAntiga1")).isNotBlank();
+        assertThat(users.existsByEmail("antigo@example.com")).isFalse();
+    }
+
+    @Test
+    void sameEmailIsANoOpThatNeedsNoPassword() throws Exception {
+        registerUsuario("igual@example.com", "senhaIgual1");
+        String access = accessToken("igual@example.com", "senhaIgual1");
+
+        patchPerfil(access, "{\"email\":\"IGUAL@example.com\",\"nome\":\"Mesmo Email\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("igual@example.com"))
+                .andExpect(jsonPath("$.nome").value("Mesmo Email"));
+    }
+
+    @Test
+    void wrongPasswordsOnEmailChangeBlockTheAttemptsTemporarily() throws Exception {
+        registerUsuario("bloqueio@example.com", "senhaBloqueio1");
+        String access = accessToken("bloqueio@example.com", "senhaBloqueio1");
+        String errada = "{\"email\":\"outro@example.com\",\"senhaAtual\":\"errada123\"}";
+
+        for (int i = 0; i < 4; i++) {
+            patchPerfil(access, errada).andExpect(status().isForbidden());
+        }
+        patchPerfil(access, errada).andExpect(status().isLocked());
+        patchPerfil(access, "{\"email\":\"outro@example.com\",\"senhaAtual\":\"senhaBloqueio1\"}")
+                .andExpect(status().isLocked());
+        assertThat(users.existsByEmail("bloqueio@example.com")).isTrue();
+        patchPerfil(access, "{\"nome\":\"Continua Editando\"}").andExpect(status().isOk());
+    }
 }
+
