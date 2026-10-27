@@ -1,7 +1,6 @@
 package com.api.quimia.domain.safety;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.api.quimia.TestCatalogo;
@@ -13,20 +12,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
 
 /**
- * Compara o motor da API com `fn_match_produtos` do banco real. Só roda no PostgreSQL.
- *
- * <p>Defeito conhecido do banco (G20): a função falha com `column reference "id_regra" is ambiguous`
- * sempre que os dois produtos têm composição resolvida, porque as colunas de saída (`RETURNS TABLE`)
- * colidem com as colunas da CTE `regras_batidas` dentro do PL/pgSQL. Enquanto isso valer, os testes de
- * paridade que dependem dessa parte são ignorados com o motivo explícito, e
- * {@link #funcaoDoBancoFalhaComAmbiguidadeDeColuna} serve de alarme: quando o DBA corrigir a função,
- * ele falha, e basta apagá-lo para a paridade passar a valer.
+ * Compara o motor da API com `fn_match_produtos` do banco real. Só roda no PostgreSQL. A função falhava com
+ * `id_regra` ambíguo (G20) até o quimia-bd corrigi-la em 2026-10-27; desde então a paridade vale sem ressalvas.
  */
 @SpringBootTest(classes = com.api.quimia.Application.class)
 @ActiveProfiles("test")
@@ -63,29 +55,6 @@ class CompatibilidadeParidadeTest {
                 "SELECT resultado, severidade FROM fn_match_produtos(?, ?) LIMIT 1", Math.min(a, b), Math.max(a, b));
     }
 
-    /** O resultado da função do banco, ou a partida ignorada se ela estiver quebrada (G20). */
-    private Map<String, Object> doBancoOuIgnora(int a, int b) {
-        try {
-            return doBanco(a, b);
-        } catch (BadSqlGrammarException defeito) {
-            assumeTrue(false, "fn_match_produtos falha no banco real (id_regra ambíguo, G20): " + defeito.getMessage());
-            throw defeito;
-        }
-    }
-
-    @Test
-    void funcaoDoBancoFalhaComAmbiguidadeDeColuna() {
-        int agua = catalogo.substancia("Água", "7732-18-5", null);
-        int sal = catalogo.substancia("Cloreto de sódio", "7647-14-5", null);
-        int a = produto("A", agua);
-        int b = produto("B", sal);
-
-        assertThatThrownBy(() -> doBanco(a, b))
-                .isInstanceOf(BadSqlGrammarException.class)
-                .rootCause()
-                .hasMessageContaining("ambiguous");
-    }
-
     @Test
     void incompativelCoincideComAFuncaoDoBanco() {
         int hipoclorito = catalogo.substancia("Hipoclorito de sódio", "7681-52-9", null);
@@ -96,7 +65,7 @@ class CompatibilidadeParidadeTest {
         int b = produto("B", amonia);
 
         AvaliacaoParView api = gateway.avaliarPar(a, b);
-        Map<String, Object> banco = doBancoOuIgnora(a, b);
+        Map<String, Object> banco = doBanco(a, b);
 
         assertThat(api.resultado()).isEqualTo(banco.get("resultado"));
         assertThat(api.severidade()).isEqualTo(banco.get("severidade"));
@@ -109,7 +78,7 @@ class CompatibilidadeParidadeTest {
         int a = produto("A", agua);
         int b = produto("B", sal);
 
-        assertThat(gateway.avaliarPar(a, b).resultado()).isEqualTo(doBancoOuIgnora(a, b).get("resultado")).isEqualTo("compativel");
+        assertThat(gateway.avaliarPar(a, b).resultado()).isEqualTo(doBanco(a, b).get("resultado")).isEqualTo("compativel");
     }
 
     @Test
@@ -131,7 +100,7 @@ class CompatibilidadeParidadeTest {
         catalogo.composto(fdsA, null, "1.00", "2.00", "%");
         int b = produto("B", sal);
 
-        assertThat(doBancoOuIgnora(a, b).get("resultado")).isEqualTo("compativel");
+        assertThat(doBanco(a, b).get("resultado")).isEqualTo("compativel");
         assertThat(gateway.avaliarPar(a, b).resultado()).isEqualTo("nao_avaliado");
     }
 }

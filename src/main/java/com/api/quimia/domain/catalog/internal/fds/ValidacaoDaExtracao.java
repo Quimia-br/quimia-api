@@ -1,6 +1,7 @@
 package com.api.quimia.domain.catalog.internal.fds;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,7 @@ public final class ValidacaoDaExtracao {
         }
         validarCompostos(secoes.path("03").path("compostos"));
         validarIncompatibilidades(secoes.path("10").path("incompatibilidades"));
+        validarPrimeirosSocorros(secoes.path("04"));
         validarDescartes(secoes.path("13").path("descartes"));
     }
 
@@ -95,9 +97,30 @@ public final class ValidacaoDaExtracao {
         }
     }
 
+    /**
+     * A function lê `secoes.04.primeiros_socorros` (ou `primeiro_socorro`) com `jsonb_array_elements` sem checar o tipo:
+     * qualquer valor que não seja lista, inclusive `null`, aborta o cadastro. Rota fora das quatro conhecidas ela
+     * ignora; já `atencao_medica_imediata` precisa ser booleano para o `::BOOLEAN`.
+     */
+    private static void validarPrimeirosSocorros(JsonNode secao) {
+        for (String chave : List.of("primeiros_socorros", "primeiro_socorro")) {
+            for (JsonNode socorro : listaSeExiste(secao.path(chave), "secoes.04." + chave)) {
+                for (String texto : List.of("rota_exposicao", "descricao", "sintomas", "tratamento_especial")) {
+                    if (!textoOpcional(socorro.path(texto), Integer.MAX_VALUE)) {
+                        throw invalida("primeiro socorro com " + texto + " que não é texto");
+                    }
+                }
+                JsonNode atencao = socorro.path("atencao_medica_imediata");
+                if (!(atencao.isMissingNode() || atencao.isNull() || atencao.isBoolean())) {
+                    throw invalida("atencao_medica_imediata não é booleano");
+                }
+            }
+        }
+    }
+
     /** O extrator ainda não devolve a seção 13, mas o trigger a processa sempre que ela vem. */
     private static void validarDescartes(JsonNode descartes) {
-        for (JsonNode descarte : listaOpcional(descartes, "secoes.13.descartes")) {
+        for (JsonNode descarte : listaSeExiste(descartes, "secoes.13.descartes")) {
             JsonNode instrucao = descarte.path("instrucao_descarte");
             if (!(instrucao.isMissingNode() || instrucao.isNull() || instrucao.isString())) {
                 throw invalida("instrucao_descarte não é texto");
@@ -106,6 +129,22 @@ public final class ValidacaoDaExtracao {
                 throw invalida("tipo_residuo fora da lista");
             }
         }
+    }
+
+    /** Ausente vale como lista vazia; presente (mesmo `null`), tem de ser lista de objetos. */
+    private static Iterable<JsonNode> listaSeExiste(JsonNode lista, String caminho) {
+        if (lista.isMissingNode()) {
+            return Set.of();
+        }
+        if (!lista.isArray()) {
+            throw invalida(caminho + " não é lista");
+        }
+        for (JsonNode item : lista) {
+            if (!item.isObject()) {
+                throw invalida(caminho + " tem item que não é objeto");
+            }
+        }
+        return lista;
     }
 
     /** Ausente ou nula vale como lista vazia; presente, tem de ser lista de objetos. */

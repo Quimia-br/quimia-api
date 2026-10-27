@@ -4,6 +4,8 @@ import com.api.quimia.domain.account.internal.dto.LocalizacaoRequest;
 import com.api.quimia.domain.account.internal.dto.LocalizacaoResponse;
 import com.api.quimia.domain.account.internal.model.LocalizacaoUsuario;
 import com.api.quimia.domain.account.internal.persistence.LocalizacaoUsuarioRepository;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class LocalizacaoUseCase {
     private static final int CEP_DIGITS = 8;
     private static final int CEP_PREFIX_DIGITS = 5;
+    /** `localizacao_usuario.latitude/longitude` são NUMERIC(9,6). */
+    private static final int COORDINATE_SCALE = 6;
 
     private final LocalizacaoUsuarioRepository localizacoes;
 
@@ -31,6 +35,9 @@ public class LocalizacaoUseCase {
     /** Substitui o endereço inteiro: campos ausentes ficam nulos. */
     @Transactional
     public LocalizacaoResponse replace(UUID usuarioId, LocalizacaoRequest request) {
+        if ((request.latitude() == null) != (request.longitude() == null)) {
+            throw new AccountException("invalid_coordinates", 422);
+        }
         LocalizacaoUsuario localizacao = localizacoes.findByUsuarioId(usuarioId).orElseGet(() -> {
             LocalizacaoUsuario created = new LocalizacaoUsuario();
             created.setUsuarioId(usuarioId);
@@ -42,6 +49,8 @@ public class LocalizacaoUseCase {
         localizacao.setRua(trimToNull(request.rua()));
         localizacao.setNumero(request.numero());
         localizacao.setComplemento(trimToNull(request.complemento()));
+        localizacao.setLatitude(coordinate(request.latitude()));
+        localizacao.setLongitude(coordinate(request.longitude()));
         return view(localizacoes.save(localizacao));
     }
 
@@ -54,6 +63,10 @@ public class LocalizacaoUseCase {
             throw new AccountException("invalid_cep", 422);
         }
         return digits.substring(0, CEP_PREFIX_DIGITS) + "-" + digits.substring(CEP_PREFIX_DIGITS);
+    }
+
+    private static BigDecimal coordinate(BigDecimal value) {
+        return value == null ? null : value.setScale(COORDINATE_SCALE, RoundingMode.HALF_UP);
     }
 
     private static String trimToNull(String value) {
@@ -70,6 +83,8 @@ public class LocalizacaoUseCase {
                 localizacao.getBairro(),
                 localizacao.getRua(),
                 localizacao.getNumero(),
-                localizacao.getComplemento());
+                localizacao.getComplemento(),
+                localizacao.getLatitude(),
+                localizacao.getLongitude());
     }
 }

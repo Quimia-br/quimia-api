@@ -86,4 +86,32 @@ class ValidacaoDaExtracaoTest {
                         .replace("\"alta\"", "null")))
                 .doesNotThrowAnyException();
     }
+
+    /** A function do banco aborta o cadastro com `cannot extract elements from a scalar` nestes casos. */
+    @Test
+    void primeirosSocorrosForaDoQueAFunctionAceitaSaoRecusados() {
+        invalida(EXEMPLO.replace("\"primeiros_socorros\": [", "\"primeiros_socorros\": \"lavar\", \"x\": ["));
+        invalida(EXEMPLO.replace("\"primeiros_socorros\": [", "\"primeiros_socorros\": null, \"x\": ["));
+        invalida(EXEMPLO.replace("\"primeiros_socorros\": [", "\"primeiros_socorros\": {\"a\": 1}, \"x\": ["));
+        invalida(EXEMPLO.replace("\"primeiros_socorros\": [", "\"primeiros_socorros\": [\"lavar\"], \"x\": ["));
+        invalida(EXEMPLO.replace("\"atencao_medica_imediata\": true", "\"atencao_medica_imediata\": \"sim\""));
+        invalida(EXEMPLO.replace("\"descricao\": \"Levar para local ventilado.\"", "\"descricao\": 7"));
+        invalida(EXEMPLO.replace("\"rota_exposicao\": \"inalacao\"", "\"rota_exposicao\": {\"a\": 1}"));
+    }
+
+    @Test
+    void primeirosSocorrosAusentesOuComRotaDesconhecidaSaoAceitos() {
+        assertThatCode(() -> ValidacaoDaExtracao.validar(
+                        "{\"status\":\"processado\",\"secoes\":{\"03\":{\"compostos\":[]},\"04\":{\"encontrada\":false}}}"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> ValidacaoDaExtracao.validar(
+                        EXEMPLO.replace("\"rota_exposicao\": \"inalacao\"", "\"rota_exposicao\": \"outra\"")
+                                .replace("\"atencao_medica_imediata\": true", "\"atencao_medica_imediata\": null")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void secao13NulaAbortariaOCadastroNoBanco() {
+        invalida(EXEMPLO.replace("\"secoes\": {", "\"secoes\": {\"13\": {\"descartes\": null},"));
+    }
 }

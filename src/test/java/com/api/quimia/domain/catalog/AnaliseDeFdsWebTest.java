@@ -219,6 +219,14 @@ class AnaliseDeFdsWebTest {
         assertThat(fds.at("/secoes/03/compostos/0/unidade_concentracao").asString()).isEqualTo("%");
         assertThat(fds.path("pendencias")).hasSize(1);
         assertThat(fds.at("/pendencias/0/secao").asString()).isEqualTo("10");
+        if (catalogo.postgres()) {
+            // Desde 2026-10-27 a function do banco copia a unidade para a coluna (antes só ficava no raw_json).
+            assertThat(jdbc.queryForObject(
+                            "SELECT fc.unidade_concentracao FROM fds_composto fc JOIN fds f ON f.id = fc.id_fds "
+                                    + "WHERE f.id_produto = ?",
+                            String.class, produto))
+                    .isEqualTo("%");
+        }
     }
 
     @Test

@@ -58,7 +58,20 @@ class LocalizacaoGatewayTest {
 
         LocalizacaoView view = gateway.doUsuario(usuario).orElseThrow();
 
-        assertThat(view).isEqualTo(new LocalizacaoView("01001-000", "SP", "Sé", "Praça da Sé", 10, "Lado A"));
+        assertThat(view).isEqualTo(new LocalizacaoView("01001-000", "SP", "Sé", "Praça da Sé", 10, "Lado A", null, null));
+    }
+
+    @Test
+    void devolveAsCoordenadasParaOsOutrosModulos() throws Exception {
+        mvc.perform(put("/api/v1/usuarios/me/localizacao").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"estado\":\"SP\",\"latitude\":-23.55052,\"longitude\":-46.633309}"))
+                .andExpect(status().isOk());
+
+        LocalizacaoView view = gateway.doUsuario(usuario).orElseThrow();
+
+        assertThat(view.latitude()).isEqualByComparingTo("-23.55052");
+        assertThat(view.longitude()).isEqualByComparingTo("-46.633309");
     }
 
     @Test

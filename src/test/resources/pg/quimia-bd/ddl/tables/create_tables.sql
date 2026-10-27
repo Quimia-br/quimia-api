@@ -214,13 +214,19 @@ CREATE TABLE localizacao_usuario (
     rua         VARCHAR(255),
     numero      INTEGER,
     complemento VARCHAR(255),
-    CONSTRAINT localizacao_usuario_unique UNIQUE (id_usuario)
+    latitude    NUMERIC(9,6),
+    longitude   NUMERIC(9,6),
+    CONSTRAINT localizacao_usuario_unique UNIQUE (id_usuario),
+    CONSTRAINT chk_localizacao_latitude CHECK (latitude BETWEEN -90 AND 90),
+    CONSTRAINT chk_localizacao_longitude CHECK (longitude BETWEEN -180 AND 180),
+    CONSTRAINT chk_localizacao_coordenadas_juntas CHECK ((latitude IS NULL) = (longitude IS NULL))
 );
 
 CREATE TABLE estante (
     id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_usuario UUID NOT NULL,
     nome       VARCHAR(255),
+    ambiente   VARCHAR(255),
     criado_em  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT estante_usuario_unique UNIQUE (id_usuario)
 );
@@ -238,6 +244,7 @@ CREATE TABLE estante_produto (
     id_usuario  UUID NOT NULL,
     id_estante  INTEGER NOT NULL,
     id_comodo   INTEGER,
+    data_adicionado TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT estante_produto_unique UNIQUE (id_estante, id_produto)
 );
 
