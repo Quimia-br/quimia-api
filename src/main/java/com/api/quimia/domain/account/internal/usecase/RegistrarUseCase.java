@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RegistrarUseCase {
-    private static final int MINIMUM_AGE = 18;
+    private static final int MINIMUM_AGE = 16;
 
     private final UsuarioRepository users;
     private final PasswordEncoder passwords;
@@ -39,7 +39,7 @@ public class RegistrarUseCase {
             throw new AccountException("email_in_use", 409);
         }
         PasswordPolicy.validate(request.senha());
-        requireAdult(request.dataNasc());
+        requireMinimumAge(request.dataNasc());
         Usuario user = new Usuario();
         user.setId(UUID.randomUUID());
         user.setNome(request.nome().trim());
@@ -55,7 +55,7 @@ public class RegistrarUseCase {
         return new UserSummary(user.getId(), user.getNome(), user.getEmail());
     }
 
-    static void requireAdult(LocalDate dataNasc) {
+    static void requireMinimumAge(LocalDate dataNasc) {
         if (dataNasc != null && Period.between(dataNasc, LocalDate.now()).getYears() < MINIMUM_AGE) {
             throw new AccountException("underage", 422);
         }

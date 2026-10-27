@@ -1,6 +1,5 @@
 package com.api.quimia.domain.account.internal.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -8,17 +7,13 @@ import java.time.LocalDate;
 
 /**
  * `PATCH /usuarios/me`: campo ausente mantém o valor atual. `removerDataNasc` = true apaga a data de nascimento (um
- * `dataNasc` nulo significa "não alterar"); não vale junto com `dataNasc`. Trocar o `email`, que é o login da conta,
- * exige a `senhaAtual`: com o access token roubado, a conta não pode ser tomada trocando o e-mail. Contas criadas por
- * login social têm senha aleatória e não conseguem trocar o e-mail.
+ * `dataNasc` nulo significa "não alterar"); não vale junto com `dataNasc`.
  */
 public record UpdateProfileRequest(
         @Size(min = 2, max = 255) String nome,
         @Past LocalDate dataNasc,
         Boolean removerDataNasc,
-        @Size(max = FOTO_URL_MAXIMA) @Pattern(regexp = FOTO_URL_REGEX) String fotoUrl,
-        @Email @Size(min = 3, max = 255) String email,
-        @Size(max = 72) String senhaAtual) {
+        @Size(max = FOTO_URL_MAXIMA) @Pattern(regexp = FOTO_URL_REGEX) String fotoUrl) {
     /** Tamanho de `usuario.foto_url`; também vale para a foto do login social. */
     public static final int FOTO_URL_MAXIMA = 450;
     /** URL https sem espaço; também vale para a foto do login social. */

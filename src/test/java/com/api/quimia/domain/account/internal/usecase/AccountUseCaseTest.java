@@ -41,12 +41,12 @@ class AccountUseCaseTest {
         var viewed = perfil.current(created.id());
         assertThat(viewed.nome()).isEqualTo("Case User");
 
-        var updated = perfil.update(created.id(), new UpdateProfileRequest("Renamed", null, null, "https://cdn.example.com/me.png", null, null));
+        var updated = perfil.update(created.id(), new UpdateProfileRequest("Renamed", null, null, "https://cdn.example.com/me.png"));
         assertThat(updated.nome()).isEqualTo("Renamed");
         assertThat(updated.fotoUrl()).isEqualTo("https://cdn.example.com/me.png");
 
         assertThatThrownBy(() ->
-                        perfil.update(created.id(), new UpdateProfileRequest(null, LocalDate.now().minusYears(10), null, null, null, null)))
+                        perfil.update(created.id(), new UpdateProfileRequest(null, LocalDate.now().minusYears(10), null, null)))
                 .isInstanceOf(AccountException.class)
                 .extracting(error -> ((AccountException) error).code())
                 .isEqualTo("underage");

@@ -33,7 +33,6 @@ tests {
 docs {
   Altera nome, data de nascimento e/ou foto (https, até 450 caracteres). Campo ausente mantém o valor.
   Apagar o nascimento: `"removerDataNasc": true` (um `dataNasc` nulo significa "não alterar"; os dois juntos respondem 400 data_nasc_conflict).
-  Trocar o e-mail: `"email"` + `"senhaAtual"` (a senha atual protege a troca do login). O e-mail é normalizado; igual ao atual não faz nada. Contas de login social (senha aleatória) não conseguem trocar o e-mail. Erros de senha contam para o bloqueio temporário.
   Antes: `00 / 02`.
-  Respostas: 200, 400 validação/data_nasc_conflict, 403 invalid_current_password, 409 email_in_use, 422 underage/current_password_required, 423 blocked.
+  Respostas: 200, 400 validação/data_nasc_conflict, 422 underage (menos de 16 anos).
 }
