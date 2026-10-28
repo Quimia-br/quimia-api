@@ -1,8 +1,11 @@
 package com.api.quimia.domain.catalog.internal.web;
 
+import com.api.quimia.domain.account.AccountPrincipal;
 import com.api.quimia.domain.catalog.dto.Pagina;
 import com.api.quimia.domain.catalog.dto.ProdutoView;
 import com.api.quimia.domain.catalog.internal.dto.BuscaCodigoBarrasRequest;
+import com.api.quimia.domain.catalog.internal.dto.BuscaPorImagemView;
+import com.api.quimia.domain.catalog.internal.usecase.BuscarProdutosPorImagemUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.ConsultarProdutoUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,6 +13,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** Catálogo compartilhado lido pelo app (titular usuário). */
 @Tag(name = "Catálogo")
@@ -25,10 +31,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProdutoController {
     private final ListarProdutosUseCase listar;
     private final ConsultarProdutoUseCase consultar;
+    private final BuscarProdutosPorImagemUseCase buscarPorImagem;
 
-    public ProdutoController(ListarProdutosUseCase listar, ConsultarProdutoUseCase consultar) {
+    public ProdutoController(
+            ListarProdutosUseCase listar,
+            ConsultarProdutoUseCase consultar,
+            BuscarProdutosPorImagemUseCase buscarPorImagem) {
         this.listar = listar;
         this.consultar = consultar;
+        this.buscarPorImagem = buscarPorImagem;
     }
 
     @Operation(
@@ -87,5 +98,34 @@ public class ProdutoController {
     @PostMapping("/busca-por-codigo-barras")
     public ProdutoView buscarPorCodigoBarras(@Valid @RequestBody BuscaCodigoBarrasRequest request) {
         return consultar.porCodigoBarras(request.codBarras());
+    }
+
+    @Operation(
+            summary = "Buscar produtos pela foto do rótulo",
+            description = "Escanear o rótulo: envia a foto (multipart, campo `imagem`, JPEG, PNG ou WebP até 5 MB), "
+                    + "o quimia-agent lê os produtos nela e cada um é procurado no catálogo, primeiro pelo código de "
+                    + "barras e depois pelo nome igual (com a marca, quando lida), sem acento nem caixa. O que não "
+                    + "casa conta em `naoIdentificados`. Até 60 buscas por hora por usuário.")
+    @ApiResponse(responseCode = "200", description = "Produtos reconhecidos; lista vazia quando nenhum casou.")
+    @ApiResponse(responseCode = "400", description = "Campo `imagem` ausente ou vazio: `imagem_obrigatoria`.")
+    @ApiResponse(responseCode = "413", description = "Imagem acima de 5 MB: `imagem_muito_grande`.")
+    @ApiResponse(
+            responseCode = "415",
+            description = "Arquivo que não é JPEG, PNG ou WebP pelo conteúdo: `imagem_invalida`.")
+    @ApiResponse(responseCode = "429", description = "Limite de buscas da hora atingido: `limite_excedido`.")
+    @ApiResponse(
+            responseCode = "502",
+            description = "O agente respondeu com erro ou fora do contrato: `agente_falhou`.")
+    @ApiResponse(
+            responseCode = "503",
+            description = "Agente desligado (sem `QUIMIA_AGENTE_URL`) ou fora do ar: `agente_indisponivel`.")
+    @ApiResponse(
+            responseCode = "504",
+            description = "O agente não respondeu dentro do prazo: `agente_timeout`.")
+    @PostMapping(path = "/busca-por-imagem", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public BuscaPorImagemView buscarPorImagem(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @RequestParam(name = "imagem", required = false) MultipartFile imagem) {
+        return buscarPorImagem.execute(principal.usuarioId(), imagem);
     }
 }

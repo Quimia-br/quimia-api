@@ -1,5 +1,6 @@
 package com.api.quimia.domain.account.internal.usecase;
 
+import com.api.quimia.domain.account.FotoDoUsuarioGateway;
 import com.api.quimia.domain.account.dto.UserView;
 import com.api.quimia.domain.account.internal.dto.UpdateProfileRequest;
 import com.api.quimia.domain.account.internal.model.Usuario;
@@ -7,13 +8,17 @@ import com.api.quimia.domain.account.internal.persistence.UsuarioRepository;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class PerfilUseCase {
     private final UsuarioRepository users;
+    private final FotoDoUsuarioGateway fotos;
 
-    public PerfilUseCase(UsuarioRepository users) {
+    public PerfilUseCase(UsuarioRepository users, FotoDoUsuarioGateway fotos) {
         this.users = users;
+        this.fotos = fotos;
     }
 
     @Transactional(readOnly = true)
@@ -38,9 +43,28 @@ public class PerfilUseCase {
             user.setDataNasc(request.dataNasc());
         }
         if (request.fotoUrl() != null) {
+            String fotoAnterior = user.getFotoUrl();
             user.setFotoUrl(request.fotoUrl());
+            apagarFotoAnteriorAposCommit(id, fotoAnterior, request.fotoUrl());
         }
         return view(user);
+    }
+
+    /**
+     * Só depois do commit: se a transação for desfeita, a foto antiga continua sendo a do usuário. `fotoUrl` aceita
+     * qualquer URL https, então outro perfil pode apontar para a mesma imagem (copiada de outro usuário): enquanto
+     * alguém a usa, ela não é apagada.
+     */
+    private void apagarFotoAnteriorAposCommit(UUID usuarioId, String anterior, String atual) {
+        if (anterior == null || anterior.equals(atual) || users.existsByFotoUrlAndIdNot(anterior, usuarioId)) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                fotos.apagar(anterior);
+            }
+        });
     }
 
     private Usuario find(UUID id) {

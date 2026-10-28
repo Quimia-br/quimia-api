@@ -9,4 +9,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
     Optional<Usuario> findByEmail(String email);
 
     boolean existsByEmail(String email);
+
+    /** Outro usuário usa esta foto (`fotoUrl` aceita qualquer URL https, inclusive a de outro perfil). */
+    boolean existsByFotoUrlAndIdNot(String fotoUrl, UUID id);
 }

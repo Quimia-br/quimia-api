@@ -3,6 +3,7 @@ package com.api.quimia.domain.storage.internal.usecase;
 import com.api.quimia.domain.storage.internal.dto.ComodoRequest;
 import com.api.quimia.domain.storage.internal.dto.ComodoView;
 import com.api.quimia.domain.storage.internal.model.Comodo;
+import com.api.quimia.domain.storage.internal.model.IconeDeComodo;
 import com.api.quimia.domain.storage.internal.persistence.ComodoRepository;
 import com.api.quimia.domain.storage.internal.persistence.EstanteProdutoRepository;
 import java.util.List;
@@ -29,6 +30,9 @@ public class CriarComodoUseCase {
 
     @Transactional
     public ComodoView execute(UUID usuarioId, ComodoRequest request) {
+        if (!IconeDeComodo.existe(request.icone())) {
+            throw new StorageException("icone_invalido", 422);
+        }
         String nome = NomeDeComodo.normalizar(request.nome());
         List<Integer> produtoIds = request.produtoIds().stream().distinct().toList();
         if (produtoIds.size() < MINIMO_PRODUTOS) {

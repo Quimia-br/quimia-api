@@ -74,7 +74,7 @@ class ComodoConcorrenciaTest {
         String ids = Arrays.stream(produtos).mapToObj(String::valueOf).collect(Collectors.joining(","));
         return mvc.perform(post("/api/v1/comodos").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nome\":\"" + nome + "\",\"icone\":\"x\",\"produtoIds\":[" + ids + "]}"))
+                        .content("{\"nome\":\"" + nome + "\",\"icone\":\"toilet\",\"produtoIds\":[" + ids + "]}"))
                 .andReturn().getResponse().getStatus();
     }
 

@@ -15,8 +15,8 @@ public record ComodoRequest(
                 example = "Banheiro")
         @NotBlank @Size(max = 100) String nome,
         @Schema(
-                description = "Ícone do app: letras minúsculas, dígitos, _ e -, até 50 caracteres.",
-                example = "banheira")
+                description = "Código de um ícone de `GET /comodos/icones` (ex.: toilet, sofa, refrigerator).",
+                example = "toilet")
         @NotBlank @Size(max = 50) @Pattern(regexp = "[a-z0-9_-]+") String icone,
         @Schema(description = "De 2 a 20 produtos da estante.", example = "[42, 57]")
         @NotNull List<@NotNull Integer> produtoIds) {}
