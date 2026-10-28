@@ -39,14 +39,18 @@ public class PerfilUseCase {
         if (request.fotoUrl() != null) {
             String fotoAnterior = user.getFotoUrl();
             user.setFotoUrl(request.fotoUrl());
-            apagarFotoAnteriorAposCommit(fotoAnterior, request.fotoUrl());
+            apagarFotoAnteriorAposCommit(id, fotoAnterior, request.fotoUrl());
         }
         return view(user);
     }
 
-    /** Só depois do commit: se a transação for desfeita, a foto antiga continua sendo a do usuário. */
-    private void apagarFotoAnteriorAposCommit(String anterior, String atual) {
-        if (anterior == null || anterior.equals(atual)) {
+    /**
+     * Só depois do commit: se a transação for desfeita, a foto antiga continua sendo a do usuário. `fotoUrl` aceita
+     * qualquer URL https, então outro perfil pode apontar para a mesma imagem (copiada de outro usuário): enquanto
+     * alguém a usa, ela não é apagada.
+     */
+    private void apagarFotoAnteriorAposCommit(UUID usuarioId, String anterior, String atual) {
+        if (anterior == null || anterior.equals(atual) || users.existsByFotoUrlAndIdNot(anterior, usuarioId)) {
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

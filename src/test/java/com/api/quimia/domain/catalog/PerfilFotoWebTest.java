@@ -63,8 +63,12 @@ class PerfilFotoWebTest {
     }
 
     private void trocarFoto(String url) throws Exception {
+        trocarFoto(token, url);
+    }
+
+    private void trocarFoto(String tokenDoUsuario, String url) throws Exception {
         mvc.perform(patch("/api/v1/usuarios/me")
-                        .header("Authorization", "Bearer " + token)
+                        .header("Authorization", "Bearer " + tokenDoUsuario)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"fotoUrl\":\"" + url + "\"}"))
                 .andExpect(status().isOk());
@@ -108,6 +112,29 @@ class PerfilFotoWebTest {
         }
 
         assertThat(armazenamento.apagadas()).doesNotContain(doGoogle, deProduto);
+    }
+
+    @Test
+    void fotoCopiadaDeOutroUsuarioNaoEApagadaAoTrocar() throws Exception {
+        String outro = TestLogins.usuario(mvc, "outro@perfilfoto.test");
+        trocarFoto(FOTO_UM);
+
+        trocarFoto(outro, FOTO_UM);
+        trocarFoto(outro, FOTO_DOIS);
+
+        assertThat(armazenamento.apagadas()).isEmpty();
+    }
+
+    @Test
+    void fotoDeixadaPorTodosEApagada() throws Exception {
+        String outro = TestLogins.usuario(mvc, "outro@perfilfoto.test");
+        trocarFoto(FOTO_UM);
+        trocarFoto(outro, FOTO_UM);
+        trocarFoto(outro, FOTO_DOIS);
+
+        trocarFoto("https://lh3.googleusercontent.com/a/foto");
+
+        assertThat(armazenamento.apagadas()).containsExactly(FOTO_UM);
     }
 
     @Test
