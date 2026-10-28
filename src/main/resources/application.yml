@@ -69,6 +69,19 @@ quimia:
     timeout-segundos: ${QUIMIA_AGENTE_TIMEOUT_SEGUNDOS:120}
     mensagens-por-hora: ${QUIMIA_AGENTE_MENSAGENS_POR_HORA:20}
 
+# Documentação OpenAPI das rotas: /v3/api-docs (JSON) e /swagger-ui.html. Ligada também em produção;
+# SWAGGER_ENABLED=false desliga as duas.
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+    operations-sorter: alpha
+    display-request-duration: true
+  default-produces-media-type: application/json
+  packages-to-scan: com.api.quimia.domain
+  writer-with-order-by-keys: true
+
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}

@@ -8,6 +8,10 @@ import com.api.quimia.domain.storage.internal.dto.GuardarProdutosResponse;
 import com.api.quimia.domain.storage.internal.usecase.GuardarNaEstanteUseCase;
 import com.api.quimia.domain.storage.internal.usecase.ListarEstanteUseCase;
 import com.api.quimia.domain.storage.internal.usecase.RemoverDaEstanteUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Estante")
 @RestController
 @RequestMapping("/api/v1/estante/produtos")
 public class EstanteController {
@@ -35,12 +40,32 @@ public class EstanteController {
         this.remover = remover;
     }
 
+    @Operation(
+            summary = "Guardar produtos na estante",
+            description = "Guarda de 1 a 50 produtos (\"Guardar todos\"). Responde 200 com o resultado de cada id: "
+                    + "`adicionado`, `ja_na_estante` ou `nao_encontrado`.")
+    @ApiResponse(responseCode = "200", description = "Resultado por produto.")
+    @ApiResponse(responseCode = "404", description = "Usuário do token não existe mais: `usuario_nao_encontrado`.")
     @PostMapping
     public GuardarProdutosResponse guardar(
             @AuthenticationPrincipal AccountPrincipal principal, @Valid @RequestBody GuardarProdutosRequest request) {
         return new GuardarProdutosResponse(guardar.execute(principal.usuarioId(), request.produtoIds()));
     }
 
+    @Operation(
+            summary = "Listar a estante",
+            description = "Produtos guardados pelo usuário, inclusive os que saíram do catálogo. "
+                    + "`ordem=alfabetica` ordena por nome.")
+    @Parameter(name = "q", description = "Busca por nome, descrição ou marca (até 100 caracteres).", example = "cloro")
+    @Parameter(name = "ordem", description = "alfabetica.", example = "alfabetica")
+    @Parameter(name = "page", description = "Página, a partir de 0.", example = "0")
+    @Parameter(name = "size", description = "Itens por página, de 1 a 50.", example = "20")
+    @ApiResponse(responseCode = "200", description = "Página de produtos.")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Paginação fora das regras (página negativa, tamanho fora de 1 a 50 ou página × tamanho "
+                    + "acima do maior int): `paginacao_invalida`. Termo de busca acima de 100 caracteres: "
+                    + "`termo_muito_longo`. Ordem fora da lista: `ordem_invalida`.")
     @GetMapping
     public Pagina<ProdutoView> listar(
             @AuthenticationPrincipal AccountPrincipal principal,
@@ -51,6 +76,11 @@ public class EstanteController {
         return listar.execute(principal.usuarioId(), termo, ordem, pagina, tamanho);
     }
 
+    @Operation(
+            summary = "Tirar produto da estante",
+            description = "Tira o produto da estante, do cômodo e apaga as misturas com ele. Repetir não é erro.")
+    @Parameter(name = "produtoId", description = "Id do produto.", example = "42")
+    @ApiResponse(responseCode = "204", description = "Removido (ou já não estava).")
     @DeleteMapping("/{produtoId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void remover(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer produtoId) {
