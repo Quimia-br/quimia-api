@@ -1,5 +1,6 @@
 package com.api.quimia.domain.catalog.internal.web;
 
+import com.api.quimia.domain.account.AccountPrincipal;
 import com.api.quimia.domain.catalog.dto.Pagina;
 import com.api.quimia.domain.catalog.dto.ProdutoView;
 import com.api.quimia.domain.catalog.internal.dto.BuscaCodigoBarrasRequest;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -103,13 +105,14 @@ public class ProdutoController {
             description = "Escanear o rótulo: envia a foto (multipart, campo `imagem`, JPEG, PNG ou WebP até 5 MB), "
                     + "o quimia-agent lê os produtos nela e cada um é procurado no catálogo, primeiro pelo código de "
                     + "barras e depois pelo nome igual (com a marca, quando lida), sem acento nem caixa. O que não "
-                    + "casa conta em `naoIdentificados`.")
+                    + "casa conta em `naoIdentificados`. Até 60 buscas por hora por usuário.")
     @ApiResponse(responseCode = "200", description = "Produtos reconhecidos; lista vazia quando nenhum casou.")
     @ApiResponse(responseCode = "400", description = "Campo `imagem` ausente ou vazio: `imagem_obrigatoria`.")
     @ApiResponse(responseCode = "413", description = "Imagem acima de 5 MB: `imagem_muito_grande`.")
     @ApiResponse(
             responseCode = "415",
             description = "Arquivo que não é JPEG, PNG ou WebP pelo conteúdo: `imagem_invalida`.")
+    @ApiResponse(responseCode = "429", description = "Limite de buscas da hora atingido: `limite_excedido`.")
     @ApiResponse(
             responseCode = "502",
             description = "O agente respondeu com erro ou fora do contrato: `agente_falhou`.")
@@ -121,7 +124,8 @@ public class ProdutoController {
             description = "O agente não respondeu dentro do prazo: `agente_timeout`.")
     @PostMapping(path = "/busca-por-imagem", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BuscaPorImagemView buscarPorImagem(
+            @AuthenticationPrincipal AccountPrincipal principal,
             @RequestParam(name = "imagem", required = false) MultipartFile imagem) {
-        return buscarPorImagem.execute(imagem);
+        return buscarPorImagem.execute(principal.usuarioId(), imagem);
     }
 }

@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -33,17 +34,24 @@ public class BuscarProdutosPorImagemUseCase {
     private final ImagemDoProduto imagens;
     private final LeitorDeRotulo leitor;
     private final ProdutoRepository produtos;
+    private final LimiteDeBuscasPorImagem limite;
 
-    public BuscarProdutosPorImagemUseCase(ImagemDoProduto imagens, LeitorDeRotulo leitor, ProdutoRepository produtos) {
+    public BuscarProdutosPorImagemUseCase(
+            ImagemDoProduto imagens, LeitorDeRotulo leitor, ProdutoRepository produtos, LimiteDeBuscasPorImagem limite) {
         this.imagens = imagens;
         this.leitor = leitor;
         this.produtos = produtos;
+        this.limite = limite;
     }
 
-    public BuscaPorImagemView execute(MultipartFile arquivo) {
+    /** Só a busca que chega ao agente conta no limite: imagem ausente ou inválida é recusada antes. */
+    public BuscaPorImagemView execute(UUID usuarioId, MultipartFile arquivo) {
         byte[] imagem = imagens.ler(arquivo);
         if (imagem == null) {
             throw new CatalogException("imagem_obrigatoria", 400);
+        }
+        if (!limite.aceitar(usuarioId)) {
+            throw new CatalogException("limite_excedido", 429);
         }
         List<CandidatoDoRotulo> lidos = identificar(imagem);
         Map<Integer, ProdutoView> achados = new LinkedHashMap<>();
