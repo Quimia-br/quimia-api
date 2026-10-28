@@ -10,9 +10,12 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Decide a compatibilidade a partir das composições e das regras ativas, sem acesso ao banco. Reproduz
- * `fn_match_produtos` com uma diferença de propósito (R4): composição parcialmente resolvida e sem regra casando é
- * `nao_avaliado`, nunca `compativel`.
+ * Decide a compatibilidade a partir das composições, das regras ativas e das incompatibilidades que as próprias FDS
+ * declaram, sem acesso ao banco. Reproduz `fn_match_produtos` com uma diferença de propósito (R4): composição
+ * parcialmente resolvida e sem regra nem declaração casando é `nao_avaliado`, nunca `compativel`.
+ *
+ * <p>Como na função do banco, a incompatibilidade declarada pela FDS de um produto vale quando atinge uma substância ou
+ * classe do outro; ela vem sem `regraId`. Com regra e declaração na mesma gravidade, a regra curada é a resposta.
  */
 public final class MotorDeCompatibilidade {
     public static final String COMPATIVEL = "compativel";
@@ -23,6 +26,8 @@ public final class MotorDeCompatibilidade {
     public static final String CRITICO = "critico";
     public static final String SEM_COMPOSICAO = "Produto sem composição resolvida";
     public static final String COMPOSICAO_INCOMPLETA = "Composição incompleta: há compostos não identificados";
+    /** Quando a FDS declara a incompatibilidade mas sem descrição do risco. */
+    public static final String DECLARADA_NA_FDS = "Incompatibilidade declarada na FDS do produto";
 
     private static final int MINIMO_PARA_UM_PAR = 2;
     /** Da mais grave para a menos grave; empate pela menor regra. */
@@ -31,14 +36,34 @@ public final class MotorDeCompatibilidade {
             .reversed()
             .thenComparingInt(RegraDeIncompatibilidade::id);
 
+    /**
+     * Da mais grave para a menos grave; no empate, a que traz descrição do risco (a resposta mostra um texto de verdade
+     * em vez do padrão) e depois a descrição em ordem alfabética, para a resposta não depender da ordem de leitura.
+     */
+    private static final Comparator<IncompatibilidadeDaFds> DECLARADA_MAIS_GRAVE_PRIMEIRO = Comparator
+            .comparing(IncompatibilidadeDaFds::severidade)
+            .reversed()
+            .thenComparing(declarada -> semDescricao(declarada) ? 1 : 0)
+            .thenComparing(declarada -> semDescricao(declarada) ? "" : declarada.descricaoRisco());
+
     private final Map<Integer, ComposicaoDoProduto> composicoes;
     private final List<RegraDeIncompatibilidade> regras;
+    private final List<IncompatibilidadeDaFds> declaradas;
 
     /** `regras`: só as ativas. Produto ausente de `composicoes` não tem FDS ativa. */
     public MotorDeCompatibilidade(
             Map<Integer, ComposicaoDoProduto> composicoes, Collection<RegraDeIncompatibilidade> regras) {
+        this(composicoes, regras, List.of());
+    }
+
+    /** `declaradas`: as das FDS ativas, já resolvidas para substância ou classe. */
+    public MotorDeCompatibilidade(
+            Map<Integer, ComposicaoDoProduto> composicoes,
+            Collection<RegraDeIncompatibilidade> regras,
+            Collection<IncompatibilidadeDaFds> declaradas) {
         this.composicoes = Map.copyOf(composicoes);
         this.regras = regras.stream().sorted(MAIS_GRAVE_PRIMEIRO).toList();
+        this.declaradas = declaradas.stream().sorted(DECLARADA_MAIS_GRAVE_PRIMEIRO).toList();
     }
 
     /** Par em qualquer ordem; a resposta vem com o menor id em `produtoIdA`. Ids iguais ou nulos não formam par. */
@@ -53,11 +78,21 @@ public final class MotorDeCompatibilidade {
         if (a.semSubstanciaResolvida() || b.semSubstanciaResolvida()) {
             return new AvaliacaoParView(menor, maior, NAO_AVALIADO, null, SEM_COMPOSICAO, null);
         }
-        for (RegraDeIncompatibilidade regra : regras) {
-            if (regra.casa(a, b)) {
-                return new AvaliacaoParView(
-                        menor, maior, INCOMPATIVEL, regra.severidade().codigo(), regra.descricaoRisco(), regra.id());
-            }
+        RegraDeIncompatibilidade regra =
+                regras.stream().filter(candidata -> candidata.casa(a, b)).findFirst().orElse(null);
+        IncompatibilidadeDaFds declarada = declaradas.stream()
+                .filter(candidata -> atinge(candidata, menor, maior, a, b))
+                .findFirst()
+                .orElse(null);
+        if (regra != null && (declarada == null || regra.severidade().compareTo(declarada.severidade()) >= 0)) {
+            return new AvaliacaoParView(
+                    menor, maior, INCOMPATIVEL, regra.severidade().codigo(), regra.descricaoRisco(), regra.id());
+        }
+        if (declarada != null) {
+            String descricao = declarada.descricaoRisco() == null || declarada.descricaoRisco().isBlank()
+                    ? DECLARADA_NA_FDS
+                    : declarada.descricaoRisco();
+            return new AvaliacaoParView(menor, maior, INCOMPATIVEL, declarada.severidade().codigo(), descricao, null);
         }
         if (a.temCompostoNaoResolvido() || b.temCompostoNaoResolvido()) {
             return new AvaliacaoParView(menor, maior, NAO_AVALIADO, null, COMPOSICAO_INCOMPLETA, null);
@@ -94,7 +129,7 @@ public final class MotorDeCompatibilidade {
         incompativeis.sort(Comparator
                 .comparing((AvaliacaoParView par) -> Severidade.doCodigo(par.severidade()))
                 .reversed()
-                .thenComparing(AvaliacaoParView::regraId)
+                .thenComparing(AvaliacaoParView::regraId, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(AvaliacaoParView::produtoIdA)
                 .thenComparing(AvaliacaoParView::produtoIdB));
         Severidade pior = incompativeis.isEmpty() ? null : Severidade.doCodigo(incompativeis.get(0).severidade());
@@ -113,6 +148,19 @@ public final class MotorDeCompatibilidade {
             return pior.critica() ? CRITICO : ATENCAO;
         }
         return naoAvaliados > 0 ? NAO_AVALIADO : SEGURO;
+    }
+
+    private static boolean semDescricao(IncompatibilidadeDaFds declarada) {
+        return declarada.descricaoRisco() == null || declarada.descricaoRisco().isBlank();
+    }
+
+    /** A declaração de um produto atinge o outro; a de um produto de fora do par não conta. */
+    private static boolean atinge(
+            IncompatibilidadeDaFds declarada, int menor, int maior, ComposicaoDoProduto a, ComposicaoDoProduto b) {
+        if (declarada.produtoId() == menor) {
+            return declarada.atinge(b);
+        }
+        return declarada.produtoId() == maior && declarada.atinge(a);
     }
 
     private ComposicaoDoProduto composicao(int produtoId) {

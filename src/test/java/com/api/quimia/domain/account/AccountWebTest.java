@@ -305,4 +305,109 @@ class AccountWebTest {
     private JsonNode json(MvcResult result) throws Exception {
         return mapper.readTree(result.getResponse().getContentAsString());
     }
+
+    private String accessToken(String email, String senha) throws Exception {
+        return json(mvc.perform(post("/api/v1/auth/mobile/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"senha\":\"" + senha + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn()).get("accessToken").asText();
+    }
+
+    private org.springframework.test.web.servlet.ResultActions patchPerfil(String access, String corpo) throws Exception {
+        return mvc.perform(patch("/api/v1/usuarios/me")
+                .header("Authorization", "Bearer " + access)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(corpo));
+    }
+
+    @Test
+    void profileCanClearTheBirthDateOnlyWithTheExplicitFlag() throws Exception {
+        mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Pessoa\",\"email\":\"nasc@example.com\",\"senha\":\"senhaNasc1\",\"dataNasc\":\"1990-05-05\"}"))
+                .andExpect(status().isCreated());
+        String access = accessToken("nasc@example.com", "senhaNasc1");
+
+        patchPerfil(access, "{\"dataNasc\":null,\"nome\":\"Outro Nome\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.dataNasc").value("1990-05-05"));
+        patchPerfil(access, "{\"removerDataNasc\":false}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.dataNasc").value("1990-05-05"));
+        patchPerfil(access, "{\"removerDataNasc\":true,\"dataNasc\":\"1991-01-01\"}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("data_nasc_conflict"));
+        assertThat(json(patchPerfil(access, "{\"removerDataNasc\":true}").andExpect(status().isOk()).andReturn())
+                        .path("dataNasc").isNull())
+                .isTrue();
+        assertThat(json(mvc.perform(get("/api/v1/usuarios/me").header("Authorization", "Bearer " + access))
+                                .andExpect(status().isOk()).andReturn())
+                        .path("dataNasc").isNull())
+                .isTrue();
+        patchPerfil(access, "{\"dataNasc\":\"1992-02-02\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.dataNasc").value("1992-02-02"));
+    }
+
+    @Test
+    void locationKeepsCoordinatesTogetherAndRoundsThemToSixDecimals() throws Exception {
+        registerUsuario("geo@example.com", "senhaGeo1234");
+        String access = accessToken("geo@example.com", "senhaGeo1234");
+        String url = "/api/v1/usuarios/me/localizacao";
+
+        mvc.perform(put(url).header("Authorization", "Bearer " + access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cep\":\"01310100\",\"estado\":\"SP\",\"latitude\":-23.5505199,\"longitude\":-46.6333094}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latitude").value(-23.55052))
+                .andExpect(jsonPath("$.longitude").value(-46.633309));
+        mvc.perform(get(url).header("Authorization", "Bearer " + access))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latitude").value(-23.55052))
+                .andExpect(jsonPath("$.longitude").value(-46.633309));
+
+        mvc.perform(put(url).header("Authorization", "Bearer " + access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"estado\":\"SP\",\"latitude\":-23.5}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("invalid_coordinates"));
+        mvc.perform(put(url).header("Authorization", "Bearer " + access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"longitude\":-46.6}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("invalid_coordinates"));
+        for (String fora : new String[] {"\"latitude\":90.1,\"longitude\":0", "\"latitude\":-90.5,\"longitude\":0",
+            "\"latitude\":0,\"longitude\":180.1", "\"latitude\":0,\"longitude\":-181"}) {
+            mvc.perform(put(url).header("Authorization", "Bearer " + access)
+                            .contentType(MediaType.APPLICATION_JSON).content("{" + fora + "}"))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(put(url).header("Authorization", "Bearer " + access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"latitude\":90,\"longitude\":-180}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latitude").value(90.0))
+                .andExpect(jsonPath("$.longitude").value(-180.0));
+
+        // O endereço é substituído por inteiro: sem coordenadas, o par volta a nulo.
+        assertThat(json(mvc.perform(put(url).header("Authorization", "Bearer " + access)
+                                .contentType(MediaType.APPLICATION_JSON).content("{\"estado\":\"RJ\"}"))
+                        .andExpect(status().isOk()).andReturn())
+                        .path("latitude").isNull())
+                .isTrue();
+    }
+
+    @Test
+    void registrationAcceptsCoordinatesInTheOptionalAddress() throws Exception {
+        mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Geo","email":"geo-reg@example.com","senha":"senhaGeo1234",
+                                 "localizacao":{"cep":"06000-000","estado":"SP","latitude":-23.5,"longitude":-46.8}}
+                                """))
+                .andExpect(status().isCreated());
+        String access = accessToken("geo-reg@example.com", "senhaGeo1234");
+
+        mvc.perform(get("/api/v1/usuarios/me/localizacao").header("Authorization", "Bearer " + access))
+                .andExpect(jsonPath("$.latitude").value(-23.5))
+                .andExpect(jsonPath("$.longitude").value(-46.8));
+    }
 }
+

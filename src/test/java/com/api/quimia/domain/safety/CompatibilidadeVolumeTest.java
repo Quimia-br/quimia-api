@@ -34,8 +34,8 @@ class CompatibilidadeVolumeTest {
     private static final int PRODUTOS = 20;
     private static final int SUBSTANCIAS = 60;
     private static final int REGRAS = 1000;
-    /** Compostos, classes das substâncias e regras candidatas. */
-    private static final int CONSULTAS_POR_AVALIACAO = 3;
+    /** Compostos, classes das substâncias, regras candidatas e incompatibilidades declaradas pelas FDS. */
+    private static final int CONSULTAS_POR_AVALIACAO = 4;
     private static final Duration PRAZO = Duration.ofSeconds(3);
 
     @Autowired

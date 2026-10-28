@@ -6,12 +6,19 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
+/**
+ * `PATCH /usuarios/me`: campo ausente mantém o valor atual. `removerDataNasc` = true apaga a data de nascimento (um
+ * `dataNasc` nulo significa "não alterar"); não vale junto com `dataNasc`.
+ */
 @Schema(description = "Alteração parcial do perfil: só os campos enviados mudam.")
 public record UpdateProfileRequest(
         @Schema(description = "Nome, de 2 a 255 caracteres.", example = "Maria S. Souza")
         @Size(min = 2, max = 255) String nome,
         @Schema(description = "Data de nascimento.", example = "1990-05-20")
         @Past LocalDate dataNasc,
+        @Schema(description = "true apaga a data de nascimento (`dataNasc` nulo significa \"não alterar\"); não vale "
+                + "junto com `dataNasc`.")
+        Boolean removerDataNasc,
         @Schema(description = "URL https da foto.", example = "https://exemplo.com/foto.jpg")
         @Size(max = FOTO_URL_MAXIMA) @Pattern(regexp = FOTO_URL_REGEX) String fotoUrl) {
     /** Tamanho de `usuario.foto_url`; também vale para a foto do login social. */

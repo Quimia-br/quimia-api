@@ -105,13 +105,22 @@ class PrimeirosSocorrosWebTest {
         catalogo.fdsComConteudo(semSecao, "1", LocalDate.of(2026, 1, 1), true, "{\"secoes\":{\"03\":{\"compostos\":[]}}}");
         int foraDoContrato = produtoNaEstante("Fora do contrato");
         catalogo.fdsComConteudo(foraDoContrato, "1", LocalDate.of(2026, 1, 1), true,
-                "{\"secoes\":{\"04\":{\"encontrada\":\"sim\",\"primeiros_socorros\":\"lavar\"}}}");
+                "{\"secoes\":{\"04\":{\"encontrada\":\"sim\",\"primeiros_socorros\":[7,{\"rota_exposicao\":\"radiacao\",\"descricao\":\"x\"}]}}}");
+        // Texto solto no lugar da lista: o trigger do banco (fn_processar_fds_raw_json) recusa esse JSON, então só o H2
+        // consegue guardá-lo. A API continua lendo-o sem erro, para o que já estiver gravado de antes.
+        int textoSolto = produtoNaEstante("Texto solto");
+        if (!catalogo.postgres()) {
+            catalogo.fdsComConteudo(textoSolto, "1", LocalDate.of(2026, 1, 1), true,
+                    "{\"secoes\":{\"04\":{\"encontrada\":\"sim\",\"primeiros_socorros\":\"lavar\"}}}");
+        }
         int fdsSemJson = produtoNaEstante("FDS sem JSON");
         if (!catalogo.postgres()) {
             catalogo.fds(fdsSemJson, "1", LocalDate.of(2026, 1, 1), true, null);
         }
 
-        for (int produto : new int[] {semFds, semSecao, foraDoContrato, fdsSemJson}) {
+        for (int produto : catalogo.postgres()
+                ? new int[] {semFds, semSecao, foraDoContrato, fdsSemJson}
+                : new int[] {semFds, semSecao, foraDoContrato, textoSolto, fdsSemJson}) {
             consultar(tokenA, produto)
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.encontrada").value(false))

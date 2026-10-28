@@ -10,6 +10,7 @@ import com.api.quimia.domain.catalog.internal.usecase.AlterarProdutoEmpresaUseCa
 import com.api.quimia.domain.catalog.internal.usecase.CadastrarProdutoEmpresaUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosEmpresaUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosUseCase;
+import com.api.quimia.domain.catalog.internal.usecase.ListarTiposDeProdutoUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.RemoverProdutoEmpresaUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -41,16 +42,19 @@ public class EmpresaProdutoController {
     private final CadastrarProdutoEmpresaUseCase cadastrar;
     private final AlterarProdutoEmpresaUseCase alterar;
     private final RemoverProdutoEmpresaUseCase remover;
+    private final ListarTiposDeProdutoUseCase listarTipos;
 
     public EmpresaProdutoController(
             ListarProdutosEmpresaUseCase listar,
             CadastrarProdutoEmpresaUseCase cadastrar,
             AlterarProdutoEmpresaUseCase alterar,
-            RemoverProdutoEmpresaUseCase remover) {
+            RemoverProdutoEmpresaUseCase remover,
+            ListarTiposDeProdutoUseCase listarTipos) {
         this.listar = listar;
         this.cadastrar = cadastrar;
         this.alterar = alterar;
         this.remover = remover;
+        this.listarTipos = listarTipos;
     }
 
     @Operation(
@@ -98,6 +102,21 @@ public class EmpresaProdutoController {
         return listar.execute(principal.empresaId(), termo, fields, tipo, codBarras, sort, direcao, pagina, tamanho);
     }
 
+    /**
+     * Opções do campo "Tipo" do formulário de cadastro: array de códigos (`limpeza_geral`, `desinfetante`, ...), todos,
+     * sem paginação. O portal traduz os códigos para o texto exibido.
+     */
+    @Operation(
+            summary = "Tipos de produto",
+            description = "Opções do campo \"Tipo\" do formulário de cadastro: array com todos os códigos, sem "
+                    + "paginação (`limpeza_geral`, `desinfetante`, `desincrustante`, `desengraxante`, `alvejante`, "
+                    + "`aromatizante`, `outro`). São os mesmos valores que o cadastro aceita.")
+    @ApiResponse(responseCode = "200", description = "Códigos dos tipos de produto.")
+    @GetMapping("/tipos")
+    public List<String> tipos() {
+        return listarTipos.execute();
+    }
+
     /** `201` quando o produto foi criado; `200` quando a empresa foi vinculada ou reativada. */
     @Operation(
             summary = "Cadastrar produto",
@@ -105,18 +124,24 @@ public class EmpresaProdutoController {
                     + "a `fds` em PDF (até 10 MB). Se já existir produto com o mesmo código de barras, a "
                     + "empresa só é vinculada a ele (sem imagem nem FDS). A FDS vai para o armazenamento e "
                     + "para o extrator, que devolve a composição; com `QUIMIA_FDS_OBRIGATORIA=true`, produto "
-                    + "novo exige a FDS.")
+                    + "novo exige a FDS. Em vez do PDF, `analiseFds` (o `analiseId` de `POST "
+                    + "/produtos/fds/analises`) cadastra a FDS já revisada, com as `correcoesFds` da empresa.")
     @ApiResponse(responseCode = "201", description = "Produto criado.")
     @ApiResponse(responseCode = "200", description = "Empresa vinculada (ou reativada) a um produto que já existia.")
     @ApiResponse(
             responseCode = "400",
-            description = "Nome só com espaços: `nome_invalido`. Tipo fora da lista: `tipo_invalido`.")
+            description = "Nome só com espaços: `nome_invalido`. Tipo fora da lista: `tipo_invalido`. `fds` e "
+                    + "`analiseFds` juntos: `fds_e_analise_juntas`. `correcoesFds` sem `analiseFds`: "
+                    + "`correcoes_sem_analise`.")
     @ApiResponse(responseCode = "409", description = "Empresa já tem esse produto: `produto_ja_cadastrado`.")
+    @ApiResponse(responseCode = "410", description = "A análise da FDS passou da validade: `analise_expirada`.")
     @ApiResponse(
             responseCode = "422",
             description = "Código de barras inválido: `codigo_barras_invalido`. Produto novo sem FDS com a FDS "
                     + "obrigatória: `fds_obrigatoria`. PDF não reconhecido como FDS: `fds_invalida`. O "
-                    + "extrator não reconheceu o PDF como FDS ou não achou texto legível: `fds_invalida`.")
+                    + "extrator não reconheceu o PDF como FDS ou não achou texto legível: `fds_invalida`. "
+                    + "`analiseFds` de outra empresa ou adulterado: `analise_invalida`. Correção que não cabe na "
+                    + "FDS: `correcao_invalida`.")
     @ApiResponse(responseCode = "403", description = "Empresa desativada: `empresa_inativa`.")
     @ApiResponse(responseCode = "404", description = "Empresa do token não existe mais: `empresa_nao_encontrada`.")
     @ApiResponse(
@@ -150,13 +175,17 @@ public class EmpresaProdutoController {
     @Operation(
             summary = "Alterar produto",
             description = "Multipart; altera só os campos enviados. `imagem` troca a foto; `fds` grava uma FDS "
-                    + "nova e desativa a anterior. Produto vinculado a outra empresa ativa não pode ser "
+                    + "nova e desativa a anterior; `analiseFds` e `correcoesFds` fazem o mesmo com uma análise já "
+                    + "revisada, no lugar do PDF. Produto vinculado a outra empresa ativa não pode ser "
                     + "alterado.")
     @Parameter(name = "id", description = "Id do produto.", example = "42")
     @ApiResponse(responseCode = "200", description = "Produto alterado.")
     @ApiResponse(
             responseCode = "400",
-            description = "Nome só com espaços: `nome_invalido`. Tipo fora da lista: `tipo_invalido`.")
+            description = "Nome só com espaços: `nome_invalido`. Tipo fora da lista: `tipo_invalido`. `fds` e "
+                    + "`analiseFds` juntos: `fds_e_analise_juntas`. `correcoesFds` sem `analiseFds`: "
+                    + "`correcoes_sem_analise`.")
+    @ApiResponse(responseCode = "410", description = "A análise da FDS passou da validade: `analise_expirada`.")
     @ApiResponse(
             responseCode = "404",
             description = "Produto sem vínculo ativo com a empresa: `produto_nao_encontrado`. Empresa do token "
@@ -169,7 +198,8 @@ public class EmpresaProdutoController {
             responseCode = "422",
             description = "Código de barras inválido: `codigo_barras_invalido`. PDF não reconhecido como FDS: "
                     + "`fds_invalida`. O extrator não reconheceu o PDF como FDS ou não achou texto legível: "
-                    + "`fds_invalida`.")
+                    + "`fds_invalida`. `analiseFds` de outra empresa ou adulterado: `analise_invalida`. Correção "
+                    + "que não cabe na FDS: `correcao_invalida`.")
     @ApiResponse(responseCode = "403", description = "Empresa desativada: `empresa_inativa`.")
     @ApiResponse(
             responseCode = "413",

@@ -1,0 +1,35 @@
+meta {
+  name: 17 - Novo chat do WebKemi
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/chat/sessoes/{{sessaoWebKemi}}/encerrar
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+script:pre-request {
+  if (!bru.getVar("sessaoWebKemi")) {
+    bru.setVar("sessaoWebKemi", "bruno-webkemi");
+  }
+}
+
+tests {
+  test("a conversa anterior foi resumida (ou já estava)", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(["resumida", "ja_resumida", "sem_turnos"]).to.include(res.getBody().situacao);
+  });
+}
+
+docs {
+  "Novo chat" do portal: o agente resume a conversa `sessaoWebKemi` e guarda o resumo; o próximo envio sem `sessaoId` abre outra. Repetir não gera outro resumo (`ja_resumida`).
+  Precisa de `QUIMIA_AGENTE_URL` na API. Não conta no limite de mensagens.
+  Respostas: 200, 400 sessao_invalida, 403 empresa_inativa, 404 empresa_nao_encontrada, 502 agente_falhou, 503 agente_indisponivel, 504 agente_timeout.
+}

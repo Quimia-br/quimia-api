@@ -8,4 +8,9 @@ public final class AgenteKemiDesligado implements AgenteKemi {
     public String perguntar(UUID autorId, String sessaoId, String pergunta) {
         throw new AgenteKemiException(AgenteKemiException.Motivo.INDISPONIVEL);
     }
+
+    @Override
+    public String encerrarSessao(UUID autorId, String sessaoId) {
+        throw new AgenteKemiException(AgenteKemiException.Motivo.INDISPONIVEL);
+    }
 }

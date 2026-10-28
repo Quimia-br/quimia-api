@@ -1,0 +1,113 @@
+{
+  "status": "processado_com_pendencias",
+  "mensagem": "Informações ausentes, verifique o documento anexado",
+  "secoes": {
+    "10": {
+      "encontrada": true,
+      "situacao": "identificadas",
+      "incompatibilidades": [
+        {
+          "substancia_reagente": "Ácidos",
+          "cas_numero": null,
+          "descricao_risco": "A mistura do produto com ácidos ou produtos à base de amônia produz gases tóxicos.",
+          "severidade": null,
+          "evidencias": [
+            {
+              "secao": "10",
+              "pagina": 8,
+              "texto_evidencia": "A mistura do produto com ácidos ou produtos à base de amônia produz gases tóxicos."
+            }
+          ]
+        },
+        {
+          "substancia_reagente": "Temperaturas altas",
+          "cas_numero": null,
+          "descricao_risco": null,
+          "severidade": null,
+          "evidencias": [
+            {
+              "secao": "10",
+              "pagina": 8,
+              "texto_evidencia": "Materiais e substâncias incompatíveis: Temperaturas altas e contato com metais e materiais e substâncias incompatíveis."
+            }
+          ]
+        }
+      ],
+      "evidencias": []
+    },
+    "03": {
+      "encontrada": true,
+      "compostos": [
+        {
+          "nome": "Hipoclorito de Sódio",
+          "cas_numero": "7681-52-9",
+          "concentracao_min": 2,
+          "concentracao_max": 2.5,
+          "unidade_concentracao": null,
+          "evidencias": [
+            {
+              "secao": "03",
+              "pagina": 2,
+              "texto_evidencia": "Hipoclorito de Sódio 7681-52-9 2 – 2,5 NaClO"
+            }
+          ]
+        }
+      ]
+    },
+    "04": {
+      "encontrada": true,
+      "primeiros_socorros": [
+        {
+          "rota_exposicao": "olhos",
+          "descricao": "Lavar imediatamente os olhos com muita água corrente por pelo menos 20 minutos, mantendo as pálpebras abertas. Consultar oftalmologista imediatamente.",
+          "sintomas": null,
+          "tratamento_especial": null,
+          "atencao_medica_imediata": true,
+          "evidencias": [
+            {
+              "secao": "04",
+              "pagina": 3,
+              "texto_evidencia": "Contato com os olhos: Lave imediatamente os olhos com muita água corrente por não menos que 20 minutos, mantendo as pálpebras abertas."
+            }
+          ]
+        }
+      ],
+      "orientacoes_gerais": [],
+      "notas_ao_medico": []
+    }
+  },
+  "pendencias": [
+    {
+      "secao": "03",
+      "campo": "unidade_concentracao",
+      "motivo": "informacao_ausente",
+      "descricao": "A faixa de concentração é informada como 2 – 2,5, mas a unidade de concentração não está especificada.",
+      "composto": {
+        "indice": 0,
+        "nome": "Hipoclorito de Sódio",
+        "cas_numero": "7681-52-9"
+      },
+      "evidencias": [
+        {
+          "secao": "03",
+          "pagina": 2,
+          "texto_evidencia": "Hipoclorito de Sódio 7681-52-9 2 – 2,5 NaClO"
+        }
+      ]
+    },
+    {
+      "secao": "10",
+      "campo": "materiais_e_substancias_incompativeis",
+      "motivo": "termo_ambiguo",
+      "descricao": "A expressão “materiais e substâncias incompatíveis” não identifica quais materiais ou substâncias são mencionados.",
+      "composto": null,
+      "evidencias": [
+        {
+          "secao": "10",
+          "pagina": 8,
+          "texto_evidencia": "Materiais e substâncias incompatíveis: Temperaturas altas e contato com metais e materiais e substâncias incompatíveis."
+        }
+      ]
+    }
+  ]
+}

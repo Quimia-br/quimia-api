@@ -4,9 +4,11 @@ import com.api.quimia.domain.safety.CompatibilidadeGateway;
 import com.api.quimia.domain.safety.dto.AvaliacaoConjuntoView;
 import com.api.quimia.domain.safety.dto.AvaliacaoParView;
 import com.api.quimia.domain.safety.internal.model.ComposicaoDoProduto;
+import com.api.quimia.domain.safety.internal.model.IncompatibilidadeDaFds;
 import com.api.quimia.domain.safety.internal.model.IncompatibilidadeRegra;
 import com.api.quimia.domain.safety.internal.model.MotorDeCompatibilidade;
 import com.api.quimia.domain.safety.internal.model.RegraDeIncompatibilidade;
+import com.api.quimia.domain.safety.internal.model.Severidade;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
@@ -85,7 +87,33 @@ public class JpaCompatibilidadeGateway implements CompatibilidadeGateway {
             classes.addAll(classesDoProduto);
             composicoes.put(produto, new ComposicaoDoProduto(doProduto, classesDoProduto, comNaoResolvido.contains(produto)));
         }
-        return new MotorDeCompatibilidade(composicoes, regrasQuePodemCasar(substancias, classes));
+        return new MotorDeCompatibilidade(
+                composicoes, regrasQuePodemCasar(substancias, classes), declaradasPelasFds(produtoIds));
+    }
+
+    /**
+     * Incompatibilidades das seções 10 das FDS ativas, só as que o banco resolveu para substância ou classe (o resto é
+     * texto, como "temperaturas altas", e não entra no motor).
+     */
+    private List<IncompatibilidadeDaFds> declaradasPelasFds(Collection<Integer> produtoIds) {
+        return em.createQuery(
+                        """
+                        select f.produtoId, i.substanciaId, i.classeQuimicaId, i.severidade, i.descricaoRisco
+                        from Fds f, FdsIncompatibilidade i
+                        where i.fdsId = f.id and f.ativo = true and f.produtoId in :produtos
+                          and (i.substanciaId is not null or i.classeQuimicaId is not null)
+                        """,
+                        Object[].class)
+                .setParameter("produtos", produtoIds)
+                .getResultList()
+                .stream()
+                .map(linha -> new IncompatibilidadeDaFds(
+                        (Integer) linha[0],
+                        (Integer) linha[1],
+                        (Integer) linha[2],
+                        Severidade.doCodigo((String) linha[3]),
+                        (String) linha[4]))
+                .toList();
     }
 
     /**

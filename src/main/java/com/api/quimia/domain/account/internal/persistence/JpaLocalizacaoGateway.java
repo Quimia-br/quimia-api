@@ -29,6 +29,8 @@ public class JpaLocalizacaoGateway implements LocalizacaoGateway {
                 localizacao.getBairro(),
                 localizacao.getRua(),
                 localizacao.getNumero(),
-                localizacao.getComplemento());
+                localizacao.getComplemento(),
+                localizacao.getLatitude(),
+                localizacao.getLongitude());
     }
 }

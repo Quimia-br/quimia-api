@@ -79,7 +79,7 @@ class AccountFlowTest {
                 "Maria@Example.com",
                 "senhaForte1",
                 LocalDate.of(1990, 5, 20),
-                new LocalizacaoRequest("06000000", "sp", "Centro", "Rua A", 100, "Apto 1")));
+                new LocalizacaoRequest("06000000", "sp", "Centro", "Rua A", 100, "Apto 1", null, null)));
         assertThat(summary.email()).isEqualTo("maria@example.com");
         assertThat(localizacoes.findByUsuarioId(summary.id()).orElseThrow().getCep()).isEqualTo("06000-000");
 

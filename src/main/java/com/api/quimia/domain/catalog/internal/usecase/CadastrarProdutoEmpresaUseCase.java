@@ -67,27 +67,49 @@ public class CadastrarProdutoEmpresaUseCase {
         String tipo = EmpresaDoPortal.tipoValido(form.tipo());
         String codBarras = CatalogException.codigoBarras(form.codBarras());
         byte[] imagem = imagens.ler(form.imagem());
-        FdsDoProduto.FdsPreparada fdsPreparada =
-                codigoJaCadastrado(codBarras) ? null : fdsDoProdutoNovo(empresaId, fds.ler(form.fds()));
+        FdsDoProduto.FdsPreparada fdsPreparada = fdsDoCadastro(empresaId, codBarras, form);
         CadastroProdutoResponse resposta;
         try {
             resposta = transacao.execute(
                     status -> gravar(empresaId, empresa, nome, tipo, codBarras, form.descricao(), imagem, fdsPreparada));
         } catch (RuntimeException falha) {
-            descartar(fdsPreparada);
+            descartarSeNova(fdsPreparada);
             throw falha;
         }
-        if (!CRIADO.equals(resposta.situacao())) {
-            descartar(fdsPreparada);
+        if (!CRIADO.equals(resposta.situacao()) && fdsPreparada != null) {
+            fds.descartar(fdsPreparada);
         }
         return resposta;
     }
 
-    /** O PDF guardado antes da transação sai do armazenamento se a FDS não foi gravada. */
-    private void descartar(FdsDoProduto.FdsPreparada fdsPreparada) {
-        if (fdsPreparada != null) {
+    /**
+     * O PDF guardado antes da transação sai do armazenamento se a FDS não foi gravada. O de uma análise já revisada
+     * fica: a empresa pode corrigir o formulário e confirmar de novo com o mesmo `analiseId`.
+     */
+    private void descartarSeNova(FdsDoProduto.FdsPreparada fdsPreparada) {
+        if (fdsPreparada != null && !fdsPreparada.deAnalise()) {
             fds.descartar(fdsPreparada);
         }
+    }
+
+    /**
+     * FDS do produto a criar: a de uma análise revisada ou a lida do PDF. Código já cadastrado só vincula, então a
+     * análise enviada à toa tem o PDF apagado.
+     */
+    private FdsDoProduto.FdsPreparada fdsDoCadastro(Integer empresaId, String codBarras, CadastroProdutoForm form) {
+        boolean comAnalise = form.analiseFds() != null && !form.analiseFds().isBlank();
+        if (codigoJaCadastrado(codBarras)) {
+            if (comAnalise) {
+                fds.descartarAnalise(empresaId, form.analiseFds());
+            }
+            return null;
+        }
+        FdsDoProduto.PdfDaFds pdf = fds.ler(form.fds());
+        FdsDoProduto.exigirUmaOrigem(pdf, form.analiseFds(), form.correcoesFds());
+        if (comAnalise) {
+            return fds.usarAnalise(empresaId, form.analiseFds(), form.correcoesFds());
+        }
+        return fdsDoProdutoNovo(empresaId, pdf);
     }
 
     /** Leitura sem bloqueio, só para decidir se o extrator será chamado; a transação confere de novo. */

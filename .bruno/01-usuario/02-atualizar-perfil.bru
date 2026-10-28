@@ -32,6 +32,7 @@ tests {
 
 docs {
   Altera nome, data de nascimento e/ou foto (https, até 450 caracteres). Campo ausente mantém o valor.
+  Apagar o nascimento: `"removerDataNasc": true` (um `dataNasc` nulo significa "não alterar"; os dois juntos respondem 400 data_nasc_conflict).
   Antes: `00 / 02`.
-  Respostas: 200, 400, 422 underage.
+  Respostas: 200, 400 validação/data_nasc_conflict, 422 underage (menos de 16 anos).
 }

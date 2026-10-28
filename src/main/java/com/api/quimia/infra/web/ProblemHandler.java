@@ -228,7 +228,8 @@ public class ProblemHandler {
             case "blocked", "inactive", "email_not_verified" -> "Forbidden";
             case "email_in_use", "cnpj_in_use", "produto_ja_cadastrado", "produto_compartilhado", "cod_barras_em_uso" -> "Conflict";
             case "empresa_inativa" -> "Forbidden";
-            case "weak_password", "password_too_long", "underage", "invalid_cnpj", "invalid_cep" -> "Unprocessable";
+            case "weak_password", "password_too_long", "underage", "invalid_cnpj", "invalid_cep",
+                    "invalid_coordinates" -> "Unprocessable";
             case "not_found", "produto_nao_encontrado", "usuario_nao_encontrado", "empresa_nao_encontrada",
                     "produto_nao_esta_na_estante", "substancia_nao_encontrada" -> "Not Found";
             case "codigo_barras_invalido" -> "Unprocessable";

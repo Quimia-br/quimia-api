@@ -1,6 +1,7 @@
 package com.api.quimia.domain.account.internal.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 
 @Schema(description = "Endereço do usuário.")
 public record LocalizacaoResponse(
@@ -15,4 +16,10 @@ public record LocalizacaoResponse(
         @Schema(description = "Número.", example = "1200")
         Integer numero,
         @Schema(description = "Complemento.", example = "apto 42")
-        String complemento) {}
+        String complemento,
+        @Schema(description = "Latitude em graus decimais; nula se o endereço foi salvo sem coordenadas.",
+                example = "-23.561414")
+        BigDecimal latitude,
+        @Schema(description = "Longitude em graus decimais; nula se o endereço foi salvo sem coordenadas.",
+                example = "-46.655881")
+        BigDecimal longitude) {}

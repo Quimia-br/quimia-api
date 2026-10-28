@@ -1,0 +1,51 @@
+meta {
+  name: 15 - Cadastrar produto com a FDS analisada
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/api/v1/empresas/me/produtos
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{empresaAccessToken}}
+}
+
+body:multipart-form {
+  nome: Desinfetante Revisado
+  tipo: desinfetante
+  descricao: Cadastrado depois de revisar as pendências da FDS
+  codBarras: {{portalCodBarras}}
+  analiseFds: {{analiseFds}}
+  correcoesFds: [{"indice":0,"unidadeConcentracao":"%"}]
+}
+
+script:pre-request {
+  bru.setVar("portalCodBarras", `789${Date.now()}`.slice(0, 13));
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("portalProdutoId", res.getBody().produto.id);
+    bru.setVar("produtoId", res.getBody().produto.id);
+  }
+}
+
+tests {
+  test("cria o produto com a FDS já analisada (rode a 14 antes)", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().situacao).to.equal("criado");
+  });
+}
+
+docs {
+  Confirma o cadastro com o `analiseId` da `14` em `analiseFds`, no lugar do PDF (os dois juntos respondem 400 fds_e_analise_juntas).
+  "Adicionar mesmo assim": apague `correcoesFds`; o campo que faltava fica nulo no banco. Com `correcoesFds`, a unidade informada entra na FDS e a pendência que ela resolve sai da lista. Só se preenche a unidade de um composto que veio sem ela; a lista é `[{"indice": <posição em compostos>, "unidadeConcentracao": "<até 20 caracteres>"}]`.
+  O extrator não é chamado de novo. Se o código de barras já existir, a empresa só é vinculada e o PDF da análise é apagado.
+  Vale também em `PATCH /produtos/{id}` (`04`), com os mesmos campos.
+  Respostas: 201, 200 vinculado/reativado, 400 fds_e_analise_juntas/correcoes_sem_analise, 410 analise_expirada, 422 analise_invalida/correcao_invalida, além dos do cadastro (`09`).
+}

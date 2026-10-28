@@ -41,8 +41,14 @@ public class UsuarioController {
 
     @Operation(
             summary = "Alterar o perfil",
-            description = "Altera só os campos enviados (nome, data de nascimento, foto).")
+            description = "Altera só os campos enviados (nome, data de nascimento, foto). `removerDataNasc: true` "
+                    + "apaga a data de nascimento (um `dataNasc` nulo significa \"não alterar\"). A data exige 16 "
+                    + "anos ou mais.")
     @ApiResponse(responseCode = "200", description = "Perfil alterado.")
+    @ApiResponse(
+            responseCode = "400",
+            description = "`removerDataNasc` junto com `dataNasc`: `data_nasc_conflict`.")
+    @ApiResponse(responseCode = "422", description = "Menos de 16 anos: `underage`.")
     @ApiResponse(responseCode = "404", description = "Usuário do token não existe mais: `not_found`.")
     @PatchMapping
     public UserView update(
@@ -61,10 +67,15 @@ public class UsuarioController {
         return localizacao.current(principal.usuarioId());
     }
 
-    @Operation(summary = "Gravar o endereço do usuário", description = "Cria ou substitui o endereço inteiro.")
+    @Operation(
+            summary = "Gravar o endereço do usuário",
+            description = "Cria ou substitui o endereço inteiro. `latitude` e `longitude` (opcionais) vêm juntas e são "
+                    + "guardadas com 6 casas; sem elas o par fica nulo.")
     @ApiResponse(responseCode = "200", description = "Endereço gravado.")
     @ApiResponse(responseCode = "404", description = "Usuário do token não existe mais: `not_found`.")
-    @ApiResponse(responseCode = "422", description = "CEP que não tem 8 dígitos: `invalid_cep`.")
+    @ApiResponse(
+            responseCode = "422",
+            description = "CEP que não tem 8 dígitos: `invalid_cep`. Só uma das coordenadas: `invalid_coordinates`.")
     @PutMapping("/localizacao")
     public LocalizacaoResponse replaceLocalizacao(
             @AuthenticationPrincipal AccountPrincipal principal, @Valid @RequestBody LocalizacaoRequest request) {

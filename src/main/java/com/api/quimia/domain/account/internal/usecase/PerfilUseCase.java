@@ -32,8 +32,14 @@ public class PerfilUseCase {
         if (request.nome() != null) {
             user.setNome(request.nome().trim());
         }
-        if (request.dataNasc() != null) {
-            RegistrarUseCase.requireAdult(request.dataNasc());
+        boolean removeDataNasc = Boolean.TRUE.equals(request.removerDataNasc());
+        if (removeDataNasc && request.dataNasc() != null) {
+            throw new AccountException("data_nasc_conflict", 400);
+        }
+        if (removeDataNasc) {
+            user.setDataNasc(null);
+        } else if (request.dataNasc() != null) {
+            RegistrarUseCase.requireMinimumAge(request.dataNasc());
             user.setDataNasc(request.dataNasc());
         }
         if (request.fotoUrl() != null) {

@@ -50,11 +50,14 @@ public class AlterarProdutoEmpresaUseCase {
         portal.exigirAtiva(empresaId);
         Alteracao alteracao = validar(form);
         byte[] imagem = imagens.ler(form.imagem());
-        FdsDoProduto.FdsPreparada fdsPreparada = fdsNova(empresaId, produtoId, fds.ler(form.fds()));
+        FdsDoProduto.PdfDaFds pdf = fds.ler(form.fds());
+        FdsDoProduto.exigirUmaOrigem(pdf, form.analiseFds(), form.correcoesFds());
+        FdsDoProduto.FdsPreparada fdsPreparada = fdsNova(empresaId, produtoId, pdf, form);
         try {
             return transacao.execute(status -> gravar(empresaId, produtoId, alteracao, imagem, fdsPreparada));
         } catch (RuntimeException falha) {
-            if (fdsPreparada != null) {
+            // O PDF de uma análise já revisada fica: a empresa pode confirmar de novo com o mesmo `analiseId`.
+            if (fdsPreparada != null && !fdsPreparada.deAnalise()) {
                 fds.descartar(fdsPreparada);
             }
             throw falha;
@@ -75,13 +78,18 @@ public class AlterarProdutoEmpresaUseCase {
                 CatalogException.codigoBarras(form.codBarras()));
     }
 
-    /** `null` sem PDF; com PDF, confere que o produto pode ser alterado antes de guardar o PDF e chamar o extrator. */
-    private FdsDoProduto.FdsPreparada fdsNova(Integer empresaId, Integer produtoId, FdsDoProduto.PdfDaFds pdf) {
-        if (pdf == null) {
+    /**
+     * `null` sem FDS nova; com PDF, confere que o produto pode ser alterado antes de guardar o PDF e chamar o
+     * extrator; com análise revisada, usa a FDS dela.
+     */
+    private FdsDoProduto.FdsPreparada fdsNova(
+            Integer empresaId, Integer produtoId, FdsDoProduto.PdfDaFds pdf, AlteracaoProdutoForm form) {
+        boolean comAnalise = form.analiseFds() != null && !form.analiseFds().isBlank();
+        if (pdf == null && !comAnalise) {
             return null;
         }
         exigirAlteravel(produtos.findDaEmpresa(produtoId, empresaId), produtoId);
-        return fds.preparar(empresaId, pdf);
+        return comAnalise ? fds.usarAnalise(empresaId, form.analiseFds(), form.correcoesFds()) : fds.preparar(empresaId, pdf);
     }
 
     private ProdutoView gravar(

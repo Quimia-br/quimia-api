@@ -6,7 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * "Alterar produto" (multipart/form-data): campo ausente ou vazio mantém o valor atual. `fds` (PDF) substitui a FDS
- * ativa do produto.
+ * ativa do produto; `analiseFds` e `correcoesFds` fazem o mesmo com uma análise já revisada, no lugar do PDF.
  */
 @Schema(description = "Formulário multipart da alteração: só os campos enviados mudam.")
 public record AlteracaoProdutoForm(
@@ -21,4 +21,11 @@ public record AlteracaoProdutoForm(
         @Schema(description = "Nova foto: JPEG, PNG ou WebP até 5 MB.")
         MultipartFile imagem,
         @Schema(description = "PDF de uma FDS nova, até 10 MB (a anterior é desativada).")
-        MultipartFile fds) {}
+        MultipartFile fds,
+        @Schema(description = "`analiseId` de uma análise já revisada (`POST /produtos/fds/analises`), no lugar do PDF. "
+                + "Não vale junto com `fds`.")
+        @Size(max = 262144) String analiseFds,
+        @Schema(description = "Correções da revisão, só com `analiseFds`: lista JSON de `{\"indice\": 0, "
+                + "\"unidadeConcentracao\": \"%\"}` (unidade do composto que veio sem ela).",
+                example = "[{\"indice\":0,\"unidadeConcentracao\":\"%\"}]")
+        @Size(max = 4000) String correcoesFds) {}

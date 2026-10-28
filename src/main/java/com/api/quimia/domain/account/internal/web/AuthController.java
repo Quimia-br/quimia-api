@@ -60,7 +60,7 @@ public class AuthController {
     @Operation(
             summary = "Cadastrar usuário do app",
             description = "Cria a conta do consumidor. A senha precisa de 8 caracteres ou mais, com letra e "
-                    + "número, e até 72 bytes; a data de nascimento exige 18 anos ou mais. Não faz login: em "
+                    + "número, e até 72 bytes; a data de nascimento exige 16 anos ou mais. Não faz login: em "
                     + "seguida chame `/auth/mobile/login`.")
     @SecurityRequirements
     @ApiResponse(responseCode = "201", description = "Conta criada.")
