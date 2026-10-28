@@ -11,6 +11,10 @@ import com.api.quimia.domain.catalog.internal.usecase.CadastrarProdutoEmpresaUse
 import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosEmpresaUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.ListarProdutosUseCase;
 import com.api.quimia.domain.catalog.internal.usecase.RemoverProdutoEmpresaUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /** "Produtos cadastrados" do portal (titular empresa). Cadastro e alteração em multipart/form-data. */
+@Tag(name = "Empresa: produtos")
 @RestController
 @RequestMapping("/api/v1/empresas/me/produtos")
 public class EmpresaProdutoController {
@@ -48,6 +53,37 @@ public class EmpresaProdutoController {
         this.remover = remover;
     }
 
+    @Operation(
+            summary = "Produtos cadastrados pela empresa",
+            description = "Produtos com vínculo ativo da empresa. `fields` escolhe em que campos `q` procura (os "
+                    + "chips Nome, Tipo e Código de barras do portal); sem `fields`, procura em nome, "
+                    + "descrição e marca. Ordena por `sort` e `direcao`.")
+    @Parameter(name = "q", description = "Termo de busca (até 100 caracteres).", example = "desinfetante")
+    @Parameter(
+            name = "fields",
+            description = "Campos da busca, separados por vírgula: nome, tipo, codBarras.",
+            example = "nome,tipo")
+    @Parameter(name = "tipo", description = "Filtra pelo tipo do produto.", example = "desinfetante")
+    @Parameter(
+            name = "codBarras",
+            description = "Filtra pelo código de barras (UPC-A ou EAN-13).",
+            example = "7891234567895")
+    @Parameter(
+            name = "sort",
+            description = "Coluna da ordenação: nome (padrão), tipo, descricao ou codBarras.",
+            example = "nome")
+    @Parameter(name = "direcao", description = "asc (padrão) ou desc.", example = "asc")
+    @Parameter(name = "page", description = "Página, a partir de 0.", example = "0")
+    @Parameter(name = "size", description = "Itens por página, de 1 a 50.", example = "20")
+    @ApiResponse(responseCode = "200", description = "Página de produtos.")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Paginação fora das regras (página negativa, tamanho fora de 1 a 50 ou página × tamanho "
+                    + "acima do maior int): `paginacao_invalida`. Termo de busca acima de 100 caracteres: "
+                    + "`termo_muito_longo`. Campo de busca, tipo ou ordenação fora da lista: "
+                    + "`campo_busca_invalido`, `tipo_invalido`, `ordenacao_invalida`.")
+    @ApiResponse(responseCode = "403", description = "Empresa desativada: `empresa_inativa`.")
+    @ApiResponse(responseCode = "404", description = "Empresa do token não existe mais: `empresa_nao_encontrada`.")
     @GetMapping
     public Pagina<ProdutoView> listar(
             @AuthenticationPrincipal AccountPrincipal principal,
@@ -63,6 +99,44 @@ public class EmpresaProdutoController {
     }
 
     /** `201` quando o produto foi criado; `200` quando a empresa foi vinculada ou reativada. */
+    @Operation(
+            summary = "Cadastrar produto",
+            description = "Multipart com os dados do produto, a `imagem` opcional (JPEG, PNG ou WebP até 5 MB) e "
+                    + "a `fds` em PDF (até 10 MB). Se já existir produto com o mesmo código de barras, a "
+                    + "empresa só é vinculada a ele (sem imagem nem FDS). A FDS vai para o armazenamento e "
+                    + "para o extrator, que devolve a composição; com `QUIMIA_FDS_OBRIGATORIA=true`, produto "
+                    + "novo exige a FDS.")
+    @ApiResponse(responseCode = "201", description = "Produto criado.")
+    @ApiResponse(responseCode = "200", description = "Empresa vinculada (ou reativada) a um produto que já existia.")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Nome só com espaços: `nome_invalido`. Tipo fora da lista: `tipo_invalido`.")
+    @ApiResponse(responseCode = "409", description = "Empresa já tem esse produto: `produto_ja_cadastrado`.")
+    @ApiResponse(
+            responseCode = "422",
+            description = "Código de barras inválido: `codigo_barras_invalido`. Produto novo sem FDS com a FDS "
+                    + "obrigatória: `fds_obrigatoria`. PDF não reconhecido como FDS: `fds_invalida`. O "
+                    + "extrator não reconheceu o PDF como FDS ou não achou texto legível: `fds_invalida`.")
+    @ApiResponse(responseCode = "403", description = "Empresa desativada: `empresa_inativa`.")
+    @ApiResponse(responseCode = "404", description = "Empresa do token não existe mais: `empresa_nao_encontrada`.")
+    @ApiResponse(
+            responseCode = "413",
+            description = "Imagem acima de 5 MB: `imagem_muito_grande`. PDF da FDS acima de 10 MB: "
+                    + "`pdf_muito_grande`.")
+    @ApiResponse(
+            responseCode = "415",
+            description = "Arquivo que não é JPEG, PNG ou WebP pelo conteúdo: `imagem_invalida`. Arquivo `fds` "
+                    + "que não começa com `%PDF-`: `pdf_invalido`.")
+    @ApiResponse(
+            responseCode = "502",
+            description = "O armazenamento de imagens recusou o envio: `armazenamento_imagem_falhou`. Extrator ou "
+                    + "armazenamento do PDF responderam com erro: `extrator_falhou`, "
+                    + "`armazenamento_fds_falhou`.")
+    @ApiResponse(
+            responseCode = "503",
+            description = "Armazenamento de imagens desligado (sem `CLOUDINARY_*`) ou fora do ar: "
+                    + "`armazenamento_imagem_indisponivel`. Extrator ou armazenamento do PDF desligados ou "
+                    + "fora do ar: `extrator_indisponivel`, `armazenamento_fds_indisponivel`.")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CadastroProdutoResponse> cadastrar(
             @AuthenticationPrincipal AccountPrincipal principal, @Valid @ModelAttribute CadastroProdutoForm form) {
@@ -73,6 +147,48 @@ public class EmpresaProdutoController {
         return ResponseEntity.status(status).body(resposta);
     }
 
+    @Operation(
+            summary = "Alterar produto",
+            description = "Multipart; altera só os campos enviados. `imagem` troca a foto; `fds` grava uma FDS "
+                    + "nova e desativa a anterior. Produto vinculado a outra empresa ativa não pode ser "
+                    + "alterado.")
+    @Parameter(name = "id", description = "Id do produto.", example = "42")
+    @ApiResponse(responseCode = "200", description = "Produto alterado.")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Nome só com espaços: `nome_invalido`. Tipo fora da lista: `tipo_invalido`.")
+    @ApiResponse(
+            responseCode = "404",
+            description = "Produto sem vínculo ativo com a empresa: `produto_nao_encontrado`. Empresa do token "
+                    + "não existe mais: `empresa_nao_encontrada`.")
+    @ApiResponse(
+            responseCode = "409",
+            description = "Código de barras de outro produto ou produto compartilhado com outra empresa: "
+                    + "`cod_barras_em_uso`, `produto_compartilhado`.")
+    @ApiResponse(
+            responseCode = "422",
+            description = "Código de barras inválido: `codigo_barras_invalido`. PDF não reconhecido como FDS: "
+                    + "`fds_invalida`. O extrator não reconheceu o PDF como FDS ou não achou texto legível: "
+                    + "`fds_invalida`.")
+    @ApiResponse(responseCode = "403", description = "Empresa desativada: `empresa_inativa`.")
+    @ApiResponse(
+            responseCode = "413",
+            description = "Imagem acima de 5 MB: `imagem_muito_grande`. PDF da FDS acima de 10 MB: "
+                    + "`pdf_muito_grande`.")
+    @ApiResponse(
+            responseCode = "415",
+            description = "Arquivo que não é JPEG, PNG ou WebP pelo conteúdo: `imagem_invalida`. Arquivo `fds` "
+                    + "que não começa com `%PDF-`: `pdf_invalido`.")
+    @ApiResponse(
+            responseCode = "502",
+            description = "O armazenamento de imagens recusou o envio: `armazenamento_imagem_falhou`. Extrator ou "
+                    + "armazenamento do PDF responderam com erro: `extrator_falhou`, "
+                    + "`armazenamento_fds_falhou`.")
+    @ApiResponse(
+            responseCode = "503",
+            description = "Armazenamento de imagens desligado (sem `CLOUDINARY_*`) ou fora do ar: "
+                    + "`armazenamento_imagem_indisponivel`. Extrator ou armazenamento do PDF desligados ou "
+                    + "fora do ar: `extrator_indisponivel`, `armazenamento_fds_indisponivel`.")
     @PatchMapping(path = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ProdutoView alterar(
             @AuthenticationPrincipal AccountPrincipal principal,
@@ -81,6 +197,17 @@ public class EmpresaProdutoController {
         return alterar.execute(principal.empresaId(), id, form);
     }
 
+    @Operation(
+            summary = "Remover produto do portal",
+            description = "Desativa o vínculo da empresa com o produto. O produto sai do app quando nenhuma "
+                    + "empresa ativa o tiver.")
+    @Parameter(name = "id", description = "Id do produto.", example = "42")
+    @ApiResponse(responseCode = "204", description = "Vínculo desativado.")
+    @ApiResponse(
+            responseCode = "404",
+            description = "Produto sem vínculo ativo com a empresa: `produto_nao_encontrado`. Empresa do token "
+                    + "não existe mais: `empresa_nao_encontrada`.")
+    @ApiResponse(responseCode = "403", description = "Empresa desativada: `empresa_inativa`.")
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void remover(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer id) {

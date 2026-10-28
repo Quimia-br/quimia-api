@@ -21,6 +21,18 @@ mvn test                      # so testes
 mvn dependency-check:check    # auditoria manual opcional (nao executada no CI)
 ```
 
+## Documentação da API (Swagger)
+
+Com a API no ar, a documentação interativa fica em `/swagger-ui.html` e o documento OpenAPI em
+`/v3/api-docs` (por exemplo `http://localhost:8080/swagger-ui.html`). As duas são públicas, também em
+produção; `SWAGGER_ENABLED=false` desliga. Cada rota traz o perfil exigido (usuário do app ou empresa
+do portal), os parâmetros e as respostas com os códigos de erro (`detail` do `problem+json`). Para testar
+rotas protegidas na interface, faça login, copie o `accessToken` e use o botão **Authorize**.
+
+O teste `OpenApiContratoTest` falha se uma rota nova ficar sem documentação, se um código de erro lançado
+não aparecer em nenhuma rota ou se a segurança documentada não bater com a real; ele grava o documento
+gerado em `target/openapi.json`, útil para gerar clientes no front.
+
 ## CI, checks e deploy
 
 O GitHub Actions executa `.github/workflows/ci.yml` em PRs para `main`,

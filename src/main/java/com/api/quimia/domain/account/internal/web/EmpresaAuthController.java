@@ -12,6 +12,13 @@ import com.api.quimia.domain.account.internal.usecase.EmpresaPasswordRecoveryUse
 import com.api.quimia.domain.account.internal.usecase.RegistrarEmpresaUseCase;
 import com.api.quimia.domain.account.internal.usecase.RenovarUseCase;
 import com.api.quimia.domain.account.internal.usecase.SessionIssuer;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -68,17 +75,57 @@ public class EmpresaAuthController {
         this.cookieMaxAge = Duration.ofDays(refreshTtlDays);
     }
 
+    @Tag(name = "Empresa: conta")
+    @Operation(
+            summary = "Cadastrar empresa",
+            description = "Cria a conta da empresa do portal. CNPJ com dígitos verificadores válidos; senha com 8 "
+                    + "caracteres ou mais, letra e número.")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "201", description = "Empresa criada.")
+    @ApiResponse(responseCode = "409", description = "E-mail ou CNPJ já cadastrados: `email_in_use`, `cnpj_in_use`.")
+    @ApiResponse(
+            responseCode = "422",
+            description = "CNPJ inválido ou senha fora das regras: `invalid_cnpj`, `weak_password`, "
+                    + "`password_too_long`.")
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public EmpresaSummary register(@Valid @RequestBody EmpresaRegisterRequest request) {
         return registrar.execute(request);
     }
 
+    @Tag(name = "Empresa: conta")
+    @Operation(
+            summary = "Entrar no portal",
+            description = "Devolve o access token no corpo e grava dois cookies: `quimia_rt` (refresh, HttpOnly) "
+                    + "e `quimia_csrf` (lido pelo front e repetido no cabeçalho `X-CSRF-Token` ao renovar e "
+                    + "ao sair).")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "200", description = "Login feito; cookies gravados.")
+    @ApiResponse(responseCode = "401", description = "E-mail ou senha errados: `invalid_credentials`.")
+    @ApiResponse(responseCode = "403", description = "Empresa desativada: `inactive`.")
+    @ApiResponse(responseCode = "423", description = "Login bloqueado por tentativas erradas: `blocked`.")
     @PostMapping("/login")
     public EmpresaLoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         return respond(autenticar.execute(request), response);
     }
 
+    @Tag(name = "Empresa: conta")
+    @Operation(
+            summary = "Renovar a sessão do portal",
+            description = "Usa o cookie `quimia_rt` (nunca o corpo) e exige o cabeçalho `X-CSRF-Token` igual ao "
+                    + "cookie `quimia_csrf`. Gira o refresh e grava cookies novos.")
+    @SecurityRequirement(name = "cookieDeRenovacao")
+    @Parameter(name = "X-CSRF-Token", description = "Valor do cookie `quimia_csrf`.", in = ParameterIn.HEADER)
+    @ApiResponse(responseCode = "200", description = "Sessão renovada; cookies regravados.")
+    @ApiResponse(responseCode = "400", description = "Refresh enviado no corpo em vez do cookie: `invalid_transport`.")
+    @ApiResponse(
+            responseCode = "401",
+            description = "Cookie de refresh ausente, inválido, expirado ou já usado: `invalid_refresh`.")
+    @ApiResponse(
+            responseCode = "403",
+            description = "Cabeçalho CSRF ausente ou diferente do cookie: `csrf_required`. Empresa desativada: "
+                    + "`inactive`.")
+    @ApiResponse(responseCode = "423", description = "Login bloqueado por tentativas erradas: `blocked`.")
     @PostMapping("/refresh")
     public EmpresaLoginResponse refresh(
             @RequestBody(required = false) Map<String, Object> body,
@@ -88,6 +135,15 @@ public class EmpresaAuthController {
         return respond(renovar.renewEmpresa(cookieValue(request, cookieName)), response);
     }
 
+    @Tag(name = "Empresa: conta")
+    @Operation(
+            summary = "Sair do portal",
+            description = "Apaga os cookies `quimia_rt` e `quimia_csrf`. Com o cookie de refresh presente, exige "
+                    + "o `X-CSRF-Token`.")
+    @SecurityRequirement(name = "cookieDeRenovacao")
+    @Parameter(name = "X-CSRF-Token", description = "Valor do cookie `quimia_csrf`.", in = ParameterIn.HEADER)
+    @ApiResponse(responseCode = "204", description = "Cookies apagados.")
+    @ApiResponse(responseCode = "403", description = "Cabeçalho CSRF ausente ou diferente do cookie: `csrf_required`.")
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(HttpServletResponse response) {
@@ -95,6 +151,13 @@ public class EmpresaAuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie(CSRF_COOKIE_NAME, "", false, "/", Duration.ZERO));
     }
 
+    @Tag(name = "Empresa: recuperação de senha")
+    @Operation(
+            summary = "Pedir link de recuperação de senha da empresa",
+            description = "Envia por e-mail o link de troca de senha (válido por 24 horas). Responde 202 mesmo "
+                    + "para e-mail sem conta. Pedidos repetidos são limitados.")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "202", description = "Pedido aceito.")
     @PostMapping("/forgot-password")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public Map<String, Object> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
@@ -102,6 +165,18 @@ public class EmpresaAuthController {
         return Map.of();
     }
 
+    @Tag(name = "Empresa: recuperação de senha")
+    @Operation(
+            summary = "Trocar a senha da empresa pelo link",
+            description = "Recebe o `token` do link e a nova senha. Invalida as sessões abertas.")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "204", description = "Senha trocada.")
+    @ApiResponse(
+            responseCode = "400",
+            description = "Token do link inválido, expirado ou já usado: `invalid_reset_token`.")
+    @ApiResponse(
+            responseCode = "422",
+            description = "Senha nova fora das regras: `weak_password`, `password_too_long`.")
     @PostMapping("/reset-password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
