@@ -10,7 +10,7 @@ public record ComodoView(
         Integer id,
         @Schema(description = "Nome.", example = "Banheiro")
         String nome,
-        @Schema(description = "Ícone.", example = "banheira")
+        @Schema(description = "Código do ícone (`GET /comodos/icones`).", example = "toilet")
         String icone,
         @Schema(description = "Risco de todos os pares do cômodo.")
         AvaliacaoComodo avaliacao,

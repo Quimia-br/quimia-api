@@ -20,8 +20,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Servidor HTTP de verdade no loopback, no lugar do quimia-agent: responde a cada pedido com o que o teste programar,
  * inclusive atraso, e guarda os pedidos recebidos. Usa sockets bloqueantes (sem seletor NIO), como o cliente.
  */
-final class AgenteDeTeste implements AutoCloseable {
-    record Pedido(String metodo, String caminho, String autorizacao, String tipo, String corpo) {}
+public final class AgenteDeTeste implements AutoCloseable {
+    public record Pedido(String metodo, String caminho, String autorizacao, String tipo, String corpo) {}
 
     private static final String RESPOSTA_PADRAO = "{\"resposta\":\"ok\"}";
 
@@ -31,33 +31,33 @@ final class AgenteDeTeste implements AutoCloseable {
     private volatile byte[] corpo = RESPOSTA_PADRAO.getBytes(StandardCharsets.UTF_8);
     private volatile Duration atraso = Duration.ZERO;
 
-    AgenteDeTeste() throws IOException {
+    public AgenteDeTeste() throws IOException {
         servidor = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
         Thread aceitar = new Thread(this::aceitar, "agente-de-teste");
         aceitar.setDaemon(true);
         aceitar.start();
     }
 
-    String url() {
+    public String url() {
         return "http://127.0.0.1:" + servidor.getLocalPort();
     }
 
-    AgenteDeTeste responder(int novoStatus, String novoCorpo) {
+    public AgenteDeTeste responder(int novoStatus, String novoCorpo) {
         return responder(novoStatus, novoCorpo.getBytes(StandardCharsets.UTF_8));
     }
 
-    AgenteDeTeste responder(int novoStatus, byte[] novoCorpo) {
+    public AgenteDeTeste responder(int novoStatus, byte[] novoCorpo) {
         status = novoStatus;
         corpo = novoCorpo;
         return this;
     }
 
-    AgenteDeTeste atrasar(Duration novoAtraso) {
+    public AgenteDeTeste atrasar(Duration novoAtraso) {
         atraso = novoAtraso;
         return this;
     }
 
-    List<Pedido> pedidos() {
+    public List<Pedido> pedidos() {
         return List.copyOf(pedidos);
     }
 
@@ -86,13 +86,12 @@ final class AgenteDeTeste implements AutoCloseable {
                 cabecalhos.put(cabecalho.substring(0, separador).trim().toLowerCase(Locale.ROOT),
                         cabecalho.substring(separador + 1).trim());
             }
-            int tamanho = Integer.parseInt(cabecalhos.getOrDefault("content-length", "0"));
             pedidos.add(new Pedido(
                     linhaInicial[0],
                     linhaInicial[1],
                     cabecalhos.get("authorization"),
                     cabecalhos.get("content-type"),
-                    new String(entrada.readNBytes(tamanho), StandardCharsets.UTF_8)));
+                    new String(corpoDoPedido(entrada, cabecalhos), StandardCharsets.UTF_8)));
             if (!atraso.isZero()) {
                 Thread.sleep(atraso.toMillis());
             }
@@ -108,6 +107,26 @@ final class AgenteDeTeste implements AutoCloseable {
         } catch (InterruptedException interrompido) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /** Lê o corpo inteiro, com `Content-Length` ou em blocos (`chunked`, como o multipart de tamanho desconhecido). */
+    private static byte[] corpoDoPedido(InputStream entrada, Map<String, String> cabecalhos) throws IOException {
+        if (!cabecalhos.getOrDefault("transfer-encoding", "").toLowerCase(Locale.ROOT).contains("chunked")) {
+            return entrada.readNBytes(Integer.parseInt(cabecalhos.getOrDefault("content-length", "0")));
+        }
+        ByteArrayOutputStream corpo = new ByteArrayOutputStream();
+        for (int bloco = tamanhoDoBloco(entrada); bloco > 0; bloco = tamanhoDoBloco(entrada)) {
+            corpo.write(entrada.readNBytes(bloco));
+            linha(entrada);
+        }
+        linha(entrada);
+        return corpo.toByteArray();
+    }
+
+    private static int tamanhoDoBloco(InputStream entrada) throws IOException {
+        String cabecalho = linha(entrada);
+        int extensao = cabecalho.indexOf(';');
+        return Integer.parseInt((extensao < 0 ? cabecalho : cabecalho.substring(0, extensao)).trim(), 16);
     }
 
     private static String linha(InputStream entrada) throws IOException {

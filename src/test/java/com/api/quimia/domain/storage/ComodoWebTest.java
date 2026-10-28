@@ -95,7 +95,7 @@ class ComodoWebTest {
     }
 
     private int criarEObterId(String token, String nome, int... produtos) throws Exception {
-        String corpo = criar(token, nome, "icone", produtos).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String corpo = criar(token, nome, "toilet", produtos).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         return JsonPath.read(corpo, "$.id");
     }
 
@@ -103,11 +103,11 @@ class ComodoWebTest {
 
     @Test
     void criaComodoComDoisProdutosEDevolveAvaliacao() throws Exception {
-        criar(tokenA, "Banheiro", "banheira", p1, p2)
+        criar(tokenA, "Banheiro", "toilet", p1, p2)
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.matchesPattern("/api/v1/comodos/\\d+")))
                 .andExpect(jsonPath("$.nome").value("Banheiro"))
-                .andExpect(jsonPath("$.icone").value("banheira"))
+                .andExpect(jsonPath("$.icone").value("toilet"))
                 .andExpect(jsonPath("$.avaliacao.status").value("critico"))
                 .andExpect(jsonPath("$.avaliacao.paresIncompativeis").value(1))
                 .andExpect(jsonPath("$.avaliacao.incompatibilidades[0].severidade").value("critica"))
@@ -121,15 +121,54 @@ class ComodoWebTest {
 
     @Test
     void umProdutoSoListaVaziaOuIdsRepetidosNaoBastam() throws Exception {
-        criar(tokenA, "Banheiro", "banheira", p1)
+        criar(tokenA, "Banheiro", "toilet", p1)
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detail").value("comodo_produtos_insuficientes"));
-        criar(tokenA, "Banheiro", "banheira")
+        criar(tokenA, "Banheiro", "toilet")
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detail").value("comodo_produtos_insuficientes"));
-        criar(tokenA, "Banheiro", "banheira", p1, p1)
+        criar(tokenA, "Banheiro", "toilet", p1, p1)
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detail").value("comodo_produtos_insuficientes"));
+    }
+
+    @Test
+    void iconeForaDoCatalogoDa422ENenhumComodoENascido() throws Exception {
+        criar(tokenA, "Banheiro", "banheira", p1, p2)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("icone_invalido"));
+        Integer comodos = jdbc.queryForObject("SELECT count(*) FROM comodo WHERE id_usuario = ?", Integer.class, usuarioA);
+        assertThat(comodos).isZero();
+    }
+
+    @Test
+    void todoIconeDoCatalogoCriaOComodo() throws Exception {
+        String corpo = mvc.perform(get("/api/v1/comodos/icones").header("Authorization", "Bearer " + tokenA))
+                .andReturn().getResponse().getContentAsString();
+        java.util.List<String> codigos = JsonPath.read(corpo, "$[*].codigo");
+
+        for (String codigo : codigos) {
+            jdbc.update("UPDATE estante_produto SET id_comodo = NULL WHERE id_usuario = ?", usuarioA);
+            jdbc.update("DELETE FROM comodo WHERE id_usuario = ?", usuarioA);
+            criar(tokenA, "Cômodo " + codigo, codigo, p1, p2)
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.icone").value(codigo));
+        }
+    }
+
+    @Test
+    void listaOCatalogoDeIconesDoApp() throws Exception {
+        mvc.perform(get("/api/v1/comodos/icones").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(10))
+                .andExpect(jsonPath("$[0].codigo").value("mirror"))
+                .andExpect(jsonPath("$[0].rotulo").value("Espelho"))
+                .andExpect(jsonPath("$[6].codigo").value("toilet"))
+                .andExpect(jsonPath("$[6].rotulo").value("Banheiro"))
+                .andExpect(jsonPath("$[*].codigo").value(org.hamcrest.Matchers.contains(
+                        "mirror", "refrigerator", "fence", "laundry", "double-bed", "single-bed", "toilet", "sofa",
+                        "pool", "shelving")));
+        mvc.perform(get("/api/v1/comodos/icones")).andExpect(status().isUnauthorized());
     }
 
     private int[] produtosNaEstante(String prefixo, int quantidade) {
@@ -148,7 +187,7 @@ class ComodoWebTest {
 
     @Test
     void vinteProdutosNaCriacaoEhOLimiteAceito() throws Exception {
-        criar(tokenA, "Despensa", "caixa", produtosNaEstante("Vinte", 20))
+        criar(tokenA, "Despensa", "shelving", produtosNaEstante("Vinte", 20))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.produtos.length()").value(20))
                 .andExpect(jsonPath("$.avaliacao.totalProdutos").value(20));
@@ -162,26 +201,26 @@ class ComodoWebTest {
             muitos[i] = catalogo.produto("Produto " + i, marca, "outro", null, null);
             catalogo.guardar(usuarioA, muitos[i]);
         }
-        criar(tokenA, "Despensa", "caixa", muitos)
+        criar(tokenA, "Despensa", "shelving", muitos)
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detail").value("comodo_produtos_demais"));
     }
 
     @Test
     void produtoForaDaEstanteOuDeOutroUsuarioEhRecusado() throws Exception {
-        criar(tokenA, "Banheiro", "banheira", p1, doOutro)
+        criar(tokenA, "Banheiro", "toilet", p1, doOutro)
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detail").value("produto_fora_da_estante"));
-        criar(tokenA, "Banheiro", "banheira", p1, 999999)
+        criar(tokenA, "Banheiro", "toilet", p1, 999999)
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detail").value("produto_fora_da_estante"));
     }
 
     @Test
     void produtoJaEmOutroComodoDaConflitoENadaMuda() throws Exception {
-        criar(tokenA, "Banheiro", "banheira", p1, p2).andExpect(status().isCreated());
+        criar(tokenA, "Banheiro", "toilet", p1, p2).andExpect(status().isCreated());
 
-        criar(tokenA, "Cozinha", "fogao", p2, p3)
+        criar(tokenA, "Cozinha", "refrigerator", p2, p3)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("produto_em_outro_comodo"));
 
@@ -209,19 +248,19 @@ class ComodoWebTest {
 
     @Test
     void outroUsuarioPodeUsarOMesmoNome() throws Exception {
-        criar(tokenA, "Banheiro", "banheira", p1, p2).andExpect(status().isCreated());
+        criar(tokenA, "Banheiro", "toilet", p1, p2).andExpect(status().isCreated());
         int marca = catalogo.marca("Outra", null);
         int x = catalogo.produto("X", marca, "outro", null, null);
         int y = catalogo.produto("Y", marca, "outro", null, null);
         catalogo.guardar(usuarioB, x);
         catalogo.guardar(usuarioB, y);
 
-        criar(tokenB, "Banheiro", "banheira", x, y).andExpect(status().isCreated());
+        criar(tokenB, "Banheiro", "toilet", x, y).andExpect(status().isCreated());
     }
 
     @Test
     void validacoesDeCorpo() throws Exception {
-        criar(tokenA, "", "banheira", p1, p2).andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value("validation"));
+        criar(tokenA, "", "toilet", p1, p2).andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value("validation"));
         criar(tokenA, "Banheiro", "Banheira!", p1, p2).andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/comodos").header("Authorization", "Bearer " + tokenA)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"nome\":"))
@@ -242,7 +281,7 @@ class ComodoWebTest {
         mvc.perform(post("/api/v1/comodos").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized());
         String empresa = TestLogins.empresa(mvc, "e@comodo.test", "30000002000141");
-        criar(empresa, "Banheiro", "banheira", p1, p2).andExpect(status().isForbidden());
+        criar(empresa, "Banheiro", "toilet", p1, p2).andExpect(status().isForbidden());
     }
 
     // --- GET /comodos e /comodos/{id} ---
@@ -343,7 +382,7 @@ class ComodoWebTest {
 
     @Test
     void adicionaProdutoERecalcula() throws Exception {
-        String corpo = criar(tokenA, "Banheiro", "icone", p1, p3)
+        String corpo = criar(tokenA, "Banheiro", "toilet", p1, p3)
                 .andExpect(jsonPath("$.avaliacao.status").value("seguro"))
                 .andReturn().getResponse().getContentAsString();
         int id = JsonPath.read(corpo, "$.id");

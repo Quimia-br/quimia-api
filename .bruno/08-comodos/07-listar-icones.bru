@@ -1,0 +1,29 @@
+meta {
+  name: 07 - Listar ícones
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/comodos/icones
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("lista os 10 ícones do app", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.length(10);
+    expect(res.getBody()[0]).to.have.property("codigo");
+  });
+}
+
+docs {
+  Catálogo de ícones aceitos em `icone` no `01 - Criar cômodo`: `codigo` (o que vai no corpo) e `rotulo` (o texto da tela).
+  Respostas: 200, 401.
+}

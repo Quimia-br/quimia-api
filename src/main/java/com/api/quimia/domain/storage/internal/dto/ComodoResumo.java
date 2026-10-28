@@ -8,7 +8,7 @@ public record ComodoResumo(
         Integer id,
         @Schema(description = "Nome.", example = "Banheiro")
         String nome,
-        @Schema(description = "Ícone.", example = "banheira")
+        @Schema(description = "Código do ícone (`GET /comodos/icones`).", example = "toilet")
         String icone,
         @Schema(description = "Produtos no cômodo.", example = "4")
         int totalProdutos,
