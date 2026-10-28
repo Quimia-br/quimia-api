@@ -65,6 +65,9 @@ public class SecurityConfig {
                         "/api/v1/empresas/auth/reset-password",
                         "/actuator/health")
                 .permitAll()
+                // Documentação OpenAPI: pública, como no portal de desenvolvedor (decisão do produto).
+                .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
+                .permitAll()
                 .requestMatchers(
                         "/api/v1/usuarios/**",
                         "/api/v1/produtos/**",
