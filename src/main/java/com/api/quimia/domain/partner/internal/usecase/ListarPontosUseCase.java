@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ListarPontosUseCase {
     public static final int TAMANHO_PADRAO = 20;
     private static final int TAMANHO_MAXIMO = 50;
-    private static final Set<String> TIPOS = Set.of("compra", "descarte");
+    static final Set<String> TIPOS = Set.of("compra", "descarte");
     private static final int RANK_CEP_IGUAL = 0;
     private static final int RANK_MESMO_PREFIXO = 1;
     private static final int RANK_DEMAIS = 2;

@@ -25,6 +25,7 @@ public final class TestCatalogo {
             jdbc.update("DELETE FROM sinonimo_pendente");
         }
         jdbc.update("DELETE FROM historico_match");
+        jdbc.update("DELETE FROM ponto_salvo");
         jdbc.update("DELETE FROM ponto_parceiro");
         jdbc.update("DELETE FROM incompatibilidade_regra");
         jdbc.update("DELETE FROM fds_composto");

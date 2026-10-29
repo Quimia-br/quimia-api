@@ -231,7 +231,8 @@ public class ProblemHandler {
             case "weak_password", "password_too_long", "underage", "invalid_cnpj", "invalid_cep",
                     "invalid_coordinates" -> "Unprocessable";
             case "not_found", "produto_nao_encontrado", "usuario_nao_encontrado", "empresa_nao_encontrada",
-                    "produto_nao_esta_na_estante", "substancia_nao_encontrada" -> "Not Found";
+                    "produto_nao_esta_na_estante", "substancia_nao_encontrada", "ponto_nao_encontrado",
+                    "ponto_salvo_nao_encontrado" -> "Not Found";
             case "codigo_barras_invalido" -> "Unprocessable";
             case "paginacao_invalida", "tipo_invalido", "termo_muito_longo", "nome_invalido", "campo_busca_invalido" -> "Bad Request";
             case "imagem_invalida" -> "Unsupported Media Type";
