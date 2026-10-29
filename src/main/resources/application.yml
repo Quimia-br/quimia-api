@@ -3,7 +3,8 @@ spring:
     name: app
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/quimia}
-    username: ${SPRING_DATASOURCE_USERNAME:quimia}
+    # Usuário próprio da API no banco; não usar o administrador.
+    username: ${SPRING_DATASOURCE_USERNAME:quimia_api}
     password: ${SPRING_DATASOURCE_PASSWORD:}
     # Teto de conexões desta instância. O banco tem limite de conexões e é dividido com o quimia-agent e as
     # ferramentas do time: a soma dos pools precisa ficar abaixo do max_connections do plano.

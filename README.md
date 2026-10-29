@@ -90,7 +90,8 @@ o smoke check em `https://quimia.discloud.app` passar.
 
 As variáveis de runtime da API devem ser configuradas na Discloud, separadas
 dos secrets do Actions: `SPRING_DATASOURCE_URL`,
-`SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`,
+`SPRING_DATASOURCE_USERNAME` (`quimia_api`, o usuário próprio da API; não o
+administrador do banco), `SPRING_DATASOURCE_PASSWORD`,
 `QUIMIA_JWT_KID`, `QUIMIA_JWT_PRIVATE_KEY_BASE64`,
 `QUIMIA_JWT_PUBLIC_KEY_BASE64`, `APP_AUTH_HMAC_SECRET` (32 bytes ou mais; o
 nome legado `APP_AUTH_RECOVERY_CODE_PEPPER` continua aceito),
