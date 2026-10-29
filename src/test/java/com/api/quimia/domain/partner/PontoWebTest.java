@@ -77,6 +77,22 @@ class PontoWebTest {
     }
 
     @Test
+    void devolveCoordenadasDoPontoOuNulasQuandoNaoHa() throws Exception {
+        int comCoordenadas = catalogo.pontoParceiro("Ecoponto", "descarte", "01001-000", "SP", "Centro", "TRUE");
+        jdbc.update("UPDATE ponto_parceiro SET latitude = -23.550520, longitude = -46.633308 WHERE id = ?", comCoordenadas);
+        catalogo.pontoParceiro("Sem mapa", "descarte", "01002-000", "SP", "Centro", "TRUE");
+
+        buscar("tipo", "descarte")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[0].nome").value("Ecoponto"))
+                .andExpect(jsonPath("$.itens[0].latitude").value(-23.550520))
+                .andExpect(jsonPath("$.itens[0].longitude").value(-46.633308))
+                .andExpect(jsonPath("$.itens[1].nome").value("Sem mapa"))
+                .andExpect(jsonPath("$.itens[1].latitude").doesNotExist())
+                .andExpect(jsonPath("$.itens[1].longitude").doesNotExist());
+    }
+
+    @Test
     void tipoAusenteOuInvalidoDa400() throws Exception {
         buscar().andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value("tipo_invalido"));
         buscar("tipo", "x").andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value("tipo_invalido"));

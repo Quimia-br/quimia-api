@@ -6,9 +6,13 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import org.hibernate.annotations.Immutable;
 
-/** Ponto de compra ou descarte (`ponto_parceiro`). Só endereço: a tabela não tem coordenadas. `ativo` nulo vale ativo. */
+/**
+ * Ponto de compra ou descarte (`ponto_parceiro`). `ativo` nulo vale ativo. Latitude e longitude vêm juntas ou
+ * ambas nulas (CHECK do banco); pontos antigos podem não ter coordenadas.
+ */
 @Entity
 @Immutable
 @Table(name = "ponto_parceiro")
@@ -45,6 +49,12 @@ public class PontoParceiro {
     private String tipo;
 
     private Boolean ativo;
+
+    @Column(precision = 9, scale = 6)
+    private BigDecimal latitude;
+
+    @Column(precision = 9, scale = 6)
+    private BigDecimal longitude;
 
     public Integer getId() {
         return id;
@@ -88,5 +98,13 @@ public class PontoParceiro {
 
     public boolean isAtivo() {
         return !Boolean.FALSE.equals(ativo);
+    }
+
+    public BigDecimal getLatitude() {
+        return latitude;
+    }
+
+    public BigDecimal getLongitude() {
+        return longitude;
     }
 }

@@ -14,8 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Pontos de compra e descarte sem coordenadas: `estado` e `bairro` filtram; o CEP ordena
+ * Pontos de compra e descarte: `estado` e `bairro` filtram; o CEP ordena
  * (igual, depois mesmo prefixo de 5 dígitos, depois o resto). Ranking e paginação em memória.
+ * As coordenadas só vão na resposta, para o mapa (nem todo ponto tem); não filtram nem ordenam.
  */
 @Service
 public class ListarPontosUseCase {
@@ -93,6 +94,6 @@ public class ListarPontosUseCase {
     private static PontoView view(PontoParceiro ponto) {
         return new PontoView(
                 ponto.getId(), ponto.getNome(), ponto.getTipo(), ponto.getCep(), ponto.getEstado(), ponto.getBairro(),
-                ponto.getRua(), ponto.getNumero(), ponto.getComplemento());
+                ponto.getRua(), ponto.getNumero(), ponto.getComplemento(), ponto.getLatitude(), ponto.getLongitude());
     }
 }

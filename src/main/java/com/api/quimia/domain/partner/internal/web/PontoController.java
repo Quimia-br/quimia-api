@@ -26,9 +26,9 @@ public class PontoController {
 
     @Operation(
             summary = "Pontos de compra e de descarte",
-            description = "Pontos parceiros ativos do `tipo` pedido. Sem distância (o banco não tem coordenadas): "
-                    + "filtra por `estado`, `bairro` e `cep`, ou pelo endereço do usuário com "
-                    + "`usarLocalizacaoCadastrada=true`.")
+            description = "Pontos parceiros ativos do `tipo` pedido, com `latitude`/`longitude` para o mapa quando o "
+                    + "ponto as tem (senão, nulas). Sem filtro por distância: filtra por `estado`, `bairro` e `cep`, "
+                    + "ou pelo endereço do usuário com `usarLocalizacaoCadastrada=true`.")
     @Parameter(name = "tipo", description = "compra ou descarte (obrigatório).", example = "descarte")
     @Parameter(name = "estado", description = "UF com 2 letras.", example = "SP")
     @Parameter(name = "bairro", description = "Bairro, sem acento nem caixa.", example = "Pinheiros")
