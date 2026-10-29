@@ -6,7 +6,7 @@ arquivos e eles não são migrations: o schema de produção é administrado no
 repositório `Quimia-br/quimia-bd`.
 
 - `quimia-bd/`: cópia fiel de `src/database/sql/{ddl,logs,indexes,routines}`
-  do `quimia-bd`, commit `eaccdd1` (2026-10-28). Contém `DROP TABLE`: nunca
+  do `quimia-bd`, commit `133b069` (2026-10-29). Contém `DROP TABLE`: nunca
   aplicar em banco compartilhado.
 - `alteracoes-combinadas.sql`: mudanças já acordadas com o DBA que ainda não
   estão no `quimia-bd`.
