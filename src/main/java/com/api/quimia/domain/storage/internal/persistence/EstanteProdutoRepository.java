@@ -73,4 +73,9 @@ public interface EstanteProdutoRepository extends JpaRepository<EstanteProduto, 
             where ep.usuarioId = :usuario and ep.comodoId = :comodo and ep.produtoId = :produto
             """)
     int removerDoComodo(@Param("usuario") UUID usuarioId, @Param("comodo") Integer comodoId, @Param("produto") Integer produtoId);
+
+    /** Tira todos os produtos do cômodo; eles continuam na estante. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update EstanteProduto ep set ep.comodoId = null where ep.usuarioId = :usuario and ep.comodoId = :comodo")
+    int soltarDoComodo(@Param("usuario") UUID usuarioId, @Param("comodo") Integer comodoId);
 }
