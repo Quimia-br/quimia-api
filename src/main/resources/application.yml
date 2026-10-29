@@ -5,6 +5,17 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/quimia}
     username: ${SPRING_DATASOURCE_USERNAME:quimia}
     password: ${SPRING_DATASOURCE_PASSWORD:}
+    # Teto de conexões desta instância. O banco tem limite de conexões e é dividido com o quimia-agent e as
+    # ferramentas do time: a soma dos pools precisa ficar abaixo do max_connections do plano.
+    hikari:
+      maximum-pool-size: ${QUIMIA_DB_POOL_MAXIMO:5}
+      # Ociosa, a API segura só 1 conexão; as outras fecham depois de idle-timeout.
+      minimum-idle: ${QUIMIA_DB_POOL_MINIMO_OCIOSO:1}
+      idle-timeout: 300000
+      # Recicla cada conexão em 25 min, antes que o servidor ou um proxy a derrube.
+      max-lifetime: 1500000
+      # Pool cheio por 10 s: o pedido falha (500) em vez de esperar indefinidamente.
+      connection-timeout: 10000
   jpa:
     hibernate:
       ddl-auto: validate
