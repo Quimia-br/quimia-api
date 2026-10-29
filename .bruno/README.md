@@ -23,7 +23,7 @@ Para o portal: **06 Portal** (02) cadastra um produto e já deixa o `produtoId` 
 | `01-usuario` | app | Perfil, endereço, renovar sessão, sair, Firebase, trocar foto de perfil |
 | `02-empresa` | portal | Perfil, renovar sessão, sair |
 | `03-catalogo` | app | Listar, detalhe, busca por código de barras |
-| `04-estante` | app | Guardar, listar (alfabética, recentes ou antigos), remover |
+| `04-estante` | app | Guardar, listar (alfabética, recentes, antigos ou só favoritos), remover, favoritar e desfavoritar |
 | `05-seguranca` | app | Resumo do rótulo, substâncias do produto e da estante, detalhe, "Como se proteger?" |
 | `06-portal` | portal | Listar, cadastrar (com e sem imagem), alterar, trocar imagem, remover, Home, Estatísticas, WebKemi, revisão das pendências da FDS (14 a 16) novo chat (17) e tipos de produto (18) |
 | `07-recuperacao-de-senha` | app e portal | Código por email (usuário) e link por email (empresa) |

@@ -2,12 +2,16 @@ package com.api.quimia.domain.storage.internal.usecase;
 
 import java.util.Set;
 
-/** Ordenações da estante. Favoritos esperam o DBA (G1); substâncias não têm data própria e só ordenam por nome. */
+/**
+ * Ordenações da estante. `favoritos` traz só os favoritos, por nome. Substâncias não têm data nem favorito próprios e
+ * só ordenam por nome.
+ */
 final class OrdemDaEstante {
     static final String ALFABETICA = "alfabetica";
     static final String RECENTES = "recentes";
     static final String ANTIGOS = "antigos";
-    private static final Set<String> DOS_PRODUTOS = Set.of(ALFABETICA, RECENTES, ANTIGOS);
+    static final String FAVORITOS = "favoritos";
+    private static final Set<String> DOS_PRODUTOS = Set.of(ALFABETICA, RECENTES, ANTIGOS, FAVORITOS);
 
     private OrdemDaEstante() {}
 

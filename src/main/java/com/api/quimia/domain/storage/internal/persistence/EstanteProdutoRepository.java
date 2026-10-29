@@ -32,6 +32,22 @@ public interface EstanteProdutoRepository extends JpaRepository<EstanteProduto, 
     @Query("select ep.produtoId from EstanteProduto ep where ep.usuarioId = :usuario order by ep.dataAdicionado asc, ep.id asc")
     List<Integer> produtoIdsDosAntigos(@Param("usuario") UUID usuarioId);
 
+    @Query("select ep.produtoId from EstanteProduto ep where ep.usuarioId = :usuario and ep.favorito = true")
+    List<Integer> produtoIdsFavoritos(@Param("usuario") UUID usuarioId);
+
+    /** Quais destes produtos da estante do usuário são favoritos. */
+    @Query("""
+            select ep.produtoId from EstanteProduto ep
+            where ep.usuarioId = :usuario and ep.produtoId in :produtos and ep.favorito = true
+            """)
+    List<Integer> favoritosEntre(@Param("usuario") UUID usuarioId, @Param("produtos") Collection<Integer> produtoIds);
+
+    /** Devolve 0 quando o produto não está na estante do usuário. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update EstanteProduto ep set ep.favorito = :favorito where ep.usuarioId = :usuario and ep.produtoId = :produto")
+    int marcarFavorito(
+            @Param("usuario") UUID usuarioId, @Param("produto") Integer produtoId, @Param("favorito") boolean favorito);
+
     /** Linhas dos produtos na estante do usuário, travadas para leitura (FOR SHARE) até o fim da transação. */
     @Lock(LockModeType.PESSIMISTIC_READ)
     @Query("select ep from EstanteProduto ep where ep.usuarioId = :usuario and ep.produtoId in :produtos")

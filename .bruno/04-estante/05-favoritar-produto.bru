@@ -1,0 +1,29 @@
+meta {
+  name: 05 - Favoritar produto
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/estante/produtos/{{outroProdutoId}}/favorito
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("favorita o produto", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Marca o produto da estante como favorito. Repetir não é erro. Usa `outroProdutoId`, porque 03 tira
+  `produtoId` da estante.
+  Antes: 02 (com dois produtos).
+  Respostas: 204, 400 parametro_invalido, 404 produto_nao_esta_na_estante.
+}

@@ -123,8 +123,8 @@ class EstanteOrdemWebTest {
     }
 
     @Test
-    void ordemFuturaVaziaOuDesconhecidaDevolve400() throws Exception {
-        for (String ordem : new String[] {"favoritos", "", "x", "RECENTES"}) {
+    void ordemVaziaOuDesconhecidaDevolve400() throws Exception {
+        for (String ordem : new String[] {"", "x", "RECENTES", "favorito"}) {
             mvc.perform(get("/api/v1/estante/produtos").param("ordem", ordem).header("Authorization", "Bearer " + token))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.detail").value("ordem_invalida"));

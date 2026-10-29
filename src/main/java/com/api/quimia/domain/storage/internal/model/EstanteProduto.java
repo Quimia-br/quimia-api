@@ -40,6 +40,11 @@ public class EstanteProduto {
     @Column(name = "data_adicionado", nullable = false, insertable = false, updatable = false)
     private LocalDateTime dataAdicionado;
 
+    /** Começa falso (default do banco); só muda pelas rotas de favorito. */
+    @ColumnDefault("false")
+    @Column(nullable = false, insertable = false)
+    private boolean favorito;
+
     public Integer getProdutoId() {
         return produtoId;
     }
