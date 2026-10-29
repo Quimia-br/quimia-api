@@ -5,9 +5,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Apaga a foto antiga do perfil. O app envia a foto direto ao Cloudinary, na pasta de perfil, depois que o
- * usuário confirma; a API só a apaga quando ela é trocada. Só o que está nessa pasta é apagado: `PATCH /usuarios/me`
- * aceita qualquer URL https e não autoriza apagar imagem alheia.
+ * Apaga a foto antiga do perfil. A foto chega à pasta de perfil por `POST /usuarios/me/foto`; a API só a apaga quando
+ * ela é trocada. Só o que está nessa pasta é apagado: `PATCH /usuarios/me` aceita qualquer URL https e não autoriza
+ * apagar imagem alheia.
  */
 @Component
 class CloudinaryFotoDoUsuario implements FotoDoUsuarioGateway {

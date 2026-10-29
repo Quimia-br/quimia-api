@@ -127,7 +127,7 @@ class OpenApiContratoTest {
         Set<String> documentadas = operacoes().stream().map(Operacao::nome).collect(Collectors.toCollection(TreeSet::new));
 
         assertThat(documentadas).containsExactlyElementsOf(rotasDaAplicacao());
-        assertThat(documentadas).hasSize(64);
+        assertThat(documentadas).hasSize(65);
     }
 
     @Test
