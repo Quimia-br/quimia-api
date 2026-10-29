@@ -4,8 +4,6 @@ import com.api.quimia.domain.account.LocalizacaoGateway;
 import com.api.quimia.domain.account.dto.LocalizacaoView;
 import com.api.quimia.domain.catalog.dto.Pagina;
 import com.api.quimia.domain.partner.internal.dto.PontoView;
-import com.api.quimia.domain.partner.internal.model.PontoParceiro;
-import com.api.quimia.domain.partner.internal.persistence.PontoParceiroRepository;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -29,10 +27,10 @@ public class ListarPontosUseCase {
     /** Estado nulo vai para o fim da ordenação. */
     private static final String ESTADO_AUSENTE = "￿";
 
-    private final PontoParceiroRepository pontos;
+    private final PontosDoFiltro pontos;
     private final LocalizacaoGateway localizacao;
 
-    public ListarPontosUseCase(PontoParceiroRepository pontos, LocalizacaoGateway localizacao) {
+    public ListarPontosUseCase(PontosDoFiltro pontos, LocalizacaoGateway localizacao) {
         this.pontos = pontos;
         this.localizacao = localizacao;
     }
@@ -58,15 +56,15 @@ public class ListarPontosUseCase {
             cepBusca = cepBusca != null ? cepBusca : TextoPonto.cepDoBanco(cadastrada.cep());
         }
         String cepFinal = cepBusca;
-        List<PontoParceiro> ordenados = pontos.buscar(tipo, uf, bairroBusca).stream()
-                .sorted(Comparator.comparingInt((PontoParceiro ponto) -> rank(ponto, cepFinal))
-                        .thenComparing(ponto -> ponto.getEstado() == null ? ESTADO_AUSENTE : ponto.getEstado())
-                        .thenComparing(ponto -> TextoPonto.semAcento(ponto.getNome()))
-                        .thenComparing(PontoParceiro::getId))
+        List<PontoView> ordenados = pontos.buscar(tipo, uf, bairroBusca).stream()
+                .sorted(Comparator.comparingInt((PontoView ponto) -> rank(ponto, cepFinal))
+                        .thenComparing(ponto -> ponto.estado() == null ? ESTADO_AUSENTE : ponto.estado())
+                        .thenComparing(ponto -> TextoPonto.semAcento(ponto.nome()))
+                        .thenComparing(PontoView::id))
                 .toList();
         int inicio = (int) Math.min((long) pagina * tamanho, ordenados.size());
         int fim = Math.min(inicio + tamanho, ordenados.size());
-        List<PontoView> itens = ordenados.subList(inicio, fim).stream().map(ListarPontosUseCase::view).toList();
+        List<PontoView> itens = ordenados.subList(inicio, fim);
         int totalPaginas = (int) Math.ceil(ordenados.size() / (double) tamanho);
         return new Pagina<>(itens, pagina, tamanho, ordenados.size(), totalPaginas);
     }
@@ -80,8 +78,8 @@ public class ListarPontosUseCase {
         }
     }
 
-    private static int rank(PontoParceiro ponto, String cepBusca) {
-        String cepDoPonto = TextoPonto.cepDoBanco(ponto.getCep());
+    private static int rank(PontoView ponto, String cepBusca) {
+        String cepDoPonto = TextoPonto.cepDoBanco(ponto.cep());
         if (cepBusca == null || cepDoPonto == null) {
             return RANK_DEMAIS;
         }
@@ -89,11 +87,5 @@ public class ListarPontosUseCase {
             return RANK_CEP_IGUAL;
         }
         return TextoPonto.prefixo(cepDoPonto).equals(TextoPonto.prefixo(cepBusca)) ? RANK_MESMO_PREFIXO : RANK_DEMAIS;
-    }
-
-    private static PontoView view(PontoParceiro ponto) {
-        return new PontoView(
-                ponto.getId(), ponto.getNome(), ponto.getTipo(), ponto.getCep(), ponto.getEstado(), ponto.getBairro(),
-                ponto.getRua(), ponto.getNumero(), ponto.getComplemento(), ponto.getLatitude(), ponto.getLongitude());
     }
 }

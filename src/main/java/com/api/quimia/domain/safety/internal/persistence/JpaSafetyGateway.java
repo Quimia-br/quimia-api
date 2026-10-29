@@ -8,6 +8,7 @@ import com.api.quimia.domain.safety.dto.PrimeirosSocorrosView;
 import com.api.quimia.domain.safety.dto.ResumoSimplificadoView;
 import com.api.quimia.domain.safety.dto.SubstanciaNaEstanteView;
 import com.api.quimia.domain.safety.dto.SubstanciaView;
+import com.api.quimia.domain.safety.internal.config.CacheDaSeguranca;
 import com.api.quimia.domain.safety.internal.model.ClasseQuimica;
 import com.api.quimia.domain.safety.internal.model.Fds;
 import com.api.quimia.domain.safety.internal.model.FdsConteudo;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +44,7 @@ public class JpaSafetyGateway implements SafetyGateway {
     private EntityManager em;
 
     @Override
+    @Cacheable(CacheDaSeguranca.RESUMO_DA_FDS)
     public ResumoSimplificadoView resumoSimplificado(Integer produtoId) {
         Fds fds = fdsAtivasMaisRecentes(List.of(produtoId)).get(produtoId);
         if (fds == null) {
@@ -52,6 +55,7 @@ public class JpaSafetyGateway implements SafetyGateway {
     }
 
     @Override
+    @Cacheable(CacheDaSeguranca.PRIMEIROS_SOCORROS)
     public PrimeirosSocorrosView primeirosSocorros(Integer produtoId) {
         Fds fds = fdsAtivasMaisRecentes(List.of(produtoId)).get(produtoId);
         if (fds == null) {
@@ -91,6 +95,7 @@ public class JpaSafetyGateway implements SafetyGateway {
     }
 
     @Override
+    @Cacheable(CacheDaSeguranca.COMPOSICAO)
     public List<ComposicaoView> composicao(Integer produtoId) {
         Fds fds = fdsAtivasMaisRecentes(List.of(produtoId)).get(produtoId);
         if (fds == null) {
@@ -147,7 +152,9 @@ public class JpaSafetyGateway implements SafetyGateway {
                 .toList();
     }
 
+    /** Substância inexistente não fica no cache: a cadastrada depois pelo DBA aparece na hora. */
     @Override
+    @Cacheable(cacheNames = CacheDaSeguranca.SUBSTANCIA, unless = "#result == null")
     public Optional<SubstanciaView> substancia(Integer substanciaId) {
         Substancia substancia = em.find(Substancia.class, substanciaId);
         if (substancia == null) {
