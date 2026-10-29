@@ -25,6 +25,13 @@ public interface EstanteProdutoRepository extends JpaRepository<EstanteProduto, 
     @Query("select ep.produtoId from EstanteProduto ep where ep.usuarioId = :usuario")
     List<Integer> produtoIds(@Param("usuario") UUID usuarioId);
 
+    /** Do último guardado ao primeiro; o id desempata os guardados no mesmo instante. */
+    @Query("select ep.produtoId from EstanteProduto ep where ep.usuarioId = :usuario order by ep.dataAdicionado desc, ep.id desc")
+    List<Integer> produtoIdsDosRecentes(@Param("usuario") UUID usuarioId);
+
+    @Query("select ep.produtoId from EstanteProduto ep where ep.usuarioId = :usuario order by ep.dataAdicionado asc, ep.id asc")
+    List<Integer> produtoIdsDosAntigos(@Param("usuario") UUID usuarioId);
+
     /** Linhas dos produtos na estante do usuário, travadas para leitura (FOR SHARE) até o fim da transação. */
     @Lock(LockModeType.PESSIMISTIC_READ)
     @Query("select ep from EstanteProduto ep where ep.usuarioId = :usuario and ep.produtoId in :produtos")

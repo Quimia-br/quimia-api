@@ -1,5 +1,6 @@
 package com.api.quimia.domain.storage;
 
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -7,7 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.api.quimia.TestCatalogo;
 import com.api.quimia.TestJwtKeys;
 import com.api.quimia.TestLogins;
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,17 +33,21 @@ class EstanteOrdemWebTest {
     private JdbcTemplate jdbc;
 
     private String token;
+    private TestCatalogo catalogo;
+    private UUID usuario;
+    private int marca;
+    private int p;
 
     @BeforeEach
     void seed() throws Exception {
-        TestCatalogo catalogo = new TestCatalogo(jdbc);
+        catalogo = new TestCatalogo(jdbc);
         catalogo.limpar();
         jdbc.update("DELETE FROM usuario WHERE email LIKE '%@ordem.test'");
         jdbc.update("DELETE FROM empresa WHERE email LIKE '%@ordem.test'");
         token = TestLogins.usuario(mvc, "u@ordem.test");
-        var usuario = catalogo.usuarioId("u@ordem.test");
-        int marca = catalogo.marca("Marca", null);
-        int p = catalogo.produto("Produto", marca, "limpeza_geral", null, null);
+        usuario = catalogo.usuarioId("u@ordem.test");
+        marca = catalogo.marca("Marca", null);
+        p = catalogo.produto("Produto", marca, "limpeza_geral", null, null);
         catalogo.guardar(usuario, p);
         int fds = catalogo.fds(p, "1", LocalDate.of(2026, 1, 1), true, null);
         int bicarbonato = catalogo.substancia("Bicarbonato de sódio", "144-55-8", "Sal alcalino suave");
@@ -59,8 +66,65 @@ class EstanteOrdemWebTest {
     }
 
     @Test
+    void recentesEAntigosOrdenamPelaDataEmQueFoiGuardado() throws Exception {
+        int alfa = catalogo.produto("Alfa", marca, "limpeza_geral", null, null);
+        int beta = catalogo.produto("Beta", marca, "limpeza_geral", null, null);
+        catalogo.guardar(usuario, alfa);
+        catalogo.guardar(usuario, beta);
+        guardadoEm(p, "2026-01-01 10:00:00");
+        guardadoEm(alfa, "2026-03-01 10:00:00");
+        guardadoEm(beta, "2026-02-01 10:00:00");
+
+        mvc.perform(get("/api/v1/estante/produtos").param("ordem", "recentes").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[*].nome").value(contains("Alfa", "Beta", "Produto")))
+                .andExpect(jsonPath("$.totalItens").value(3));
+        mvc.perform(get("/api/v1/estante/produtos").param("ordem", "antigos").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[*].nome").value(contains("Produto", "Beta", "Alfa")));
+    }
+
+    @Test
+    void ordemPorDataPaginaEFiltraPeloTermo() throws Exception {
+        int alfa = catalogo.produto("Alfa", marca, "limpeza_geral", null, null);
+        int beta = catalogo.produto("Beta", marca, "limpeza_geral", null, null);
+        catalogo.guardar(usuario, alfa);
+        catalogo.guardar(usuario, beta);
+        guardadoEm(p, "2026-01-01 10:00:00");
+        guardadoEm(alfa, "2026-03-01 10:00:00");
+        guardadoEm(beta, "2026-02-01 10:00:00");
+
+        mvc.perform(get("/api/v1/estante/produtos").param("ordem", "recentes").param("page", "1").param("size", "2")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[*].nome").value(contains("Produto")))
+                .andExpect(jsonPath("$.pagina").value(1))
+                .andExpect(jsonPath("$.totalItens").value(3))
+                .andExpect(jsonPath("$.totalPaginas").value(2));
+        mvc.perform(get("/api/v1/estante/produtos").param("ordem", "recentes").param("page", "5")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(0))
+                .andExpect(jsonPath("$.totalItens").value(3));
+        mvc.perform(get("/api/v1/estante/produtos").param("ordem", "antigos").param("q", "ALFA")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[*].nome").value(contains("Alfa")))
+                .andExpect(jsonPath("$.totalItens").value(1));
+    }
+
+    @Test
+    void ordemPorDataComEstanteVazia() throws Exception {
+        String outro = TestLogins.usuario(mvc, "vazio@ordem.test");
+        mvc.perform(get("/api/v1/estante/produtos").param("ordem", "recentes").header("Authorization", "Bearer " + outro))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens.length()").value(0))
+                .andExpect(jsonPath("$.totalItens").value(0));
+    }
+
+    @Test
     void ordemFuturaVaziaOuDesconhecidaDevolve400() throws Exception {
-        for (String ordem : new String[] {"recentes", "antigos", "favoritos", "", "x"}) {
+        for (String ordem : new String[] {"favoritos", "", "x", "RECENTES"}) {
             mvc.perform(get("/api/v1/estante/produtos").param("ordem", ordem).header("Authorization", "Bearer " + token))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.detail").value("ordem_invalida"));
@@ -100,6 +164,12 @@ class EstanteOrdemWebTest {
         mvc.perform(get("/api/v1/estante/substancias").param("ordem", "recentes").header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("ordem_invalida"));
+    }
+
+    private void guardadoEm(int produto, String quando) {
+        jdbc.update(
+                "UPDATE estante_produto SET data_adicionado = ? WHERE id_usuario = ? AND id_produto = ?",
+                Timestamp.valueOf(quando), usuario, produto);
     }
 
     @Test

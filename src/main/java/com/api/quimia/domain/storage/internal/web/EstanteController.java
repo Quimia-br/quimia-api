@@ -55,9 +55,10 @@ public class EstanteController {
     @Operation(
             summary = "Listar a estante",
             description = "Produtos guardados pelo usuário, inclusive os que saíram do catálogo. "
-                    + "`ordem=alfabetica` ordena por nome.")
+                    + "`ordem=alfabetica` (padrão) ordena por nome; `recentes` e `antigos`, pela data em que o "
+                    + "produto foi guardado.")
     @Parameter(name = "q", description = "Busca por nome, descrição ou marca (até 100 caracteres).", example = "cloro")
-    @Parameter(name = "ordem", description = "alfabetica.", example = "alfabetica")
+    @Parameter(name = "ordem", description = "alfabetica, recentes ou antigos.", example = "recentes")
     @Parameter(name = "page", description = "Página, a partir de 0.", example = "0")
     @Parameter(name = "size", description = "Itens por página, de 1 a 50.", example = "20")
     @ApiResponse(responseCode = "200", description = "Página de produtos.")
