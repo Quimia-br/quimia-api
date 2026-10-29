@@ -1,7 +1,9 @@
 package com.api.quimia.domain.catalog.internal.usecase;
 
+import com.api.quimia.domain.catalog.internal.config.CacheDoCatalogo;
 import com.api.quimia.domain.catalog.internal.model.EmpresaProduto;
 import com.api.quimia.domain.catalog.internal.persistence.EmpresaProdutoRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,11 @@ public class RemoverProdutoEmpresaUseCase {
         this.vinculos = vinculos;
     }
 
+    @CacheEvict(
+            cacheNames = {
+                CacheDoCatalogo.PRODUTO, CacheDoCatalogo.PRODUTO_POR_CODIGO, CacheDoCatalogo.BUSCA_DE_PRODUTOS
+            },
+            allEntries = true)
     @Transactional
     public void execute(Integer empresaId, Integer produtoId) {
         portal.exigirAtiva(empresaId);

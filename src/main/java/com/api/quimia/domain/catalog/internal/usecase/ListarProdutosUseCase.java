@@ -2,11 +2,13 @@ package com.api.quimia.domain.catalog.internal.usecase;
 
 import com.api.quimia.domain.catalog.dto.Pagina;
 import com.api.quimia.domain.catalog.dto.ProdutoView;
+import com.api.quimia.domain.catalog.internal.config.CacheDoCatalogo;
 import com.api.quimia.domain.catalog.internal.mapper.ProdutoMapper;
 import com.api.quimia.domain.catalog.internal.model.CodigoBarras;
 import com.api.quimia.domain.catalog.internal.model.TermoBusca;
 import com.api.quimia.domain.catalog.internal.model.TipoProduto;
 import com.api.quimia.domain.catalog.internal.persistence.ProdutoRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,10 @@ public class ListarProdutosUseCase {
         this.produtos = produtos;
     }
 
+    @Cacheable(
+            cacheNames = CacheDoCatalogo.BUSCA_DE_PRODUTOS,
+            key = "T(com.api.quimia.domain.catalog.internal.usecase.ListarProdutosUseCase)"
+                    + ".chaveDaBusca(#termo, #tipo, #codBarras, #pagina, #tamanho)")
     @Transactional(readOnly = true)
     public Pagina<ProdutoView> execute(String termo, String tipo, String codBarras, int pagina, int tamanho) {
         if (pagina < 0 || tamanho < 1 || tamanho > TAMANHO_MAXIMO || offsetExcedeLimite(pagina, tamanho)) {
@@ -48,6 +54,15 @@ public class ListarProdutosUseCase {
                 codigo == null,
                 CodigoBarras.paraFiltro(codigo),
                 PageRequest.of(pagina, tamanho, Sort.by("nome").and(Sort.by("id")))));
+    }
+
+    /** Chave do cache sem ambiguidade: `null` não colide com o texto "null", nem um termo com o separador. */
+    public static String chaveDaBusca(String termo, String tipo, String codBarras, int pagina, int tamanho) {
+        return parteDaChave(termo) + parteDaChave(tipo) + parteDaChave(codBarras) + pagina + ":" + tamanho;
+    }
+
+    private static String parteDaChave(String valor) {
+        return valor == null ? "-|" : valor.length() + ":" + valor + "|";
     }
 
     /** O offset da consulta é um int: páginas além dele viravam 500 no Spring Data. */
