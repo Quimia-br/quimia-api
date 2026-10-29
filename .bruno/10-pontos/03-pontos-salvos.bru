@@ -1,0 +1,30 @@
+meta {
+  name: 03 - Pontos salvos
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pontos/salvos?page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("lista os pontos salvos", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("itens");
+  });
+}
+
+docs {
+  Pontos salvos do usuário, do mais recente ao mais antigo. `tipo` (compra ou descarte) é opcional.
+  Pontos desativados depois de salvos não aparecem.
+  Antes: 02.
+  Respostas: 200, 400 tipo_invalido ou paginacao_invalida.
+}

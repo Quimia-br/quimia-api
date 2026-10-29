@@ -1,0 +1,35 @@
+meta {
+  name: 08 - Trocar foto de perfil
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/usuarios/me/foto
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:multipart-form {
+  imagem: @file(fixtures/imagem-produto.png)
+}
+
+tests {
+  test("troca a foto (exige Cloudinary configurado)", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().fotoUrl).to.be.a("string").and.not.be.empty;
+  });
+}
+
+docs {
+  Envia a foto de perfil (JPEG, PNG ou WebP, até 5 MB) para a pasta de perfil do Cloudinary e grava a URL no usuário.
+  O app não precisa de upload preset: a API assina o envio. A foto anterior só é apagada depois da gravação e só
+  se nenhum outro perfil usa a mesma URL; se a gravação falhar, a nova é descartada.
+  Antes: `00`. Confira com `01 - Meu perfil`.
+  Respostas: 200, 400 imagem_obrigatoria, 404 usuario_nao_encontrado, 413, 415, 502, 503.
+}

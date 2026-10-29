@@ -102,8 +102,11 @@ de produção, com o domínio `quimia.app` verificado no painel do Resend), conf
 domínio verificado. A alternativa pelo Gmail usa `APP_EMAIL_SENDER_MODE=smtp`,
 `APP_EMAIL_FROM`, `SPRING_MAIL_USERNAME` e `SPRING_MAIL_PASSWORD` (senha de app do
 Google). Faltando variável do modo escolhido, a API não sobe. As imagens de
-produto e o logo da empresa usam `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` e
-`CLOUDINARY_API_SECRET`; sem elas, enviar imagem responde 503. A leitura do PDF da
+produto, o logo da empresa e a foto de perfil do usuário usam `CLOUDINARY_CLOUD_NAME`,
+`CLOUDINARY_API_KEY` e `CLOUDINARY_API_SECRET`; sem elas, enviar imagem responde 503.
+O pool de conexões com o banco tem teto de 5 conexões (`QUIMIA_DB_POOL_MAXIMO`) e
+mantém 1 ociosa (`QUIMIA_DB_POOL_MINIMO_OCIOSO`): o banco é dividido com o
+quimia-agent, e a soma dos pools precisa ficar abaixo do `max_connections` do plano. A leitura do PDF da
 FDS no cadastro de produto usa o `quimia-extractor-ai`: `QUIMIA_EXTRATOR_URL`,
 `QUIMIA_EXTRATOR_TOKEN` (obrigatório quando há URL) e `QUIMIA_EXTRATOR_TIMEOUT_SEGUNDOS`
 (padrão 60). Sem URL, enviar `fds` responde 503; `QUIMIA_FDS_OBRIGATORIA=true` exige a

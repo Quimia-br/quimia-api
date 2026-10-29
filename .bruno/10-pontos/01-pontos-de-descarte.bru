@@ -15,6 +15,13 @@ headers {
   Authorization: Bearer {{accessToken}}
 }
 
+script:post-response {
+  const body = res.getBody();
+  if (res.getStatus() === 200 && body.itens.length > 0) {
+    bru.setVar("pontoId", body.itens[0].id);
+  }
+}
+
 tests {
   test("lista os pontos", function () {
     expect(res.getStatus()).to.equal(200);
@@ -23,8 +30,9 @@ tests {
 }
 
 docs {
-  Pontos parceiros por `tipo` (compra ou descarte), sem distância (o banco não tem coordenadas).
-  Filtra por `estado`, `bairro` ou `cep`; com `usarLocalizacaoCadastrada=true` usa o endereço do
-  usuário (`01 - Usuário`, endereço).
+  Pontos parceiros por `tipo` (compra ou descarte), com `latitude` e `longitude` para o mapa quando o
+  ponto as tem (senão os dois campos não vêm). Sem filtro por distância: filtra por `estado`, `bairro`
+  ou `cep`; com `usarLocalizacaoCadastrada=true` usa o endereço do usuário (`01 - Usuário`, endereço).
+  Guarda o primeiro em `pontoId` (usado nos pontos salvos).
   Respostas: 200, 400 tipo_invalido, estado_invalido ou cep_invalido, 422 localizacao_necessaria.
 }
