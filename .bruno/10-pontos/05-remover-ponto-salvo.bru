@@ -1,0 +1,28 @@
+meta {
+  name: 05 - Remover ponto salvo
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/pontos/salvos/{{pontoId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("tira dos salvos", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Tira o ponto dos salvos do usuário. Repetir, ou remover um ponto que não estava salvo, não é erro.
+  Antes: 02.
+  Respostas: 204, 400 parametro_invalido.
+}

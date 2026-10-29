@@ -1,0 +1,39 @@
+meta {
+  name: 08 - Editar cômodo
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/comodos/{{comodoId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "nome": "Lavanderia",
+    "icone": "laundry"
+  }
+}
+
+tests {
+  test("renomeia e troca o ícone", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().nome).to.equal("Lavanderia");
+    expect(res.getBody().icone).to.equal("laundry");
+  });
+}
+
+docs {
+  Renomeia e/ou troca o ícone; campo ausente fica como está. Os produtos não mudam. O nome continua único
+  por usuário (sem acento nem caixa); o próprio cômodo não conta.
+  Antes: 01.
+  Respostas: 200, 400 (nome em branco ou acima de 100 caracteres), 404 comodo_nao_encontrado,
+  409 comodo_ja_existe, 422 icone_invalido.
+}

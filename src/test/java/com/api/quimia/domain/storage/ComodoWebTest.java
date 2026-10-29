@@ -3,6 +3,7 @@ package com.api.quimia.domain.storage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -597,6 +598,104 @@ class ComodoWebTest {
 
         mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
                 .andExpect(jsonPath("$.produtos.length()").value(1));
+    }
+
+    // --- PATCH e DELETE /comodos/{id} ---
+
+    private ResultActions editar(String token, int id, String corpo) throws Exception {
+        return mvc.perform(patch("/api/v1/comodos/" + id)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(corpo));
+    }
+
+    @Test
+    void editarRenomeiaETrocaIconeSemMexerNosProdutos() throws Exception {
+        int id = criarEObterId(tokenA, "Banheiro", p1, p2);
+
+        editar(tokenA, id, "{\"nome\":\"  Lavanderia   nova \",\"icone\":\"laundry\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.nome").value("Lavanderia nova"))
+                .andExpect(jsonPath("$.icone").value("laundry"))
+                .andExpect(jsonPath("$.produtos.length()").value(2));
+        editar(tokenA, id, "{\"icone\":\"sofa\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Lavanderia nova"))
+                .andExpect(jsonPath("$.icone").value("sofa"));
+        editar(tokenA, id, "{}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Lavanderia nova"));
+
+        mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.nome").value("Lavanderia nova"))
+                .andExpect(jsonPath("$.icone").value("sofa"));
+    }
+
+    @Test
+    void editarComONomeDeOutroComodoDevolve409MasOProprioNomeNao() throws Exception {
+        int banheiro = criarEObterId(tokenA, "Banheiro", p1, p2);
+        int sabao = produtoCom("Sabão", agua);
+        catalogo.guardar(usuarioA, sabao);
+        criarEObterId(tokenA, "Cozinha", p3, sabao);
+
+        editar(tokenA, banheiro, "{\"nome\":\"COZINHA\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("comodo_ja_existe"));
+        editar(tokenA, banheiro, "{\"nome\":\"banheiro\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("banheiro"));
+    }
+
+    @Test
+    void editarValidaIconeNomeEDono() throws Exception {
+        int id = criarEObterId(tokenA, "Banheiro", p1, p2);
+
+        editar(tokenA, id, "{\"icone\":\"foguete\"}")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("icone_invalido"));
+        editar(tokenA, id, "{\"nome\":\"   \"}").andExpect(status().isBadRequest());
+        editar(tokenA, id, "{\"nome\":\"" + "a".repeat(101) + "\"}").andExpect(status().isBadRequest());
+        editar(tokenB, id, "{\"nome\":\"Meu\"}")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("comodo_nao_encontrado"));
+        editar(tokenA, 999999, "{\"nome\":\"X\"}").andExpect(status().isNotFound());
+    }
+
+    @Test
+    void excluirApagaOComodoEMantemOsProdutosNaEstanteSemComodo() throws Exception {
+        int id = criarEObterId(tokenA, "Banheiro", p1, p2);
+
+        mvc.perform(delete("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/estante/produtos").header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.totalItens").value(3));
+        mvc.perform(get("/api/v1/estante/produtos/" + p1 + "/comodo").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("produto_sem_comodo"));
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM estante_produto WHERE id_comodo IS NOT NULL AND id_usuario = ?",
+                        Integer.class, usuarioA))
+                .isZero();
+        criar(tokenA, "Banheiro", "toilet", p1, p2).andExpect(status().isCreated());
+    }
+
+    @Test
+    void excluirComodoDeOutroUsuarioOuInexistenteDevolve404() throws Exception {
+        int id = criarEObterId(tokenA, "Banheiro", p1, p2);
+
+        mvc.perform(delete("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenB))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("comodo_nao_encontrado"));
+        mvc.perform(get("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk());
+        mvc.perform(delete("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNoContent());
+        mvc.perform(delete("/api/v1/comodos/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isNotFound());
     }
 
     // --- GET /estante/produtos/{id}/comodo ---

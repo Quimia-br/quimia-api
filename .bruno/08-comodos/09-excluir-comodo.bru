@@ -1,0 +1,29 @@
+meta {
+  name: 09 - Excluir cômodo
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/comodos/{{comodoId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("apaga o cômodo", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Apaga o cômodo. Os produtos dele continuam na estante, sem cômodo. Rode por último na pasta: depois
+  dele `comodoId` não existe mais.
+  Antes: 01.
+  Respostas: 204, 404 comodo_nao_encontrado (inclusive de outro usuário ou já excluído).
+}

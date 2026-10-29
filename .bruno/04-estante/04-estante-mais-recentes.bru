@@ -1,0 +1,30 @@
+meta {
+  name: 04 - Estante mais recentes
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/estante/produtos?ordem=recentes&page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("lista do último guardado ao primeiro", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("totalItens");
+  });
+}
+
+docs {
+  Mesma lista de 02, do último produto guardado ao primeiro. `ordem=antigos` inverte; `ordem=favoritos`
+  traz só os favoritos (05).
+  Antes: 01.
+  Respostas: 200, 400 ordem_invalida, paginacao_invalida ou termo_muito_longo.
+}

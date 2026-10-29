@@ -2,6 +2,7 @@ package com.api.quimia.domain.storage.internal.web;
 
 import com.api.quimia.domain.account.AccountPrincipal;
 import com.api.quimia.domain.catalog.dto.Pagina;
+import com.api.quimia.domain.storage.internal.dto.ComodoEdicaoRequest;
 import com.api.quimia.domain.storage.internal.dto.ComodoRequest;
 import com.api.quimia.domain.storage.internal.dto.ComodoResumo;
 import com.api.quimia.domain.storage.internal.dto.ComodoView;
@@ -12,6 +13,8 @@ import com.api.quimia.domain.storage.internal.usecase.AdicionarProdutosAoComodoU
 import com.api.quimia.domain.storage.internal.usecase.ConsultarComodoDoProdutoUseCase;
 import com.api.quimia.domain.storage.internal.usecase.ConsultarComodoUseCase;
 import com.api.quimia.domain.storage.internal.usecase.CriarComodoUseCase;
+import com.api.quimia.domain.storage.internal.usecase.EditarComodoUseCase;
+import com.api.quimia.domain.storage.internal.usecase.ExcluirComodoUseCase;
 import com.api.quimia.domain.storage.internal.usecase.ListarComodosUseCase;
 import com.api.quimia.domain.storage.internal.usecase.RemoverProdutoDoComodoUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +30,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -45,6 +49,8 @@ public class ComodoController {
     private final AdicionarProdutosAoComodoUseCase adicionar;
     private final RemoverProdutoDoComodoUseCase remover;
     private final ConsultarComodoDoProdutoUseCase comodoDoProduto;
+    private final EditarComodoUseCase editar;
+    private final ExcluirComodoUseCase excluir;
 
     public ComodoController(
             CriarComodoUseCase criar,
@@ -52,13 +58,17 @@ public class ComodoController {
             ConsultarComodoUseCase consultar,
             AdicionarProdutosAoComodoUseCase adicionar,
             RemoverProdutoDoComodoUseCase remover,
-            ConsultarComodoDoProdutoUseCase comodoDoProduto) {
+            ConsultarComodoDoProdutoUseCase comodoDoProduto,
+            EditarComodoUseCase editar,
+            ExcluirComodoUseCase excluir) {
         this.criar = criar;
         this.listar = listar;
         this.consultar = consultar;
         this.adicionar = adicionar;
         this.remover = remover;
         this.comodoDoProduto = comodoDoProduto;
+        this.editar = editar;
+        this.excluir = excluir;
     }
 
     @Operation(
@@ -127,6 +137,37 @@ public class ComodoController {
     @GetMapping("/comodos/{id}")
     public ComodoView consultar(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer id) {
         return consultar.execute(principal.usuarioId(), id);
+    }
+
+    @Operation(
+            summary = "Editar cômodo",
+            description = "Renomeia o cômodo e/ou troca o ícone; campo ausente fica como está. Os produtos não "
+                    + "mudam. O nome continua único por usuário (sem acento nem caixa).")
+    @Parameter(name = "id", description = "Id do cômodo.", example = "3")
+    @ApiResponse(responseCode = "200", description = "Cômodo alterado.")
+    @ApiResponse(responseCode = "404", description = "Cômodo inexistente ou de outro usuário: `comodo_nao_encontrado`.")
+    @ApiResponse(responseCode = "409", description = "Nome de outro cômodo do usuário: `comodo_ja_existe`.")
+    @ApiResponse(
+            responseCode = "422",
+            description = "Ícone fora do catálogo de `GET /comodos/icones`: `icone_invalido`.")
+    @PatchMapping("/comodos/{id}")
+    public ComodoView editar(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @PathVariable Integer id,
+            @Valid @RequestBody ComodoEdicaoRequest request) {
+        return editar.execute(principal.usuarioId(), id, request);
+    }
+
+    @Operation(
+            summary = "Excluir cômodo",
+            description = "Apaga o cômodo. Os produtos dele continuam na estante, sem cômodo.")
+    @Parameter(name = "id", description = "Id do cômodo.", example = "3")
+    @ApiResponse(responseCode = "204", description = "Cômodo excluído.")
+    @ApiResponse(responseCode = "404", description = "Cômodo inexistente ou de outro usuário: `comodo_nao_encontrado`.")
+    @DeleteMapping("/comodos/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void excluir(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer id) {
+        excluir.execute(principal.usuarioId(), id);
     }
 
     @Operation(

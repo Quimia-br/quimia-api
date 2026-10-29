@@ -1,0 +1,30 @@
+meta {
+  name: 04 - Último descarte salvo
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/pontos/salvos/ultimo?tipo=descarte
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("traz o último descarte salvo", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().tipo).to.equal("descarte");
+  });
+}
+
+docs {
+  Card da Home: o ponto de descarte salvo mais recente. Removido o último, vale o anterior. Sem `tipo`,
+  considera compra e descarte.
+  Antes: 02.
+  Respostas: 200, 400 tipo_invalido, 404 ponto_salvo_nao_encontrado (nenhum salvo).
+}

@@ -1,0 +1,28 @@
+meta {
+  name: 07 - Desfavoritar produto
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/estante/produtos/{{outroProdutoId}}/favorito
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("tira o favorito", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  Tira o favorito; o produto continua na estante. Repetir não é erro.
+  Antes: 05.
+  Respostas: 204, 400 parametro_invalido, 404 produto_nao_esta_na_estante.
+}

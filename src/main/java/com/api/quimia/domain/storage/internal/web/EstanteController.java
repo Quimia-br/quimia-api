@@ -2,11 +2,12 @@ package com.api.quimia.domain.storage.internal.web;
 
 import com.api.quimia.domain.account.AccountPrincipal;
 import com.api.quimia.domain.catalog.dto.Pagina;
-import com.api.quimia.domain.catalog.dto.ProdutoView;
 import com.api.quimia.domain.storage.internal.dto.GuardarProdutosRequest;
 import com.api.quimia.domain.storage.internal.dto.GuardarProdutosResponse;
+import com.api.quimia.domain.storage.internal.dto.ProdutoDaEstanteView;
 import com.api.quimia.domain.storage.internal.usecase.GuardarNaEstanteUseCase;
 import com.api.quimia.domain.storage.internal.usecase.ListarEstanteUseCase;
+import com.api.quimia.domain.storage.internal.usecase.MarcarFavoritoUseCase;
 import com.api.quimia.domain.storage.internal.usecase.RemoverDaEstanteUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -32,12 +34,17 @@ public class EstanteController {
     private final GuardarNaEstanteUseCase guardar;
     private final ListarEstanteUseCase listar;
     private final RemoverDaEstanteUseCase remover;
+    private final MarcarFavoritoUseCase favorito;
 
     public EstanteController(
-            GuardarNaEstanteUseCase guardar, ListarEstanteUseCase listar, RemoverDaEstanteUseCase remover) {
+            GuardarNaEstanteUseCase guardar,
+            ListarEstanteUseCase listar,
+            RemoverDaEstanteUseCase remover,
+            MarcarFavoritoUseCase favorito) {
         this.guardar = guardar;
         this.listar = listar;
         this.remover = remover;
+        this.favorito = favorito;
     }
 
     @Operation(
@@ -54,10 +61,11 @@ public class EstanteController {
 
     @Operation(
             summary = "Listar a estante",
-            description = "Produtos guardados pelo usuário, inclusive os que saíram do catálogo. "
-                    + "`ordem=alfabetica` ordena por nome.")
+            description = "Produtos guardados pelo usuário, inclusive os que saíram do catálogo, cada um com "
+                    + "`favorito`. `ordem=alfabetica` (padrão) ordena por nome; `recentes` e `antigos`, pela data em "
+                    + "que o produto foi guardado; `favoritos` traz só os favoritos, por nome.")
     @Parameter(name = "q", description = "Busca por nome, descrição ou marca (até 100 caracteres).", example = "cloro")
-    @Parameter(name = "ordem", description = "alfabetica.", example = "alfabetica")
+    @Parameter(name = "ordem", description = "alfabetica, recentes, antigos ou favoritos.", example = "recentes")
     @Parameter(name = "page", description = "Página, a partir de 0.", example = "0")
     @Parameter(name = "size", description = "Itens por página, de 1 a 50.", example = "20")
     @ApiResponse(responseCode = "200", description = "Página de produtos.")
@@ -67,7 +75,7 @@ public class EstanteController {
                     + "acima do maior int): `paginacao_invalida`. Termo de busca acima de 100 caracteres: "
                     + "`termo_muito_longo`. Ordem fora da lista: `ordem_invalida`.")
     @GetMapping
-    public Pagina<ProdutoView> listar(
+    public Pagina<ProdutoDaEstanteView> listar(
             @AuthenticationPrincipal AccountPrincipal principal,
             @RequestParam(name = "q", required = false) String termo,
             @RequestParam(name = "ordem", required = false) String ordem,
@@ -85,5 +93,29 @@ public class EstanteController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void remover(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer produtoId) {
         remover.execute(principal.usuarioId(), produtoId);
+    }
+
+    @Operation(
+            summary = "Favoritar produto da estante",
+            description = "Marca o produto da estante como favorito. Repetir não é erro.")
+    @Parameter(name = "produtoId", description = "Id do produto.", example = "42")
+    @ApiResponse(responseCode = "204", description = "Favoritado.")
+    @ApiResponse(responseCode = "404", description = "Produto fora da estante do usuário: `produto_nao_esta_na_estante`.")
+    @PutMapping("/{produtoId}/favorito")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void favoritar(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer produtoId) {
+        favorito.execute(principal.usuarioId(), produtoId, true);
+    }
+
+    @Operation(
+            summary = "Desfavoritar produto da estante",
+            description = "Tira o favorito do produto da estante; ele continua guardado. Repetir não é erro.")
+    @Parameter(name = "produtoId", description = "Id do produto.", example = "42")
+    @ApiResponse(responseCode = "204", description = "Desfavoritado.")
+    @ApiResponse(responseCode = "404", description = "Produto fora da estante do usuário: `produto_nao_esta_na_estante`.")
+    @DeleteMapping("/{produtoId}/favorito")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void desfavoritar(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable Integer produtoId) {
+        favorito.execute(principal.usuarioId(), produtoId, false);
     }
 }

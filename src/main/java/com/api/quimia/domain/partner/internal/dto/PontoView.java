@@ -1,6 +1,7 @@
 package com.api.quimia.domain.partner.internal.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 
 @Schema(description = "Ponto parceiro.")
 public record PontoView(
@@ -21,4 +22,14 @@ public record PontoView(
         @Schema(description = "Número.", example = "1200")
         Integer numero,
         @Schema(description = "Complemento.", example = "Portão 2")
-        String complemento) {}
+        String complemento,
+        @Schema(
+                description = "Latitude em graus decimais; nula se o ponto ainda não tem coordenadas (vem junto com "
+                        + "`longitude`).",
+                example = "-23.561414")
+        BigDecimal latitude,
+        @Schema(
+                description = "Longitude em graus decimais; nula se o ponto ainda não tem coordenadas (vem junto com "
+                        + "`latitude`).",
+                example = "-46.682510")
+        BigDecimal longitude) {}

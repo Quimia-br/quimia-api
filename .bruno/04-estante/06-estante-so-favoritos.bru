@@ -1,0 +1,31 @@
+meta {
+  name: 06 - Estante só favoritos
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/estante/produtos?ordem=favoritos&page=0&size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("traz só favoritos", function () {
+    expect(res.getStatus()).to.equal(200);
+    res.getBody().itens.forEach(function (item) {
+      expect(item.favorito).to.equal(true);
+    });
+  });
+}
+
+docs {
+  Só os produtos favoritos da estante, por nome. Aceita `q`, `page` e `size`.
+  Antes: 05.
+  Respostas: 200, 400 paginacao_invalida ou termo_muito_longo.
+}

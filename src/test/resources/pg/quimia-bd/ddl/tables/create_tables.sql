@@ -26,6 +26,7 @@ DROP TABLE IF EXISTS substancia CASCADE;
 DROP TABLE IF EXISTS classe_quimica CASCADE;
 DROP TABLE IF EXISTS empresa_produto CASCADE;
 DROP TABLE IF EXISTS produto CASCADE;
+DROP TABLE IF EXISTS ponto_salvo CASCADE;
 DROP TABLE IF EXISTS ponto_parceiro CASCADE;
 DROP TABLE IF EXISTS usuario CASCADE;
 DROP TABLE IF EXISTS empresa CASCADE;
@@ -245,6 +246,7 @@ CREATE TABLE estante_produto (
     id_estante  INTEGER NOT NULL,
     id_comodo   INTEGER,
     data_adicionado TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    favorito    BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT estante_produto_unique UNIQUE (id_estante, id_produto)
 );
 
@@ -270,7 +272,20 @@ CREATE TABLE ponto_parceiro (
     complemento VARCHAR(50),
     tipo        VARCHAR(50)
         CHECK (tipo IN ('compra', 'descarte')),
-    ativo       BOOLEAN DEFAULT TRUE
+    ativo       BOOLEAN DEFAULT TRUE,
+    latitude    NUMERIC(9,6),
+    longitude   NUMERIC(9,6),
+    CONSTRAINT chk_ponto_latitude CHECK (latitude BETWEEN -90 AND 90),
+    CONSTRAINT chk_ponto_longitude CHECK (longitude BETWEEN -180 AND 180),
+    CONSTRAINT chk_ponto_coordenadas_juntas CHECK ((latitude IS NULL) = (longitude IS NULL))
+);
+
+CREATE TABLE ponto_salvo (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id_usuario UUID NOT NULL,
+    id_ponto   INTEGER NOT NULL,
+    criado_em  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ponto_salvo_unique UNIQUE (id_usuario, id_ponto)
 );
 
 CREATE TABLE historico_match (
