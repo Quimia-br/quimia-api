@@ -278,6 +278,42 @@ class MisturaWebTest {
                 .andExpect(jsonPath("$.totalItens").value(0));
     }
 
+    // --- GET /misturas/resumo ---
+
+    @Test
+    void resumoContaSoAsMisturasDoUsuarioPorResultado() throws Exception {
+        misturar(tokenA, alvejante, limpaVidros).andExpect(status().isCreated());
+        misturar(tokenA, alvejante, sabao).andExpect(status().isCreated());
+        misturar(tokenA, sabao, limpaVidros).andExpect(status().isCreated());
+        misturar(tokenA, alvejante, semFds).andExpect(status().isCreated());
+        catalogo.historicoMatch(usuarioB, alvejante, limpaVidros, "incompativel", "critica", "Risco", null);
+
+        mvc.perform(get("/api/v1/misturas/resumo").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(4))
+                .andExpect(jsonPath("$.compativeis").value(2))
+                .andExpect(jsonPath("$.incompativeis").value(1))
+                .andExpect(jsonPath("$.naoAvaliadas").value(1));
+    }
+
+    @Test
+    void resumoSemHistoricoDevolveZeros() throws Exception {
+        mvc.perform(get("/api/v1/misturas/resumo").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0))
+                .andExpect(jsonPath("$.compativeis").value(0))
+                .andExpect(jsonPath("$.incompativeis").value(0))
+                .andExpect(jsonPath("$.naoAvaliadas").value(0));
+    }
+
+    @Test
+    void resumoExigeUsuario() throws Exception {
+        mvc.perform(get("/api/v1/misturas/resumo")).andExpect(status().isUnauthorized());
+        String empresa = TestLogins.empresa(mvc, "e@mistura.test", "30000003000196");
+        mvc.perform(get("/api/v1/misturas/resumo").header("Authorization", "Bearer " + empresa))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     void paginacaoInvalidaDa400() throws Exception {
         for (String[] par : new String[][] {{"size", "51"}, {"size", "0"}, {"page", "-1"}, {"page", "2147483647"}}) {

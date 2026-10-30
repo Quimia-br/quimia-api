@@ -38,4 +38,12 @@ public interface HistoricoMatchRepository extends JpaRepository<HistoricoMatch, 
             group by h.resultado
             """)
     List<Object[]> contarPorResultado(@Param("produtos") Collection<Integer> produtoIds);
+
+    /** Uma linha por resultado, só das misturas do usuário. */
+    @Query("""
+            select h.resultado, count(h) from HistoricoMatch h
+            where h.usuarioId = :usuario
+            group by h.resultado
+            """)
+    List<Object[]> contarDoUsuarioPorResultado(@Param("usuario") UUID usuarioId);
 }

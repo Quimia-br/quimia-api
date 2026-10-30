@@ -23,5 +23,5 @@ public record MisturaView(
         String descricaoRisco,
         @Schema(description = "Momento da consulta.", example = "2026-10-22T10:15:30-03:00")
         OffsetDateTime consultadoEm,
-        @Schema(description = "Dosagem recomendada; sempre nula nesta versão.")
+        @Schema(description = "Dosagem recomendada; sempre nula nesta versão (depende do agente).")
         DosagemView dosagem) {}

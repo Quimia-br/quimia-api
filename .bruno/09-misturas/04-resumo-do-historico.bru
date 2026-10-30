@@ -1,0 +1,30 @@
+meta {
+  name: 04 - Resumo do histórico
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/misturas/resumo
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+tests {
+  test("conta as misturas por resultado", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("total");
+    expect(res.getBody()).to.have.property("naoAvaliadas");
+  });
+}
+
+docs {
+  Totais das misturas do usuário para a Home: total, compativeis, incompativeis e naoAvaliadas. Zeros sem
+  histórico; muda a cada POST /misturas.
+  Respostas: 200.
+}
