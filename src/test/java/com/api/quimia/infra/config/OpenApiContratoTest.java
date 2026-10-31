@@ -49,7 +49,7 @@ class OpenApiContratoTest {
     private static final Set<String> METODOS = Set.of("get", "post", "put", "patch", "delete");
     private static final Pattern CODIGO = Pattern.compile("`([a-z][a-z0-9_]*)`");
     private static final Pattern CODIGO_LANCADO =
-            Pattern.compile("\\b(?:(?:Account|Catalog|Safety|Storage|Recommendation|Partner|Insights|Assistant)Exception|"
+            Pattern.compile("\\b(?:(?:Account|Catalog|Safety|Storage|Recommendation|Partner|Insights|Kpi|Assistant)Exception|"
                     + "escrever)\\([^\"]*\"([a-z][a-z0-9_]*)\"");
     private static final Path FONTES = Path.of("src", "main", "java");
     /** Códigos que não são de nenhuma rota: o firewall recusa a URL antes de achar a rota. */
@@ -127,7 +127,7 @@ class OpenApiContratoTest {
         Set<String> documentadas = operacoes().stream().map(Operacao::nome).collect(Collectors.toCollection(TreeSet::new));
 
         assertThat(documentadas).containsExactlyElementsOf(rotasDaAplicacao());
-        assertThat(documentadas).hasSize(68);
+        assertThat(documentadas).hasSize(72);
     }
 
     @Test

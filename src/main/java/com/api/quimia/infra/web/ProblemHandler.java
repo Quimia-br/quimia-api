@@ -4,6 +4,7 @@ import com.api.quimia.domain.account.internal.usecase.AccountException;
 import com.api.quimia.domain.assistant.internal.usecase.AssistantException;
 import com.api.quimia.domain.catalog.internal.usecase.CatalogException;
 import com.api.quimia.domain.insights.internal.usecase.InsightsException;
+import com.api.quimia.domain.kpi.internal.usecase.KpiException;
 import com.api.quimia.domain.partner.internal.usecase.PartnerException;
 import com.api.quimia.domain.recommendation.internal.usecase.RecommendationException;
 import com.api.quimia.domain.safety.internal.usecase.SafetyException;
@@ -84,6 +85,11 @@ public class ProblemHandler {
 
     @ExceptionHandler(InsightsException.class)
     ProblemDetail insights(InsightsException error, HttpServletRequest request) {
+        return problem(error.status(), codeTitle(error.code()), error.code(), request);
+    }
+
+    @ExceptionHandler(KpiException.class)
+    ProblemDetail kpi(KpiException error, HttpServletRequest request) {
         return problem(error.status(), codeTitle(error.code()), error.code(), request);
     }
 

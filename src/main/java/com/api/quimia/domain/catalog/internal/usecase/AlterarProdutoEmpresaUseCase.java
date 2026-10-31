@@ -1,12 +1,14 @@
 package com.api.quimia.domain.catalog.internal.usecase;
 
 import com.api.quimia.domain.catalog.dto.ProdutoView;
+import com.api.quimia.domain.catalog.internal.config.CacheDoCatalogo;
 import com.api.quimia.domain.catalog.internal.dto.AlteracaoProdutoForm;
 import com.api.quimia.domain.catalog.internal.mapper.ProdutoMapper;
 import com.api.quimia.domain.catalog.internal.model.Produto;
 import com.api.quimia.domain.catalog.internal.persistence.EmpresaProdutoRepository;
 import com.api.quimia.domain.catalog.internal.persistence.ProdutoRepository;
 import java.util.Optional;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -46,6 +48,11 @@ public class AlterarProdutoEmpresaUseCase {
         this.transacao = new TransactionTemplate(transacoes);
     }
 
+    @CacheEvict(
+            cacheNames = {
+                CacheDoCatalogo.PRODUTO, CacheDoCatalogo.PRODUTO_POR_CODIGO, CacheDoCatalogo.BUSCA_DE_PRODUTOS
+            },
+            allEntries = true)
     public ProdutoView execute(Integer empresaId, Integer produtoId, AlteracaoProdutoForm form) {
         portal.exigirAtiva(empresaId);
         Alteracao alteracao = validar(form);

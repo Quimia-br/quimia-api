@@ -1,6 +1,7 @@
 package com.api.quimia.domain.catalog.internal.usecase;
 
 import com.api.quimia.domain.account.dto.EmpresaView;
+import com.api.quimia.domain.catalog.internal.config.CacheDoCatalogo;
 import com.api.quimia.domain.catalog.internal.dto.CadastroProdutoForm;
 import com.api.quimia.domain.catalog.internal.dto.CadastroProdutoResponse;
 import com.api.quimia.domain.catalog.internal.mapper.ProdutoMapper;
@@ -14,6 +15,7 @@ import com.api.quimia.domain.catalog.internal.persistence.ProdutoRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -58,6 +60,11 @@ public class CadastrarProdutoEmpresaUseCase {
         this.transacao = new TransactionTemplate(transacoes);
     }
 
+    @CacheEvict(
+            cacheNames = {
+                CacheDoCatalogo.PRODUTO, CacheDoCatalogo.PRODUTO_POR_CODIGO, CacheDoCatalogo.BUSCA_DE_PRODUTOS
+            },
+            allEntries = true)
     public CadastroProdutoResponse execute(Integer empresaId, CadastroProdutoForm form) {
         EmpresaView empresa = portal.exigirAtiva(empresaId);
         String nome = form.nome().trim();
