@@ -21,6 +21,18 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  # Cache das leituras (quimia.cache). Só conecta com QUIMIA_CACHE_ENABLED=true. No Aiven, REDIS_URL é o Service
+  # URI (`rediss://`, com TLS).
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      # Redis lento não segura o pedido: estourado o prazo, a leitura vai ao Postgres.
+      timeout: ${QUIMIA_CACHE_TIMEOUT_MS:500}ms
+      connect-timeout: ${QUIMIA_CACHE_TIMEOUT_MS:500}ms
+      repositories:
+        enabled: false
+  cache:
+    type: redis
   # Usado só com APP_EMAIL_SENDER_MODE=smtp. Gmail: senha de app (conta com verificação em 2 etapas).
   mail:
     host: ${SPRING_MAIL_HOST:smtp.gmail.com}
@@ -84,6 +96,22 @@ quimia:
     mensagens-por-hora: ${QUIMIA_AGENTE_MENSAGENS_POR_HORA:20}
     # Buscas pela foto do rótulo por hora por usuário: folgado para escanear a despensa, barra só o abuso.
     buscas-por-imagem-por-hora: ${QUIMIA_AGENTE_BUSCAS_POR_IMAGEM_POR_HORA:60}
+  # Cache das leituras no Redis. Desligado, tudo é lido do Postgres e o Redis nem é contatado.
+  cache:
+    enabled: ${QUIMIA_CACHE_ENABLED:false}
+    # Separa ambientes na mesma instância (`quimia:prod:`, `quimia:hml:`).
+    prefix: ${QUIMIA_CACHE_PREFIX:quimia:}
+    # Validade de cada cache. Os só com TTL são dados que a API não grava (o DBA altera direto no banco).
+    ttl:
+      produto: 1h
+      produto-por-codigo: 1h
+      busca-de-produtos: 10m
+      substancia: 24h
+      composicao: 1h
+      resumo-da-fds: 1h
+      primeiros-socorros: 1h
+      pontos: 6h
+      resumo-da-empresa: 5m
 
 # Documentação OpenAPI das rotas: /v3/api-docs (JSON) e /swagger-ui.html. Ligada também em produção;
 # SWAGGER_ENABLED=false desliga as duas.
