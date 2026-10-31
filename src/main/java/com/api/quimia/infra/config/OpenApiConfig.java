@@ -64,6 +64,7 @@ public class OpenApiConfig {
             secao("Empresa: recuperação de senha", "Link por e-mail."),
             secao("Empresa: produtos", "Produtos do portal, imagem e FDS."),
             secao("Empresa: indicadores", "Home e Estatísticas (só agregados)."),
+            secao("Empresa: KPIs", "Gráficos de uso dos produtos da empresa (só agregados)."),
             secao("WebKemi", "Assistente do portal."));
 
     @Bean
