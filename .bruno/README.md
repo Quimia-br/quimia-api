@@ -28,7 +28,7 @@ Para o portal: **06 Portal** (02) cadastra um produto e já deixa o `produtoId` 
 | `06-portal` | portal | Listar, cadastrar (com e sem imagem), alterar, trocar imagem, remover, Home, Estatísticas, WebKemi, revisão das pendências da FDS (14 a 16) novo chat (17) e tipos de produto (18) |
 | `07-recuperacao-de-senha` | app e portal | Código por email (usuário) e link por email (empresa) |
 | `08-comodos` | app | Criar, listar, detalhar, adicionar e remover produtos, cômodo do produto, editar e excluir (09 por último) |
-| `09-misturas` | app | Misturar dois produtos, histórico, detalhe |
+| `09-misturas` | app | Misturar dois produtos, histórico, detalhe, resumo para a Home, misturar produto com substância (05) |
 | `10-pontos` | app | Pontos de compra e descarte com coordenadas, pontos salvos e último descarte da Home |
 | `11-kemi` | app | Perguntar ao Kemi e novo chat |
 | `90-casos-de-erro` | — | Respostas de erro esperadas (401, 403, 404, 409, 415, 422...) |

@@ -1,7 +1,9 @@
 package com.api.quimia.domain.safety.internal.model;
 
 import com.api.quimia.domain.safety.dto.AvaliacaoConjuntoView;
+import com.api.quimia.domain.safety.dto.AvaliacaoItensView;
 import com.api.quimia.domain.safety.dto.AvaliacaoParView;
+import com.api.quimia.domain.safety.dto.ItemParaAvaliar;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -47,6 +49,7 @@ public final class MotorDeCompatibilidade {
             .thenComparing(declarada -> semDescricao(declarada) ? "" : declarada.descricaoRisco());
 
     private final Map<Integer, ComposicaoDoProduto> composicoes;
+    private final Map<Integer, ComposicaoDoProduto> substanciasAvulsas;
     private final List<RegraDeIncompatibilidade> regras;
     private final List<IncompatibilidadeDaFds> declaradas;
 
@@ -61,7 +64,17 @@ public final class MotorDeCompatibilidade {
             Map<Integer, ComposicaoDoProduto> composicoes,
             Collection<RegraDeIncompatibilidade> regras,
             Collection<IncompatibilidadeDaFds> declaradas) {
+        this(composicoes, Map.of(), regras, declaradas);
+    }
+
+    /** `substanciasAvulsas`: composição de cada substância solta (id da substância, ela mesma e suas classes). */
+    public MotorDeCompatibilidade(
+            Map<Integer, ComposicaoDoProduto> composicoes,
+            Map<Integer, ComposicaoDoProduto> substanciasAvulsas,
+            Collection<RegraDeIncompatibilidade> regras,
+            Collection<IncompatibilidadeDaFds> declaradas) {
         this.composicoes = Map.copyOf(composicoes);
+        this.substanciasAvulsas = Map.copyOf(substanciasAvulsas);
         this.regras = regras.stream().sorted(MAIS_GRAVE_PRIMEIRO).toList();
         this.declaradas = declaradas.stream().sorted(DECLARADA_MAIS_GRAVE_PRIMEIRO).toList();
     }
@@ -73,31 +86,54 @@ public final class MotorDeCompatibilidade {
         }
         int menor = Math.min(produtoIdA, produtoIdB);
         int maior = Math.max(produtoIdA, produtoIdB);
-        ComposicaoDoProduto a = composicao(menor);
-        ComposicaoDoProduto b = composicao(maior);
+        AvaliacaoItensView veredito = decidir(menor, composicao(menor), maior, composicao(maior));
+        return new AvaliacaoParView(
+                menor,
+                maior,
+                veredito.resultado(),
+                veredito.severidade(),
+                veredito.descricaoRisco(),
+                veredito.regraId());
+    }
+
+    /**
+     * Dois itens, cada um produto ou substância, em qualquer ordem. Itens iguais ou nulos não formam par. A substância
+     * solta tem composição de um item só e não tem FDS, então só as regras curadas e as declarações da FDS do outro
+     * produto podem atingi-la.
+     */
+    public AvaliacaoItensView avaliar(ItemParaAvaliar a, ItemParaAvaliar b) {
+        if (a == null || b == null || a.equals(b)) {
+            throw new IllegalArgumentException("itens_iguais");
+        }
+        return decidir(a.produtoId(), composicaoDe(a), b.produtoId(), composicaoDe(b));
+    }
+
+    /** `produtoA` e `produtoB` são nulos quando o lado é uma substância solta: nenhuma declaração de FDS é dela. */
+    private AvaliacaoItensView decidir(
+            Integer produtoA, ComposicaoDoProduto a, Integer produtoB, ComposicaoDoProduto b) {
         if (a.semSubstanciaResolvida() || b.semSubstanciaResolvida()) {
-            return new AvaliacaoParView(menor, maior, NAO_AVALIADO, null, SEM_COMPOSICAO, null);
+            return new AvaliacaoItensView(NAO_AVALIADO, null, SEM_COMPOSICAO, null);
         }
         RegraDeIncompatibilidade regra =
                 regras.stream().filter(candidata -> candidata.casa(a, b)).findFirst().orElse(null);
         IncompatibilidadeDaFds declarada = declaradas.stream()
-                .filter(candidata -> atinge(candidata, menor, maior, a, b))
+                .filter(candidata -> atinge(candidata, produtoA, produtoB, a, b))
                 .findFirst()
                 .orElse(null);
         if (regra != null && (declarada == null || regra.severidade().compareTo(declarada.severidade()) >= 0)) {
-            return new AvaliacaoParView(
-                    menor, maior, INCOMPATIVEL, regra.severidade().codigo(), regra.descricaoRisco(), regra.id());
+            return new AvaliacaoItensView(
+                    INCOMPATIVEL, regra.severidade().codigo(), regra.descricaoRisco(), regra.id());
         }
         if (declarada != null) {
             String descricao = declarada.descricaoRisco() == null || declarada.descricaoRisco().isBlank()
                     ? DECLARADA_NA_FDS
                     : declarada.descricaoRisco();
-            return new AvaliacaoParView(menor, maior, INCOMPATIVEL, declarada.severidade().codigo(), descricao, null);
+            return new AvaliacaoItensView(INCOMPATIVEL, declarada.severidade().codigo(), descricao, null);
         }
         if (a.temCompostoNaoResolvido() || b.temCompostoNaoResolvido()) {
-            return new AvaliacaoParView(menor, maior, NAO_AVALIADO, null, COMPOSICAO_INCOMPLETA, null);
+            return new AvaliacaoItensView(NAO_AVALIADO, null, COMPOSICAO_INCOMPLETA, null);
         }
-        return new AvaliacaoParView(menor, maior, COMPATIVEL, null, null, null);
+        return new AvaliacaoItensView(COMPATIVEL, null, null, null);
     }
 
     /**
@@ -156,14 +192,25 @@ public final class MotorDeCompatibilidade {
 
     /** A declaração de um produto atinge o outro; a de um produto de fora do par não conta. */
     private static boolean atinge(
-            IncompatibilidadeDaFds declarada, int menor, int maior, ComposicaoDoProduto a, ComposicaoDoProduto b) {
-        if (declarada.produtoId() == menor) {
+            IncompatibilidadeDaFds declarada,
+            Integer produtoA,
+            Integer produtoB,
+            ComposicaoDoProduto a,
+            ComposicaoDoProduto b) {
+        if (Objects.equals(declarada.produtoId(), produtoA)) {
             return declarada.atinge(b);
         }
-        return declarada.produtoId() == maior && declarada.atinge(a);
+        return Objects.equals(declarada.produtoId(), produtoB) && declarada.atinge(a);
     }
 
     private ComposicaoDoProduto composicao(int produtoId) {
         return composicoes.getOrDefault(produtoId, ComposicaoDoProduto.VAZIA);
+    }
+
+    private ComposicaoDoProduto composicaoDe(ItemParaAvaliar item) {
+        if (item.produtoId() != null) {
+            return composicao(item.produtoId());
+        }
+        return substanciasAvulsas.getOrDefault(item.substanciaId(), ComposicaoDoProduto.VAZIA);
     }
 }
