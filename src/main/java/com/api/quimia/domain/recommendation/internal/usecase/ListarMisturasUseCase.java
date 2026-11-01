@@ -25,14 +25,23 @@ public class ListarMisturasUseCase {
     }
 
     @Transactional(readOnly = true)
-    public Pagina<MisturaView> execute(UUID usuarioId, Integer produtoId, int pagina, int tamanho) {
+    public Pagina<MisturaView> execute(
+            UUID usuarioId, Integer produtoId, Integer substanciaId, int pagina, int tamanho) {
+        if (produtoId != null && substanciaId != null) {
+            throw new RecommendationException("filtro_invalido", 400);
+        }
         if (pagina < 0 || tamanho < 1 || tamanho > TAMANHO_MAXIMO || (long) pagina * tamanho > Integer.MAX_VALUE) {
             throw new RecommendationException("paginacao_invalida", 400);
         }
         PageRequest pedido = PageRequest.of(pagina, tamanho, Sort.by(Sort.Order.desc("dataConsulta"), Sort.Order.desc("id")));
-        Page<HistoricoMatch> resultado = produtoId == null
-                ? historico.findByUsuarioId(usuarioId, pedido)
-                : historico.doUsuarioComProduto(usuarioId, produtoId, pedido);
+        Page<HistoricoMatch> resultado;
+        if (produtoId != null) {
+            resultado = historico.doUsuarioComProduto(usuarioId, produtoId, pedido);
+        } else if (substanciaId != null) {
+            resultado = historico.doUsuarioComSubstancia(usuarioId, substanciaId, pedido);
+        } else {
+            resultado = historico.findByUsuarioId(usuarioId, pedido);
+        }
         return new Pagina<>(
                 montar.views(resultado.getContent()),
                 resultado.getNumber(),

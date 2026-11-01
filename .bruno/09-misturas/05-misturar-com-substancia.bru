@@ -1,0 +1,50 @@
+meta {
+  name: 05 - Misturar produto com substância
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/misturas
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+  Authorization: Bearer {{accessToken}}
+}
+
+body:json {
+  {
+    "produtoIdA": {{outroProdutoId}},
+    "substanciaIdB": {{substanciaId}}
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("misturaId", res.getBody().id);
+  }
+}
+
+tests {
+  test("registra a consulta com a substância no lado B", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(["compativel", "incompativel", "nao_avaliado"]).to.include(res.getBody().resultado);
+    expect(res.getBody().substanciaB).to.have.property("id");
+    expect(res.getBody().produtoB).to.equal(null);
+  });
+}
+
+docs {
+  Cada lado do par é um produto (`produtoIdA`, `produtoIdB`) ou uma substância (`substanciaIdA`, `substanciaIdB`, as
+  de `GET /estante/substancias`), nunca os dois: produto com substância (nas duas ordens) ou substância com
+  substância. A resposta ordena o par, produto antes de substância; o lado que é substância vem em
+  `substanciaA`/`substanciaB` e o `produtoA`/`produtoB` correspondente vem nulo.
+  Antes: `04 - Estante / 01` com dois produtos e `05 - Segurança / 02` (preenche `substanciaId` com uma substância de
+  `produtoId`; `outroProdutoId` não pode tê-la).
+  Respostas: 201, 400 validation (lado sem item ou com produto e substância), 404 produto_nao_esta_na_estante ou
+  substancia_nao_esta_na_estante, 422 produtos_iguais, substancias_iguais ou substancia_ja_no_produto.
+}

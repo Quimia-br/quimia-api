@@ -47,6 +47,9 @@ class MisturaWebTest {
     private int semFds;
     private int doOutro;
     private int regraCloroAmonia;
+    private int hipoclorito;
+    private int amonia;
+    private int agua;
 
     @BeforeEach
     void seed() throws Exception {
@@ -59,9 +62,9 @@ class MisturaWebTest {
         usuarioA = catalogo.usuarioId("a@mistura.test");
         usuarioB = catalogo.usuarioId("b@mistura.test");
         int marca = catalogo.marca("Marca", null);
-        int hipoclorito = catalogo.substancia("Hipoclorito de sódio", "7681-52-9", null);
-        int amonia = catalogo.substancia("Amônia", "7664-41-7", null);
-        int agua = catalogo.substancia("Água", "7732-18-5", null);
+        hipoclorito = catalogo.substancia("Hipoclorito de sódio", "7681-52-9", null);
+        amonia = catalogo.substancia("Amônia", "7664-41-7", null);
+        agua = catalogo.substancia("Água", "7732-18-5", null);
         regraCloroAmonia = catalogo.regra(hipoclorito, null, amonia, null, "critica", "Libera gás tóxico", true);
         alvejante = produtoCom(marca, "Alvejante", hipoclorito);
         limpaVidros = produtoCom(marca, "Limpa vidros", amonia);
@@ -155,8 +158,6 @@ class MisturaWebTest {
     @Test
     void compostoNaoIdentificadoNaoEscondeRegraQueCasa() throws Exception {
         misturar(tokenA, alvejante, desengordurante).andExpect(jsonPath("$.resultado").value("nao_avaliado"));
-        int hipoclorito = jdbc.queryForObject("SELECT id FROM substancia WHERE cas_numero = '7681-52-9'", Integer.class);
-        int agua = jdbc.queryForObject("SELECT id FROM substancia WHERE cas_numero = '7732-18-5'", Integer.class);
         catalogo.regra(agua, null, hipoclorito, null, "baixa", "Dilui", true);
 
         misturar(tokenA, alvejante, desengordurante)
@@ -241,6 +242,154 @@ class MisturaWebTest {
         misturar(empresa, alvejante, limpaVidros).andExpect(status().isForbidden());
     }
 
+    // --- POST /misturas com substância ---
+
+    private ResultActions misturarCorpo(String token, String corpo) throws Exception {
+        return mvc.perform(post("/api/v1/misturas")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(corpo));
+    }
+
+    private static String produtoESubstancia(int produto, int substancia) {
+        return "{\"produtoIdA\":" + produto + ",\"substanciaIdB\":" + substancia + "}";
+    }
+
+    private static String substanciaEProduto(int substancia, int produto) {
+        return "{\"substanciaIdA\":" + substancia + ",\"produtoIdB\":" + produto + "}";
+    }
+
+    private static String duasSubstancias(int a, int b) {
+        return "{\"substanciaIdA\":" + a + ",\"substanciaIdB\":" + b + "}";
+    }
+
+    @Test
+    void produtoComSubstanciaGravaOParComOProdutoAntesDaSubstanciaNasDuasOrdens() throws Exception {
+        misturarCorpo(tokenA, substanciaEProduto(hipoclorito, limpaVidros))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultado").value("incompativel"))
+                .andExpect(jsonPath("$.severidade").value("critica"))
+                .andExpect(jsonPath("$.descricaoRisco").value("Libera gás tóxico"))
+                .andExpect(jsonPath("$.produtoA.id").value(limpaVidros))
+                .andExpect(jsonPath("$.produtoB").doesNotExist())
+                .andExpect(jsonPath("$.substanciaA").doesNotExist())
+                .andExpect(jsonPath("$.substanciaB.id").value(hipoclorito))
+                .andExpect(jsonPath("$.substanciaB.nome").value("Hipoclorito de sódio"));
+        misturarCorpo(tokenA, produtoESubstancia(limpaVidros, hipoclorito))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.produtoA.id").value(limpaVidros))
+                .andExpect(jsonPath("$.substanciaB.id").value(hipoclorito));
+
+        var linhas = jdbc.queryForList(
+                "SELECT id_produto_a, id_produto_b, id_substancia_a, id_substancia_b, id_regra FROM historico_match"
+                        + " WHERE id_usuario = ?",
+                usuarioA);
+        assertThat(linhas).hasSize(2);
+        for (var linha : linhas) {
+            assertThat(((Number) linha.get("id_produto_a")).intValue()).isEqualTo(limpaVidros);
+            assertThat(linha.get("id_produto_b")).isNull();
+            assertThat(linha.get("id_substancia_a")).isNull();
+            assertThat(((Number) linha.get("id_substancia_b")).intValue()).isEqualTo(hipoclorito);
+            assertThat(((Number) linha.get("id_regra")).intValue()).isEqualTo(regraCloroAmonia);
+        }
+    }
+
+    @Test
+    void duasSubstanciasSaoOrdenadasPeloMenorId() throws Exception {
+        misturarCorpo(tokenA, duasSubstancias(amonia, hipoclorito))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultado").value("incompativel"))
+                .andExpect(jsonPath("$.produtoA").doesNotExist())
+                .andExpect(jsonPath("$.produtoB").doesNotExist())
+                .andExpect(jsonPath("$.substanciaA.id").value(Math.min(hipoclorito, amonia)))
+                .andExpect(jsonPath("$.substanciaB.id").value(Math.max(hipoclorito, amonia)));
+
+        var linha = jdbc.queryForMap(
+                "SELECT id_produto_a, id_produto_b, id_substancia_a, id_substancia_b FROM historico_match"
+                        + " WHERE id_usuario = ?",
+                usuarioA);
+        assertThat(linha.get("id_produto_a")).isNull();
+        assertThat(linha.get("id_produto_b")).isNull();
+        assertThat(((Number) linha.get("id_substancia_a")).intValue()).isEqualTo(Math.min(hipoclorito, amonia));
+        assertThat(((Number) linha.get("id_substancia_b")).intValue()).isEqualTo(Math.max(hipoclorito, amonia));
+    }
+
+    @Test
+    void semRegraAMisturaComSubstanciaECompativelENaoAvaliadaSemComposicao() throws Exception {
+        misturarCorpo(tokenA, produtoESubstancia(alvejante, agua))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultado").value("compativel"))
+                .andExpect(jsonPath("$.severidade").doesNotExist());
+        misturarCorpo(tokenA, duasSubstancias(hipoclorito, agua))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultado").value("compativel"));
+        misturarCorpo(tokenA, produtoESubstancia(semFds, hipoclorito))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultado").value("nao_avaliado"))
+                .andExpect(jsonPath("$.descricaoRisco").value("Produto sem composição resolvida"));
+    }
+
+    @Test
+    void substanciaForaDaEstanteInexistenteOuDeOutroUsuarioDa404() throws Exception {
+        for (int fora : new int[] {999999, -1, 0, Integer.MAX_VALUE}) {
+            misturarCorpo(tokenA, substanciaEProduto(fora, alvejante))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.detail").value("substancia_nao_esta_na_estante"));
+        }
+        misturarCorpo(tokenB, substanciaEProduto(hipoclorito, doOutro))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("substancia_nao_esta_na_estante"));
+        misturarCorpo(tokenB, duasSubstancias(agua, hipoclorito))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("substancia_nao_esta_na_estante"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM historico_match", Integer.class)).isZero();
+    }
+
+    @Test
+    void produtoForaDaEstanteComSubstanciaDa404() throws Exception {
+        misturarCorpo(tokenA, produtoESubstancia(doOutro, hipoclorito))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("produto_nao_esta_na_estante"));
+    }
+
+    @Test
+    void substanciaNaoMisturaComOProdutoQueJaAContem() throws Exception {
+        misturarCorpo(tokenA, produtoESubstancia(alvejante, hipoclorito))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("substancia_ja_no_produto"));
+        misturarCorpo(tokenA, substanciaEProduto(agua, desengordurante))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("substancia_ja_no_produto"));
+        misturarCorpo(tokenA, produtoESubstancia(alvejante, agua)).andExpect(status().isCreated());
+    }
+
+    @Test
+    void itensIguaisDao422() throws Exception {
+        misturarCorpo(tokenA, duasSubstancias(hipoclorito, hipoclorito))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("substancias_iguais"));
+    }
+
+    @Test
+    void cadaLadoPrecisaDeProdutoOuSubstanciaMasNuncaOsDois() throws Exception {
+        String[] invalidos = {
+            "{\"produtoIdA\":" + alvejante + ",\"substanciaIdA\":" + hipoclorito + ",\"produtoIdB\":" + sabao + "}",
+            "{\"produtoIdA\":" + alvejante + "}",
+            "{\"substanciaIdA\":" + hipoclorito + ",\"substanciaIdB\":" + agua + ",\"produtoIdB\":" + sabao + "}",
+            "{\"produtoIdA\":" + alvejante + ",\"produtoIdB\":" + sabao + ",\"substanciaIdB\":" + agua + "}",
+            "{\"substanciaIdA\":" + hipoclorito + "}"
+        };
+        for (String corpo : invalidos) {
+            misturarCorpo(tokenA, corpo)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.detail").value("validation"));
+        }
+        misturarCorpo(tokenA, "{\"substanciaIdA\":\"abc\",\"produtoIdB\":" + sabao + "}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("corpo_invalido"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM historico_match", Integer.class)).isZero();
+    }
+
     // --- GET /misturas e /misturas/{id} ---
 
     @Test
@@ -268,6 +417,62 @@ class MisturaWebTest {
                 .andExpect(jsonPath("$.totalItens").value(2));
         mvc.perform(get("/api/v1/misturas").param("produtoId", String.valueOf(alvejante)).header("Authorization", "Bearer " + tokenA))
                 .andExpect(jsonPath("$.totalItens").value(1));
+    }
+
+    @Test
+    void filtraPorSubstanciaEmQualquerLadoEnaoAceitaOsDoisFiltros() throws Exception {
+        misturarCorpo(tokenA, substanciaEProduto(hipoclorito, limpaVidros)).andExpect(status().isCreated());
+        misturarCorpo(tokenA, duasSubstancias(hipoclorito, amonia)).andExpect(status().isCreated());
+        misturar(tokenA, alvejante, limpaVidros).andExpect(status().isCreated());
+
+        mvc.perform(get("/api/v1/misturas").param("substanciaId", String.valueOf(hipoclorito))
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.totalItens").value(2));
+        mvc.perform(get("/api/v1/misturas").param("substanciaId", String.valueOf(amonia))
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.totalItens").value(1));
+        mvc.perform(get("/api/v1/misturas").param("produtoId", String.valueOf(limpaVidros))
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.totalItens").value(2));
+        mvc.perform(get("/api/v1/misturas")
+                        .param("produtoId", String.valueOf(limpaVidros))
+                        .param("substanciaId", String.valueOf(hipoclorito))
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("filtro_invalido"));
+        mvc.perform(get("/api/v1/misturas").param("substanciaId", "abc").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("parametro_invalido"));
+    }
+
+    @Test
+    void listaEDetalheTrazemAsSubstanciasComONome() throws Exception {
+        misturarCorpo(tokenA, duasSubstancias(hipoclorito, amonia)).andExpect(status().isCreated());
+        int id = jdbc.queryForObject("SELECT max(id) FROM historico_match", Integer.class);
+
+        mvc.perform(get("/api/v1/misturas").header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.itens[0].produtoA").doesNotExist())
+                .andExpect(jsonPath("$.itens[0].substanciaA.nome").value("Hipoclorito de sódio"))
+                .andExpect(jsonPath("$.itens[0].substanciaB.nome").value("Amônia"));
+        mvc.perform(get("/api/v1/misturas/" + id).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.substanciaA.id").value(hipoclorito))
+                .andExpect(jsonPath("$.substanciaB.id").value(amonia));
+        mvc.perform(get("/api/v1/misturas/" + id).header("Authorization", "Bearer " + tokenB))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void resumoContaAsMisturasComSubstancia() throws Exception {
+        misturarCorpo(tokenA, duasSubstancias(hipoclorito, amonia)).andExpect(status().isCreated());
+        misturarCorpo(tokenA, produtoESubstancia(alvejante, agua)).andExpect(status().isCreated());
+        misturarCorpo(tokenA, produtoESubstancia(semFds, hipoclorito)).andExpect(status().isCreated());
+
+        mvc.perform(get("/api/v1/misturas/resumo").header("Authorization", "Bearer " + tokenA))
+                .andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.incompativeis").value(1))
+                .andExpect(jsonPath("$.compativeis").value(1))
+                .andExpect(jsonPath("$.naoAvaliadas").value(1));
     }
 
     @Test

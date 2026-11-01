@@ -10,8 +10,9 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Consulta de mistura de um usuário. O banco exige `id_produto_a < id_produto_b` (par normalizado)
- * e `resultado` em `compativel`, `incompativel` ou `nao_avaliado`.
+ * Consulta de mistura de um usuário. Cada lado é um produto (`id_produto_*`) ou uma substância (`id_substancia_*`),
+ * nunca os dois. O par é normalizado: produto antes de substância e, no mesmo tipo, o menor id primeiro. O banco exige
+ * `resultado` em `compativel`, `incompativel` ou `nao_avaliado`.
  */
 @Entity
 @Table(name = "historico_match")
@@ -23,11 +24,17 @@ public class HistoricoMatch {
     @Column(name = "id_usuario", nullable = false)
     private UUID usuarioId;
 
-    @Column(name = "id_produto_a", nullable = false)
+    @Column(name = "id_produto_a")
     private Integer produtoAId;
 
-    @Column(name = "id_produto_b", nullable = false)
+    @Column(name = "id_produto_b")
     private Integer produtoBId;
+
+    @Column(name = "id_substancia_a")
+    private Integer substanciaAId;
+
+    @Column(name = "id_substancia_b")
+    private Integer substanciaBId;
 
     @Column(nullable = false, length = 20)
     private String resultado;
@@ -70,6 +77,22 @@ public class HistoricoMatch {
 
     public void setProdutoBId(Integer produtoBId) {
         this.produtoBId = produtoBId;
+    }
+
+    public Integer getSubstanciaAId() {
+        return substanciaAId;
+    }
+
+    public void setSubstanciaAId(Integer substanciaAId) {
+        this.substanciaAId = substanciaAId;
+    }
+
+    public Integer getSubstanciaBId() {
+        return substanciaBId;
+    }
+
+    public void setSubstanciaBId(Integer substanciaBId) {
+        this.substanciaBId = substanciaBId;
     }
 
     public String getResultado() {

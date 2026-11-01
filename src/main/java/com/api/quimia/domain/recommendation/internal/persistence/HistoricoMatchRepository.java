@@ -24,6 +24,13 @@ public interface HistoricoMatchRepository extends JpaRepository<HistoricoMatch, 
     Page<HistoricoMatch> doUsuarioComProduto(
             @Param("usuario") UUID usuarioId, @Param("produto") Integer produtoId, Pageable pageable);
 
+    @Query("""
+            select h from HistoricoMatch h
+            where h.usuarioId = :usuario and (h.substanciaAId = :substancia or h.substanciaBId = :substancia)
+            """)
+    Page<HistoricoMatch> doUsuarioComSubstancia(
+            @Param("usuario") UUID usuarioId, @Param("substancia") Integer substanciaId, Pageable pageable);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             delete from HistoricoMatch h
