@@ -310,6 +310,28 @@ class ComodoWebTest {
     }
 
     @Test
+    void listaPorOrdemDeCriacao() throws Exception {
+        criarEObterId(tokenA, "Quarto", p1, p2);
+        int x = produtoCom("X", agua);
+        int y = produtoCom("Y", agua);
+        catalogo.guardar(usuarioA, x);
+        catalogo.guardar(usuarioA, y);
+        criarEObterId(tokenA, "Área de serviço", x, y);
+
+        mvc.perform(get("/api/v1/comodos").param("ordem", "recentes").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[0].nome").value("Área de serviço"))
+                .andExpect(jsonPath("$.itens[1].nome").value("Quarto"));
+        mvc.perform(get("/api/v1/comodos").param("ordem", "antigos").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[0].nome").value("Quarto"))
+                .andExpect(jsonPath("$.itens[1].nome").value("Área de serviço"));
+        mvc.perform(get("/api/v1/comodos").param("ordem", "favoritos").header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("ordem_invalida"));
+    }
+
+    @Test
     void listaFiltraPorTermoEValidaPaginacao() throws Exception {
         criarEObterId(tokenA, "Banheiro", p1, p2);
         mvc.perform(get("/api/v1/comodos").param("q", "BANH").header("Authorization", "Bearer " + tokenA))

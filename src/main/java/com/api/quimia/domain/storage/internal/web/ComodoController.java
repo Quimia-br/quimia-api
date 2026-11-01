@@ -108,9 +108,11 @@ public class ComodoController {
 
     @Operation(
             summary = "Listar cômodos",
-            description = "Cômodos do usuário por nome (sem acento), com o total de produtos e o status de risco "
-                    + "de cada um.")
+            description = "Cômodos do usuário, com o total de produtos e o status de risco de cada um. "
+                    + "`ordem=alfabetica` (padrão) ordena por nome, sem acento; `recentes` e `antigos` seguem a "
+                    + "ordem de criação.")
     @Parameter(name = "q", description = "Busca pelo nome do cômodo (até 100 caracteres).", example = "banheiro")
+    @Parameter(name = "ordem", description = "alfabetica, recentes ou antigos.", example = "recentes")
     @Parameter(name = "page", description = "Página, a partir de 0.", example = "0")
     @Parameter(name = "size", description = "Itens por página, de 1 a 50.", example = "20")
     @ApiResponse(responseCode = "200", description = "Página de cômodos.")
@@ -118,14 +120,15 @@ public class ComodoController {
             responseCode = "400",
             description = "Paginação fora das regras (página negativa, tamanho fora de 1 a 50 ou página × tamanho "
                     + "acima do maior int): `paginacao_invalida`. Termo de busca acima de 100 caracteres: "
-                    + "`termo_muito_longo`.")
+                    + "`termo_muito_longo`. Ordem fora da lista: `ordem_invalida`.")
     @GetMapping("/comodos")
     public Pagina<ComodoResumo> listar(
             @AuthenticationPrincipal AccountPrincipal principal,
             @RequestParam(name = "q", required = false) String termo,
+            @RequestParam(name = "ordem", required = false) String ordem,
             @RequestParam(name = "page", defaultValue = "0") int pagina,
             @RequestParam(name = "size", defaultValue = "" + ListarComodosUseCase.TAMANHO_PADRAO) int tamanho) {
-        return listar.execute(principal.usuarioId(), termo, pagina, tamanho);
+        return listar.execute(principal.usuarioId(), termo, ordem, pagina, tamanho);
     }
 
     @Operation(
