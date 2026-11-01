@@ -13,7 +13,16 @@ final class OrdemDaEstante {
     static final String FAVORITOS = "favoritos";
     private static final Set<String> DOS_PRODUTOS = Set.of(ALFABETICA, RECENTES, ANTIGOS, FAVORITOS);
 
+    private static final Set<String> DOS_COMODOS = Set.of(ALFABETICA, RECENTES, ANTIGOS);
+
     private OrdemDaEstante() {}
+
+    /** Cômodos não têm data própria: `recentes` e `antigos` seguem o id, que cresce a cada criação. */
+    static void validarDosComodos(String ordem) {
+        if (ordem != null && !DOS_COMODOS.contains(ordem)) {
+            throw new StorageException("ordem_invalida", 400);
+        }
+    }
 
     /** Ordem das substâncias da estante: só a alfabética. */
     static void validar(String ordem) {

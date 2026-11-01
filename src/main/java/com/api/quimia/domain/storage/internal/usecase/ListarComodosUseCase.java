@@ -32,17 +32,17 @@ public class ListarComodosUseCase {
     }
 
     @Transactional(readOnly = true)
-    public Pagina<ComodoResumo> execute(UUID usuarioId, String termo, int pagina, int tamanho) {
+    public Pagina<ComodoResumo> execute(UUID usuarioId, String termo, String ordem, int pagina, int tamanho) {
         if (pagina < 0 || tamanho < 1 || tamanho > TAMANHO_MAXIMO || (long) pagina * tamanho > Integer.MAX_VALUE) {
             throw new StorageException("paginacao_invalida", 400);
         }
         if (termo != null && termo.length() > TERMO_MAXIMO) {
             throw new StorageException("termo_muito_longo", 400);
         }
+        OrdemDaEstante.validarDosComodos(ordem);
         List<Comodo> filtrados = comodos.findByUsuarioIdOrderByIdAsc(usuarioId).stream()
                 .filter(comodo -> TextoBusca.contem(comodo.getNome(), termo))
-                .sorted(Comparator.comparing((Comodo comodo) -> NomeDeComodo.chave(comodo.getNome()))
-                        .thenComparing(Comodo::getId))
+                .sorted(comparador(ordem))
                 .toList();
         int inicio = (int) Math.min((long) pagina * tamanho, filtrados.size());
         int fim = Math.min(inicio + tamanho, filtrados.size());
@@ -55,5 +55,16 @@ public class ListarComodosUseCase {
                 .toList();
         int totalPaginas = (int) Math.ceil(filtrados.size() / (double) tamanho);
         return new Pagina<>(itensDaPagina, pagina, tamanho, filtrados.size(), totalPaginas);
+    }
+
+    private static Comparator<Comodo> comparador(String ordem) {
+        if (OrdemDaEstante.RECENTES.equals(ordem)) {
+            return Comparator.comparing(Comodo::getId).reversed();
+        }
+        if (OrdemDaEstante.ANTIGOS.equals(ordem)) {
+            return Comparator.comparing(Comodo::getId);
+        }
+        return Comparator.comparing((Comodo comodo) -> NomeDeComodo.chave(comodo.getNome()))
+                .thenComparing(Comodo::getId);
     }
 }
