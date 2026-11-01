@@ -1,148 +1,244 @@
-# quimia
+<div align="center">
 
-Scaffold modular Java/Spring. Estrutura agrupa codigo por area de negocio
-(`domain/<module>/`) com fronteiras `internal/` privadas garantidas por
-ArchUnit no build.
+# Quimia API
 
-Detalhes de convencao, nomenclatura e fronteiras estao em
-[`Arquitetura Template Modular Java Spring.md`](./Arquitetura%20Template%20Modular%20Java%20Spring.md).
+**O backend do Quimia: catálogo de produtos químicos, estante do usuário, análise de FDS e detecção de misturas perigosas.**
 
-## Requisitos
+[![CI](https://github.com/Quimia-br/quimia-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Quimia-br/quimia-api/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Quimia-br/quimia-api?sort=semver)](https://github.com/Quimia-br/quimia-api/releases)
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://adoptium.net/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 
-- JDK 21 (Temurin recomendado)
-- Maven 3.9+
+[Visão geral](#visão-geral) · [Arquitetura](#arquitetura) · [Como rodar](#como-rodar) · [Rotas](#rotas) · [Segurança](#autenticação-e-autorização) · [Cache](#cache-com-redis) · [Testes](#testes) · [Docker](#docker) · [CI/CD](#cicd)
 
-## Comandos
+**Produção:** https://quimia.discloud.app · **Swagger:** `/swagger-ui.html` · **OpenAPI:** `/v3/api-docs`
+
+</div>
+
+---
+
+API REST que atende o aplicativo móvel ([quimia-mobile](https://github.com/Quimia-br/quimia-mobile)) e o portal
+web ([quimia-web](https://github.com/Quimia-br/quimia-web)).
+
+## Visão geral
+
+| Tema | Como é tratado |
+| --- | --- |
+| **Identidade** | Usuários do app entram por Firebase; empresas do portal, por e-mail e senha (BCrypt). A API emite JWT e cookie de renovação. |
+| **Autorização** | Spring Security separa os perfis usuário, empresa e admin por rota. |
+| **Catálogo e FDS** | CRUD de produtos da empresa e análise de FDS pelo [extrator](https://github.com/Quimia-br/quimia-extractor-ai), com pendências para revisão. |
+| **Misturas** | Compatibilidade entre produtos com histórico e resumo. |
+| **Erros** | Tratamento centralizado em `application/problem+json`. |
+| **Cache** | Redis nas leituras mais frequentes, opcional por configuração. |
+| **Contrato** | Swagger gerado do código; um teste falha se uma rota ficar sem documentação. |
+| **Arquitetura** | Monólito modular com fronteiras garantidas por ArchUnit. |
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Linguagem / runtime | Java 21 (Temurin) |
+| Framework | Spring Boot, Spring MVC |
+| Persistência | Spring Data JPA / Hibernate sobre PostgreSQL |
+| Segurança | Spring Security, JWT, Firebase (login do app), BCrypt |
+| Cache | Redis (Spring Cache) |
+| Documentação | springdoc-openapi (Swagger UI) |
+| Build | Maven (wrapper `./mvnw`) |
+| Qualidade | JUnit, MockMvc, ArchUnit, JaCoCo (mínimo de 80%) |
+| Entrega | GitHub Actions, Docker, Discloud |
+
+## Arquitetura
+
+Monólito modular. O código é agrupado por área de negócio em `src/main/java/com/api/quimia/domain/<módulo>/`
+e cada módulo esconde sua implementação em `internal/`. O build **falha** (ArchUnit) se um módulo acessar o
+`internal/` de outro: a comunicação entre módulos passa apenas pelos *gateways* públicos.
+
+| Módulo | Responsabilidade |
+|---|---|
+| `account` | Usuários, empresas, perfis, localização, autenticação |
+| `catalog` | Produtos, marcas, produtos da empresa, análise de FDS, fotos |
+| `storage` | Estante do usuário, cômodos, favoritos |
+| `safety` | FDS, compatibilidade e incompatibilidades, primeiros socorros |
+| `recommendation` | Misturas e resumo do histórico |
+| `partner` | Pontos de descarte/parceiros e pontos salvos |
+| `insights` | KPIs da empresa sobre o data mart |
+| `assistant` | Integração com o agente Kemi |
+| `infra` | Segurança, cache, OpenAPI, tratamento de exceções, persistência |
+
+Dentro de cada módulo vale a divisão MVC em camadas:
 
 ```
-mvn clean verify              # compila + testes (inclui ArchUnit + JaCoCo 80%)
-mvn spring-boot:run           # sobe a aplicacao em http://localhost:8080
-mvn test                      # so testes
-mvn dependency-check:check    # auditoria manual opcional (nao executada no CI)
+internal/
+├── web/          controllers (camada de apresentação)
+├── usecase/      regras de negócio, um caso de uso por classe
+├── persistence/  repositórios Spring Data JPA e gateways
+├── model/        entidades JPA
+├── dto/          contratos de entrada e saída
+└── mapper/       conversão entre entidade e DTO
 ```
 
-## Documentação da API (Swagger)
+## Como rodar
 
-Com a API no ar, a documentação interativa fica em `/swagger-ui.html` e o documento OpenAPI em
-`/v3/api-docs` (por exemplo `http://localhost:8080/swagger-ui.html`). As duas são públicas, também em
-produção; `SWAGGER_ENABLED=false` desliga. Cada rota traz o perfil exigido (usuário do app ou empresa
-do portal), os parâmetros e as respostas com os códigos de erro (`detail` do `problem+json`). Para testar
-rotas protegidas na interface, faça login, copie o `accessToken` e use o botão **Authorize**.
+Requisitos: **JDK 21** e acesso a um PostgreSQL com o schema do [quimia-bd](https://github.com/Quimia-br/quimia-bd).
+O Maven não precisa estar instalado, o repositório traz o wrapper.
 
-O teste `OpenApiContratoTest` falha se uma rota nova ficar sem documentação, se um código de erro lançado
-não aparecer em nenhuma rota ou se a segurança documentada não bater com a real; ele grava o documento
-gerado em `target/openapi.json`, útil para gerar clientes no front.
+```bash
+cp .env.sample .env      # preencha as variáveis (veja a tabela abaixo)
+make run                 # sobe em http://localhost:8080 usando o banco do .env
+make run-local           # sobe com um banco descartável, sem credenciais
+make help                # lista os atalhos
+```
 
-## CI, checks e deploy
+Sem `make`:
 
-O GitHub Actions executa `.github/workflows/ci.yml` em PRs para `main`,
-pushes em `main` e Releases publicadas. O workflow também pode ser iniciado
-manualmente para validar os gates sem fazer deploy. Cada check publica um
-resumo com seu objetivo, critério de aprovação, resultado e onde investigar
-uma falha; o check `CI summary` consolida a execução.
+```bash
+./mvnw spring-boot:run
+```
 
-- **Build** — compila e empacota o JAR executável Spring Boot.
-- **Unit tests** — executa JUnit/Surefire e as regras de arquitetura ArchUnit.
-- **Coverage gate** — executa `mvn verify`; JaCoCo exige cobertura de
-  instruções de pelo menos 80%.
-- **Discloud artifact** — valida os testes do helper e gera um ZIP com apenas
-  `app.jar` e `discloud.config` na raiz.
-- **Deploy to Discloud** — só roda ao publicar uma Release; exige aprovação
-  no Environment `discloud`, envia o ZIP e verifica que
-  `/api/v1/usuarios/me` responde HTTP 401 sem credenciais.
-- **PR title** — `.github/workflows/pr-title.yml` exige título Conventional
-  Commits; a descrição em português é convenção revisada por pessoas, não uma
-  detecção automática de idioma.
+Conferência rápida: `GET http://localhost:8080/swagger-ui.html` abre a documentação, e
+`GET /api/v1/usuarios/me` sem credenciais deve responder `401`.
 
-Depois que os novos checks aparecerem no primeiro PR, configure a proteção de
-`main` para exigir `Build`, `Unit tests`, `Coverage gate`,
-`Discloud artifact`, `CI summary` e `PR title`.
-Remova da regra os checks antigos de Jenkins; o deploy não é um check exigido
-para PR, pois só roda em Release publicada.
+## Variáveis de ambiente
 
-O Dependency-Check do Maven permanece disponível para auditoria manual pelo
-comando acima, mas não roda nas Actions nem bloqueia PRs ou Releases.
+Modelo completo em [`.env.sample`](.env.sample). Nunca versione o `.env`.
 
-### Preparar o primeiro deploy
+| Variável | Finalidade |
+|---|---|
+| `SERVER_PORT` | Porta HTTP (padrão 8080) |
+| `SPRING_DATASOURCE_URL` / `_USERNAME` / `_PASSWORD` | Conexão PostgreSQL. Use o usuário `quimia_api` |
+| `QUIMIA_DB_POOL_MAXIMO`, `QUIMIA_DB_POOL_MINIMO_OCIOSO` | Tamanho do pool de conexões |
+| `QUIMIA_JWT_PRIVATE_KEY_BASE64`, `QUIMIA_JWT_PUBLIC_KEY_BASE64`, `QUIMIA_JWT_KID` | Par de chaves que assina e valida os tokens |
+| `APP_CORS_ALLOWED_ORIGINS` | Origens web autorizadas (lista separada por vírgula) |
+| `QUIMIA_CACHE_ENABLED` | Liga o cache Redis (`false` por padrão) |
+| `REDIS_URL` | URL do Redis |
+| `QUIMIA_CACHE_TIMEOUT_MS` | Tempo máximo de uma operação de cache |
+| `QUIMIA_CACHE_PREFIX` | Prefixo das chaves no Redis (`quimia:`) |
+| `QUIMIA_EXTRATOR_URL`, `QUIMIA_EXTRATOR_TOKEN` | Serviço [quimia-extractor-ai](https://github.com/Quimia-br/quimia-extractor-ai). Sem URL, a leitura de FDS fica desligada |
+| `SWAGGER_ENABLED` | `false` desliga o Swagger |
 
-Crie o Environment `discloud` em **Settings → Environments** e configure
-aprovação manual por reviewer. Adicione o secret `DISCLOUD_TOKEN`. Para o
-primeiro deploy, deixe `DISCLOUD_APP_ID` ausente: se `GET /v2/user` confirmar
-`user.apps: []`, o workflow cria o primeiro app com `apps.create`. Depois,
-consulte o ID interno no painel da Discloud ou em `user.apps` na resposta de
-`GET /v2/user` e cadastre-o como secret `DISCLOUD_APP_ID`; Releases seguintes
-atualizam esse app. Se já houver qualquer app na conta e o ID estiver ausente,
-o workflow falha sem criar outro app. Esse ID interno não é o subdomínio
-`quimia` configurado no `discloud.config`.
+## Rotas
 
-A primeira Release é o bootstrap do app. Assim que `apps.create` criar a
-aplicação, configure nela as variáveis de runtime listadas abaixo e cadastre
-seu ID como `DISCLOUD_APP_ID`. Se essa primeira execução falhar no smoke check
-porque o app ainda não iniciou com a configuração, reexecute o job de deploy
-falho pela aba **Actions**; ele atualizará o app criado, sem criar uma
-duplicata, e repetirá o smoke check. Não publique outra Release só para repetir
-esse bootstrap.
+Prefixo comum: `/api/v1`. A lista completa, com parâmetros e códigos de resposta, está no Swagger.
+A pasta [`.bruno/`](.bruno) traz uma coleção pronta para testar cada fluxo.
 
-O `discloud.config` já define `ID=quimia`. Se o cadastro/reserva do
-subdomínio continuar retornando HTTP 400, a criação inicial também pode ser
-recusada pela Discloud; esse erro da plataforma precisa ser resolvido antes de
-o smoke check em `https://quimia.discloud.app` passar.
+| Prefixo | Recurso |
+|---|---|
+| `/auth` | Login, cadastro, renovação e logout de usuários do app |
+| `/empresas/auth`, `/empresas/me` | Cadastro, login, perfil e foto da empresa (portal) |
+| `/empresas/me/produtos` | CRUD dos produtos da empresa |
+| `/empresas/me/produtos/fds/analises` | Análise de FDS, correção e descarte de pendências |
+| `/usuarios/me`, `/usuarios/me/foto` | Perfil e foto do usuário |
+| `/produtos` | Consulta ao catálogo, busca por texto, código de barras e imagem |
+| `/estante`, `/estante/produtos` | Estante do usuário, por data e favoritos |
+| `/misturas` | Verificação de compatibilidade, histórico e resumo |
+| `/pontos`, `/pontos/salvos` | Pontos de descarte próximos e pontos salvos |
+| `/empresas/me/resumo` e rotas de KPI sob `/empresas/me` | Indicadores da empresa logada |
 
-As variáveis de runtime da API devem ser configuradas na Discloud, separadas
-dos secrets do Actions: `SPRING_DATASOURCE_URL`,
-`SPRING_DATASOURCE_USERNAME` (`quimia_api`, o usuário próprio da API; não o
-administrador do banco), `SPRING_DATASOURCE_PASSWORD`,
-`QUIMIA_JWT_KID`, `QUIMIA_JWT_PRIVATE_KEY_BASE64`,
-`QUIMIA_JWT_PUBLIC_KEY_BASE64`, `APP_AUTH_HMAC_SECRET` (32 bytes ou mais; o
-nome legado `APP_AUTH_RECOVERY_CODE_PEPPER` continua aceito),
-`FIREBASE_PROJECT_ID` (login social), `APP_AUTH_EMPRESA_RESET_URL` e
-`SERVER_PORT=8080`. Para enviar os emails de recuperação pelo Resend (padrão
-de produção, com o domínio `quimia.app` verificado no painel do Resend), configure
-`APP_EMAIL_SENDER_MODE=resend`, `RESEND_API_KEY` (chave com permissão de envio) e
-`APP_EMAIL_FROM=Quimia <nao-responda@quimia.app>`; o remetente precisa ser do
-domínio verificado. A alternativa pelo Gmail usa `APP_EMAIL_SENDER_MODE=smtp`,
-`APP_EMAIL_FROM`, `SPRING_MAIL_USERNAME` e `SPRING_MAIL_PASSWORD` (senha de app do
-Google). Faltando variável do modo escolhido, a API não sobe. As imagens de
-produto, o logo da empresa e a foto de perfil do usuário usam `CLOUDINARY_CLOUD_NAME`,
-`CLOUDINARY_API_KEY` e `CLOUDINARY_API_SECRET`; sem elas, enviar imagem responde 503.
-O pool de conexões com o banco tem teto de 5 conexões (`QUIMIA_DB_POOL_MAXIMO`) e
-mantém 1 ociosa (`QUIMIA_DB_POOL_MINIMO_OCIOSO`): o banco é dividido com o
-quimia-agent, e a soma dos pools precisa ficar abaixo do `max_connections` do plano. A leitura do PDF da
-FDS no cadastro de produto usa o `quimia-extractor-ai`: `QUIMIA_EXTRATOR_URL`,
-`QUIMIA_EXTRATOR_TOKEN` (obrigatório quando há URL) e `QUIMIA_EXTRATOR_TIMEOUT_SEGUNDOS`
-(padrão 60). Sem URL, enviar `fds` responde 503; `QUIMIA_FDS_OBRIGATORIA=true` exige a
-FDS em produto novo e fica `false` até o extrator estar no ar. O PDF da FDS é guardado
-no Cloudinary para download (mesmas variáveis `CLOUDINARY_*`; sem elas, enviar `fds`
-responde 503). A conta precisa ter a entrega de PDF liberada (Settings › Security); o
-limite de 10 MB do PDF é o de arquivo `raw` do plano atual. A revisão das pendências da
-FDS (`POST /empresas/me/produtos/fds/analises`) devolve um `analiseId` assinado com HMAC, sem
-estado no servidor: `QUIMIA_FDS_ANALISE_SEGREDO` (mínimo 32 bytes; sem ele usa
-`APP_AUTH_HMAC_SECRET`) e `QUIMIA_FDS_ANALISE_VALIDADE_MINUTOS` (padrão 30). O PDF de uma
-análise abandonada fica no Cloudinary até ser descartado (`.../analises/descartar`). O chat do app (Kemi) e do
-portal (WebKemi) repassa as mensagens ao `quimia-agent`: `QUIMIA_AGENTE_URL` (sem ela o
-chat responde 503), `QUIMIA_AGENTE_TOKEN` (opcional, enviado como Bearer),
-`QUIMIA_AGENTE_TIMEOUT_SEGUNDOS` (padrão 120) e `QUIMIA_AGENTE_MENSAGENS_POR_HORA`
-(padrão 20 por autor). "Novo chat" (`POST .../chat/sessoes/{id}/encerrar`) chama
-`/chat/sessions/close` do agente, que resume a conversa. Não coloque os valores
-no repositório ou no pacote. O PostgreSQL administra o schema: a API não roda
-migrations nem DDL e mantém `ddl-auto: validate`. Antes de publicar, confira
-colunas, tipos, constraints e índices em consultas somente leitura conforme
-[`account-database-contract.md`](docs/context/account-database-contract.md);
-schema ausente impede a inicialização e o smoke check.
+## Autenticação e autorização
 
-O ícone dos checks padrão do GitHub Actions não é configurável por workflow.
-Uma identidade visual própria pode ser considerada depois usando uma GitHub
-App que publique checks; a imagem da App é configurável pela plataforma
-([documentação](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/creating-a-custom-badge-for-your-github-app)).
+- **Usuário do app:** identidade verificada pelo Firebase; a API emite o `accessToken` (JWT) e um cookie
+  HttpOnly de renovação (`quimia_rt`).
+- **Empresa do portal:** e-mail e senha (BCrypt), com a mesma emissão de token e cookie.
+- **CSRF:** o refresh e o logout exigem o cookie `quimia_csrf` espelhado no header `X-CSRF-TOKEN`.
+- **Autorização:** `SecurityConfig` separa os perfis (`USUARIO_PRINCIPAL`, `EMPRESA_PRINCIPAL`, `ADMIN`) por
+  rota. Rotas protegidas respondem `401` sem token e `403` com perfil errado.
+- Para testar no Swagger: faça login, copie o `accessToken` e use **Authorize**.
 
-## Como usar este scaffold
+## Validação e tratamento de erros
 
-1. Renomeie o base package `com.api.quimia` para o seu (se for
-   reaproveitar como template em outro projeto).
-2. Renomeie `domain/_example_module/` para o primeiro modulo real
-   (substantivo singular em ingles: `order`, `payment`, etc.).
-3. Apague pastas opcionais do modulo (`internal/client/`,
-   `internal/config/`, `internal/event/`, `event/`) se nao for usar.
-4. Replique a estrutura para cada novo modulo de negocio.
-5. Mantenha `ArchitectureTest` verde — a fronteira `internal/` e
-   regra de build, nao convencao.
+- Entradas são validadas com Bean Validation (`@Valid`, `@NotBlank`, `@Size`, `@Email`) nos DTOs de
+  `internal/dto`.
+- `ProblemHandler` (`@RestControllerAdvice`) concentra o tratamento de exceções: validação, integridade do
+  banco e exceções de cada módulo viram respostas `application/problem+json` com status HTTP adequado e um
+  `detail` útil para o cliente.
+- O teste `OpenApiContratoTest` falha se uma rota ficar sem documentação ou se um código de erro lançado não
+  aparecer no Swagger.
+
+## Cache com Redis
+
+As leituras mais frequentes passam por um cache Redis (`@Cacheable` / `@CacheEvict`), configurado em
+[`CacheConfig`](src/main/java/com/api/quimia/infra/config/CacheConfig.java):
+
+| Cache | Onde é usado |
+|---|---|
+| Catálogo | Consulta de produto por id e por código de barras, listagens |
+| Segurança | Dados de FDS, incompatibilidades e primeiros socorros |
+| Pontos | Pontos de descarte por filtro |
+| Insights | Agregados da empresa |
+
+Escritas no catálogo invalidam as entradas afetadas. O cache é opcional: com `QUIMIA_CACHE_ENABLED=false` a
+API funciona direto sobre o PostgreSQL. Testes: `CacheDasLeiturasWebTest` e `CachesNoRedisTest`.
+
+## Banco de dados
+
+PostgreSQL. A **fonte de verdade do schema** é o repositório [quimia-bd](https://github.com/Quimia-br/quimia-bd);
+a API só valida (`ddl-auto=validate`) e nunca altera a estrutura. Regras equivalentes às *functions* do banco
+(`fn_match_produtos`, `buscar_pontos_salvos`) estão refletidas em `MotorDeCompatibilidade` e
+`PontoSalvoRepository`.
+
+## Testes
+
+```bash
+./mvnw clean verify     # testes + ArchUnit + cobertura mínima de 80% (JaCoCo)
+./mvnw test             # só os testes
+```
+
+Os testes de web usam MockMvc com banco em memória, sem rede. As regras de fronteira entre módulos são
+verificadas por ArchUnit. A prática é escrever o teste do comportamento antes ou junto da implementação (TDD).
+
+## Docker
+
+O `Dockerfile` empacota o JAR já compilado em uma imagem `eclipse-temurin:21-jre`, executando como usuário
+não root (uid 10001) na porta 8080.
+
+```bash
+./mvnw -B clean package -DskipTests
+docker build -t quimia-api .
+docker run --rm -p 8080:8080 --env-file .env quimia-api
+```
+
+A imagem é *stateless*, toda configuração vem de variáveis de ambiente, então serve para qualquer
+orquestrador (Kubernetes, ECS, etc.) apenas informando as variáveis da seção acima e uma sonda HTTP em
+`/api/v1/usuarios/me` (esperado `401`).
+
+## CI/CD
+
+Workflow [`ci.yml`](.github/workflows/ci.yml), executado em PRs para `main`, pushes em `main` e Releases:
+
+| Job | O que faz |
+|---|---|
+| Build | Compila e empacota o JAR executável |
+| Unit tests | JUnit e regras de arquitetura (ArchUnit) |
+| Coverage gate | `mvn verify` com mínimo de 80% de cobertura |
+| Discloud artifact | Gera o ZIP de implantação (`app.jar` + `discloud.config`) |
+| Deploy to Discloud | Só em Release publicada, com aprovação manual no Environment `discloud` |
+| PR title | [`pr-title.yml`](.github/workflows/pr-title.yml) exige título no padrão Conventional Commits |
+
+Para publicar: crie uma Release no GitHub e aprove o deploy no Environment `discloud`.
+
+## Fluxo de contribuição
+
+- Uma branch por ticket (`QUI-<id>`), aberta a partir de `main`.
+- Commits e títulos de PR em [Conventional Commits](docs/conventional-commits-padrao.md).
+- Todo PR usa o [template](.github/pull_request_template.md) e precisa de revisão aprovada antes do merge.
+- Convenção de branch e PR: [docs/branch-e-pull-request-padrao.md](docs/branch-e-pull-request-padrao.md).
+
+## Padrão de projeto
+
+**Null Object + Factory** na leitura de FDS.
+[`ExtratorFdsConfiguration`](src/main/java/com/api/quimia/domain/catalog/internal/fds/ExtratorFdsConfiguration.java)
+é a fábrica: conforme a configuração, entrega `HttpExtratorFds` (chama o extrator real) ou
+`ExtratorFdsDesligado` (objeto nulo que implementa a mesma interface `ExtratorFds` sem fazer nada). O restante
+da aplicação usa `ExtratorFds` sem `if` de "extrator existe?", e o ambiente local sobe sem o serviço externo.
+
+## Repositórios relacionados
+
+| Repositório | Papel |
+|---|---|
+| [quimia-mobile](https://github.com/Quimia-br/quimia-mobile) | Aplicativo Android |
+| [quimia-web](https://github.com/Quimia-br/quimia-web) | Portal web das empresas |
+| [quimia-agent](https://github.com/Quimia-br/quimia-agent) | Assistente Kemi (multiagente) |
+| [quimia-extractor-ai](https://github.com/Quimia-br/quimia-extractor-ai) | Extração de dados de FDS |
+| [quimia-bd](https://github.com/Quimia-br/quimia-bd) | Banco de dados, data mart e documentação |
