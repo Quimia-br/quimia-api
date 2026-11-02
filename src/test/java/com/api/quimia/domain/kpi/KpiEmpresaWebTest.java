@@ -334,7 +334,7 @@ class KpiEmpresaWebTest {
 
     @Test
     void empresaApagadaComTokenAindaValidoDa404() throws Exception {
-        String token = TestLogins.empresa(mvc, "Apagada", "apagada@kpi.test", "30000033000100");
+        String token = TestLogins.empresa(mvc, "Apagada", "apagada@kpi.test", "30000066000142");
         jdbc.update("DELETE FROM empresa WHERE email = 'apagada@kpi.test'");
 
         for (String rota : ROTAS) {

@@ -3,6 +3,6 @@
 -- Quando o DBA publicar cada alteração no quimia-bd, remova a linha daqui
 -- (scripts/local-validation/sync-schema.sh mostra a diferença).
 --
--- Nenhuma pendente: quimia-bd@271eb40 já inclui marca.logo_url,
+-- Nenhuma pendente: quimia-bd@c5a9678 já inclui marca.logo_url,
 -- fds.resumo_simplificado, UNIQUE(estante.id_usuario) e estante_produto.id_comodo.
 SELECT 1;
