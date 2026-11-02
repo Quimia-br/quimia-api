@@ -111,13 +111,25 @@ public class FdsDoProduto {
      */
     FdsPreparada preparar(Integer empresaId, PdfDaFds pdf) {
         String pasta = PASTA + empresaId;
+        long inicio = System.nanoTime();
         String url = enviarPdf(pdf, pasta);
+        long aposArmazenamento = System.nanoTime();
         try {
-            return new FdsPreparada(url, pasta, extrair(pdf), false);
+            FdsPreparada preparada = new FdsPreparada(url, pasta, extrair(pdf), false);
+            log.info("FDS da empresa {} preparada: armazenamento {} ms, extrator {} ms, {} bytes", empresaId,
+                    milissegundos(inicio, aposArmazenamento), milissegundos(aposArmazenamento, System.nanoTime()),
+                    pdf.conteudo().length);
+            return preparada;
         } catch (RuntimeException falha) {
+            log.warn("FDS da empresa {} recusada após {} ms de extrator ({} bytes): {}", empresaId,
+                    milissegundos(aposArmazenamento, System.nanoTime()), pdf.conteudo().length, falha.toString());
             documentos.apagarPdf(url, pasta);
             throw falha;
         }
+    }
+
+    private static long milissegundos(long de, long ate) {
+        return (ate - de) / 1_000_000;
     }
 
     /**
@@ -204,6 +216,9 @@ public class FdsDoProduto {
                 case DOCUMENTO_RECUSADO -> new CatalogException("fds_invalida", 422);
                 case MUITO_GRANDE -> new CatalogException("pdf_muito_grande", 413);
             };
+        } catch (RuntimeException inesperada) {
+            log.error("falha inesperada no extrator de FDS", inesperada);
+            throw new CatalogException("extrator_falhou", 502);
         }
     }
 
@@ -215,6 +230,9 @@ public class FdsDoProduto {
                 case INDISPONIVEL -> new CatalogException("armazenamento_fds_indisponivel", 503);
                 case FALHOU -> new CatalogException("armazenamento_fds_falhou", 502);
             };
+        } catch (RuntimeException inesperada) {
+            log.error("falha inesperada ao guardar o PDF da FDS", inesperada);
+            throw new CatalogException("armazenamento_fds_falhou", 502);
         }
     }
 

@@ -13,9 +13,13 @@ public final class FakeDocumentoStorage implements DocumentoStorage {
     private final List<String> enviados = new CopyOnWriteArrayList<>();
     private final List<String> apagados = new CopyOnWriteArrayList<>();
     private volatile ImageStorageException.Motivo falha;
+    private volatile RuntimeException explosao;
 
     @Override
     public String enviarPdf(byte[] conteudo, String pasta, String nomeArquivo) {
+        if (explosao != null) {
+            throw explosao;
+        }
         if (falha != null) {
             throw new ImageStorageException(falha);
         }
@@ -35,6 +39,11 @@ public final class FakeDocumentoStorage implements DocumentoStorage {
         falha = motivo;
     }
 
+    /** Falha que o contrato do armazenamento não prevê (o cliente do Cloudinary lançando algo inesperado). */
+    public void explodirCom(RuntimeException inesperada) {
+        explosao = inesperada;
+    }
+
     public List<String> enviados() {
         return List.copyOf(enviados);
     }
@@ -47,5 +56,6 @@ public final class FakeDocumentoStorage implements DocumentoStorage {
         enviados.clear();
         apagados.clear();
         falha = null;
+        explosao = null;
     }
 }

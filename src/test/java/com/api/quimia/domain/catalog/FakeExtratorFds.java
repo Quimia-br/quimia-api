@@ -18,10 +18,14 @@ public final class FakeExtratorFds implements ExtratorFds {
     private final AtomicInteger chamadas = new AtomicInteger();
     private volatile String resposta = RESPOSTA_DE_EXEMPLO;
     private volatile ExtratorFdsException.Motivo falha;
+    private volatile RuntimeException explosao;
 
     @Override
     public String extrair(byte[] pdf) {
         chamadas.incrementAndGet();
+        if (explosao != null) {
+            throw explosao;
+        }
         if (falha != null) {
             throw new ExtratorFdsException(falha);
         }
@@ -36,6 +40,11 @@ public final class FakeExtratorFds implements ExtratorFds {
         falha = motivo;
     }
 
+    /** Falha que o contrato do extrator não prevê (o cliente HTTP lançando algo inesperado). */
+    public void explodirCom(RuntimeException inesperada) {
+        explosao = inesperada;
+    }
+
     public int chamadas() {
         return chamadas.get();
     }
@@ -44,6 +53,7 @@ public final class FakeExtratorFds implements ExtratorFds {
         chamadas.set(0);
         resposta = RESPOSTA_DE_EXEMPLO;
         falha = null;
+        explosao = null;
     }
 
     private static String lerExemplo() {
