@@ -3,6 +3,7 @@ package com.api.quimia.domain.catalog.internal.web;
 import com.api.quimia.domain.account.AccountPrincipal;
 import com.api.quimia.domain.catalog.internal.dto.AnaliseDeFdsForm;
 import com.api.quimia.domain.catalog.internal.dto.AnaliseDeFdsResponse;
+import com.api.quimia.domain.catalog.internal.dto.AnaliseEmAndamentoResponse;
 import com.api.quimia.domain.catalog.internal.dto.DescartarAnaliseRequest;
 import com.api.quimia.domain.catalog.internal.usecase.AnalisarFdsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,7 +13,9 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -66,6 +69,47 @@ public class EmpresaFdsController {
     public AnaliseDeFdsResponse analisar(
             @AuthenticationPrincipal AccountPrincipal principal, @Valid @ModelAttribute AnaliseDeFdsForm form) {
         return analisar.analisar(principal.empresaId(), form);
+    }
+
+    @Operation(
+            summary = "Analisar FDS em segundo plano",
+            description = "Mesmo formulário e mesmas regras de `POST /produtos/fds/analises`, mas devolve na hora um "
+                    + "`id` e a leitura roda fora do pedido. O host corta respostas após cerca de 30 s e a leitura de "
+                    + "uma FDS real pode passar disso: consulte `GET /produtos/fds/analises/assincronas/{id}` a cada "
+                    + "2 ou 3 segundos até `concluida` ou `falhou`. Os erros de arquivo (`fds_ausente`, "
+                    + "`pdf_muito_grande`, `pdf_invalido`) saem aqui, antes de criar a análise.")
+    @ApiResponse(responseCode = "202", description = "Análise iniciada; o corpo traz o `id` e `processando`.")
+    @ApiResponse(responseCode = "400", description = "Sem o arquivo `fds`: `fds_ausente`.")
+    @ApiResponse(responseCode = "403", description = "Empresa desativada: `empresa_inativa`.")
+    @ApiResponse(responseCode = "404", description = "Empresa do token não existe mais: `empresa_nao_encontrada`.")
+    @ApiResponse(responseCode = "413", description = "PDF acima de 10 MB: `pdf_muito_grande`.")
+    @ApiResponse(responseCode = "415", description = "Arquivo que não começa com `%PDF-`: `pdf_invalido`.")
+    @ApiResponse(
+            responseCode = "429",
+            description = "Análises demais em andamento neste momento: `analises_demais`. Tente de novo em instantes.")
+    @PostMapping(path = "/assincronas", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public AnaliseEmAndamentoResponse iniciar(
+            @AuthenticationPrincipal AccountPrincipal principal, @Valid @ModelAttribute AnaliseDeFdsForm form) {
+        return analisar.iniciar(principal.empresaId(), form);
+    }
+
+    @Operation(
+            summary = "Consultar análise de FDS em segundo plano",
+            description = "Estado da análise iniciada em `POST /produtos/fds/analises/assincronas`: `processando`, "
+                    + "`concluida` (com `analise`, o mesmo corpo da análise síncrona, inclusive o `analiseId` para o "
+                    + "cadastro) ou `falhou` (com `codigo` e `detail`, o mesmo status e código que a análise síncrona "
+                    + "devolveria). O `id` vale 15 minutos depois de terminar.")
+    @ApiResponse(responseCode = "200", description = "Estado da análise.")
+    @ApiResponse(responseCode = "403", description = "Empresa desativada: `empresa_inativa`.")
+    @ApiResponse(
+            responseCode = "404",
+            description = "Análise inexistente, vencida, perdida em um reinício ou de outra empresa: "
+                    + "`analise_nao_encontrada`.")
+    @GetMapping("/assincronas/{id}")
+    public AnaliseEmAndamentoResponse consultar(
+            @AuthenticationPrincipal AccountPrincipal principal, @PathVariable String id) {
+        return analisar.consultar(principal.empresaId(), id);
     }
 
     @Operation(

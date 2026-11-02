@@ -11,6 +11,8 @@ import org.springframework.web.client.RestClient;
 @Configuration(proxyBeanMethods = false)
 class ExtratorFdsConfiguration {
     private static final Duration CONEXAO = Duration.ofSeconds(3);
+    /** Cada chamada ao extrator (envio ou consulta) responde na hora; o prazo da extração inteira é o timeout. */
+    private static final Duration LEITURA_DE_CADA_CHAMADA = Duration.ofSeconds(20);
 
     /**
      * Sem URL, a leitura de FDS fica desligada. A API não sobe com configuração que quebraria em uso: URL sem token
@@ -36,7 +38,12 @@ class ExtratorFdsConfiguration {
         }
         JdkClientHttpRequestFactory fabrica =
                 new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(CONEXAO).build());
-        fabrica.setReadTimeout(Duration.ofSeconds(timeoutSegundos));
-        return new HttpExtratorFds(RestClient.builder().requestFactory(fabrica).build(), url.trim(), token.trim());
+        fabrica.setReadTimeout(LEITURA_DE_CADA_CHAMADA);
+        return new HttpExtratorFds(
+                RestClient.builder().requestFactory(fabrica).build(),
+                url.trim(),
+                token.trim(),
+                HttpExtratorFds.INTERVALO_PADRAO,
+                Duration.ofSeconds(timeoutSegundos));
     }
 }
