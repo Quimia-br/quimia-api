@@ -92,8 +92,10 @@ class PrimeirosSocorrosWebTest {
                 .andExpect(jsonPath("$.porExposicao[0].rotaExposicao").value("inalacao"))
                 .andExpect(jsonPath("$.porExposicao[0].sintomas").value("Tontura."))
                 .andExpect(jsonPath("$.porExposicao[0].atencaoMedicaImediata").value(false))
+                .andExpect(jsonPath("$.porExposicao[0].atencaoMedicaImediataFds").doesNotExist())
                 .andExpect(jsonPath("$.porExposicao[1].rotaExposicao").value("olhos"))
                 .andExpect(jsonPath("$.porExposicao[1].atencaoMedicaImediata").value(true))
+                .andExpect(jsonPath("$.porExposicao[1].atencaoMedicaImediataFds").value(true))
                 .andExpect(jsonPath("$.orientacoesGerais[0]").value("Mostrar esta ficha ao médico."))
                 .andExpect(jsonPath("$.notasAoMedico.length()").value(0));
     }

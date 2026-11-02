@@ -67,10 +67,14 @@ class LeituraDosPrimeirosSocorrosTest {
         assertThat(secao.porExposicao()).extracting(PrimeiroSocorroView::rotaExposicao).containsExactlyElementsOf(ROTAS);
         assertThat(secao.porExposicao().get(0))
                 .isEqualTo(new PrimeiroSocorroView(
-                        "inalacao", "Levar para local ventilado.", "Tontura.", "Oxigênio se necessário.", false));
+                        "inalacao", "Levar para local ventilado.", "Tontura.", "Oxigênio se necessário.", false, false));
         assertThat(secao.porExposicao().get(3))
-                .isEqualTo(new PrimeiroSocorroView("ingestao", "Não induzir vômito.", null, null, true));
+                .isEqualTo(new PrimeiroSocorroView("ingestao", "Não induzir vômito.", null, null, true, true));
         assertThat(secao.porExposicao().get(2).atencaoMedicaImediata()).isFalse();
+        assertThat(secao.porExposicao().get(0).atencaoMedicaImediataFds()).isFalse();
+        assertThat(secao.porExposicao().get(1).atencaoMedicaImediataFds()).isNull();
+        assertThat(secao.porExposicao().get(2).atencaoMedicaImediataFds()).isNull();
+        assertThat(secao.porExposicao().get(3).atencaoMedicaImediataFds()).isTrue();
         assertThat(secao.orientacoesGerais()).containsExactly("Mostrar esta ficha ao médico.");
         assertThat(secao.notasAoMedico()).containsExactly("Tratamento sintomático.");
     }
@@ -123,8 +127,8 @@ class LeituraDosPrimeirosSocorrosTest {
                 ]"""));
 
         assertThat(secao.porExposicao()).containsExactly(
-                new PrimeiroSocorroView("pele", "primeiro registro da pele", null, null, false),
-                new PrimeiroSocorroView("ingestao", null, null, null, true));
+                new PrimeiroSocorroView("pele", "primeiro registro da pele", null, null, false, null),
+                new PrimeiroSocorroView("ingestao", null, null, null, true, true));
     }
 
     @Test
@@ -138,10 +142,10 @@ class LeituraDosPrimeirosSocorrosTest {
                 ]"""));
 
         assertThat(secao.porExposicao()).containsExactly(
-                new PrimeiroSocorroView("inalacao", null, "Tosse.", null, false),
-                new PrimeiroSocorroView("pele", null, null, "Pomada.", false),
-                new PrimeiroSocorroView("olhos", "Lavar.", null, null, false),
-                new PrimeiroSocorroView("ingestao", null, null, null, true));
+                new PrimeiroSocorroView("inalacao", null, "Tosse.", null, false, null),
+                new PrimeiroSocorroView("pele", null, null, "Pomada.", false, null),
+                new PrimeiroSocorroView("olhos", "Lavar.", null, null, false, null),
+                new PrimeiroSocorroView("ingestao", null, null, null, true, true));
     }
 
     @Test

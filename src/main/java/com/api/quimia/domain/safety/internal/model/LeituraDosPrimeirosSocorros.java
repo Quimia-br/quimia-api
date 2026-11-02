@@ -92,10 +92,11 @@ public final class LeituraDosPrimeirosSocorros {
             String descricao = texto(item.path("descricao"));
             String sintomas = texto(item.path("sintomas"));
             String tratamento = texto(item.path("tratamento_especial"));
-            boolean atencao = item.path("atencao_medica_imediata").isBoolean()
-                    && item.path("atencao_medica_imediata").asBoolean();
+            JsonNode campoAtencao = item.path("atencao_medica_imediata");
+            Boolean atencaoFds = campoAtencao.isBoolean() ? campoAtencao.asBoolean() : null;
+            boolean atencao = Boolean.TRUE.equals(atencaoFds);
             if (descricao != null || sintomas != null || tratamento != null || atencao) {
-                porRota.put(rota, new PrimeiroSocorroView(rota.codigo(), descricao, sintomas, tratamento, atencao));
+                porRota.put(rota, new PrimeiroSocorroView(rota.codigo(), descricao, sintomas, tratamento, atencao, atencaoFds));
             }
         }
         return List.copyOf(porRota.values());

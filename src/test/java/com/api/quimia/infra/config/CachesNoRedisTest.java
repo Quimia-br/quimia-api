@@ -113,7 +113,7 @@ class CachesNoRedisTest {
                 "primeiros-socorros", new PrimeirosSocorrosView(
                         42, true,
                         List.of(new PrimeirosSocorrosView.PrimeiroSocorroView(
-                                "Olhos", "Lave com água", "Ardência", null, true)),
+                                "Olhos", "Lave com água", "Ardência", null, true, true)),
                         List.of("Procure o CIATox"), List.of(), "3.1", data),
                 "pontos", List.of(new PontoView(
                         1, "Ecoponto Centro", "descarte", "01001-000", "SP", "Sé", "Praça da Sé", 100, null,

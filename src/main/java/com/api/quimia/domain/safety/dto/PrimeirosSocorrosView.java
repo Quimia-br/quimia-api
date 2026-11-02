@@ -37,6 +37,8 @@ public record PrimeirosSocorrosView(
             String sintomas,
             @Schema(description = "Tratamento especial.", example = "Procurar oftalmologista.")
             String tratamentoEspecial,
-            @Schema(description = "Exige atenção médica imediata.", example = "true")
-            boolean atencaoMedicaImediata) {}
+            @Schema(description = "Campo legado: verdadeiro se a FDS informa atenção imediata; falso também pode indicar informação ausente.", example = "true")
+            boolean atencaoMedicaImediata,
+            @Schema(description = "Valor da FDS: verdadeiro ou falso quando informado; nulo quando desconhecido.", example = "true")
+            Boolean atencaoMedicaImediataFds) {}
 }
