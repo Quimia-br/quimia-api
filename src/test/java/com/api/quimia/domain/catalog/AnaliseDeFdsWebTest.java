@@ -3,6 +3,7 @@ package com.api.quimia.domain.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -378,6 +379,30 @@ class AnaliseDeFdsWebTest {
                 .andExpect(jsonPath("$.detail").value("extrator_indisponivel"));
 
         assertThat(documentos.apagados()).containsExactlyElementsOf(documentos.enviados());
+    }
+
+    @Test
+    void falhaInesperadaDoExtratorNaAnaliseResponde502EmJsonEApagaOPdf() throws Exception {
+        extrator.explodirCom(new IllegalStateException("cliente HTTP quebrou"));
+
+        analisar(token, null, pdf()).andExpect(status().isBadGateway())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value("extrator_falhou"));
+
+        assertThat(documentos.enviados()).hasSize(1);
+        assertThat(documentos.apagados()).containsExactlyElementsOf(documentos.enviados());
+    }
+
+    @Test
+    void falhaInesperadaDoArmazenamentoNaAnaliseResponde502EmJsonSemChamarOExtrator() throws Exception {
+        documentos.explodirCom(new IllegalStateException("cliente do Cloudinary quebrou"));
+
+        analisar(token, null, pdf()).andExpect(status().isBadGateway())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value("armazenamento_fds_falhou"));
+
+        assertThat(extrator.chamadas()).isZero();
+        assertThat(documentos.enviados()).isEmpty();
     }
 
     private org.springframework.test.web.servlet.RequestBuilder descartar(String tokenDeQuem, String analiseId) {

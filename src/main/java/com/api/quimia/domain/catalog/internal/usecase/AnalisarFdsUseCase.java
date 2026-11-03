@@ -6,6 +6,7 @@ import com.api.quimia.domain.catalog.internal.dto.AnaliseDeFdsResponse.CompostoD
 import com.api.quimia.domain.catalog.internal.dto.AnaliseDeFdsResponse.EvidenciaDaFds;
 import com.api.quimia.domain.catalog.internal.dto.AnaliseDeFdsResponse.PendenciaDaFds;
 import com.api.quimia.domain.catalog.internal.dto.AnaliseDeFdsResponse.ReferenciaDoComposto;
+import com.api.quimia.domain.catalog.internal.dto.AnaliseEmAndamentoResponse;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -27,10 +28,12 @@ public class AnalisarFdsUseCase {
 
     private final EmpresaDoPortal portal;
     private final FdsDoProduto fds;
+    private final AnalisesEmAndamento emAndamento;
 
-    public AnalisarFdsUseCase(EmpresaDoPortal portal, FdsDoProduto fds) {
+    public AnalisarFdsUseCase(EmpresaDoPortal portal, FdsDoProduto fds, AnalisesEmAndamento emAndamento) {
         this.portal = portal;
         this.fds = fds;
+        this.emAndamento = emAndamento;
     }
 
     public AnaliseDeFdsResponse analisar(Integer empresaId, AnaliseDeFdsForm form) {
@@ -38,6 +41,27 @@ public class AnalisarFdsUseCase {
         FdsDoProduto.AnaliseAberta analise =
                 fds.analisar(empresaId, fds.ler(form.fds()), form.analiseAnterior());
         return resposta(analise);
+    }
+
+    /**
+     * Mesma análise, em segundo plano: o PDF é lido e validado aqui (413, 415 e `fds_ausente` saem na hora) e o resto
+     * roda fora do pedido. O resultado, ou o erro que a análise síncrona devolveria, sai de {@link #consultar}.
+     */
+    public AnaliseEmAndamentoResponse iniciar(Integer empresaId, AnaliseDeFdsForm form) {
+        portal.exigirAtiva(empresaId);
+        FdsDoProduto.PdfDaFds pdf = fds.ler(form.fds());
+        if (pdf == null) {
+            throw new CatalogException("fds_ausente", 400);
+        }
+        String analiseAnterior = form.analiseAnterior();
+        return emAndamento.iniciar(empresaId, () -> resposta(fds.analisar(empresaId, pdf, analiseAnterior)));
+    }
+
+    /** Estado de uma análise da empresa; id desconhecido, vencido ou de outra empresa é `404 analise_nao_encontrada`. */
+    public AnaliseEmAndamentoResponse consultar(Integer empresaId, String id) {
+        portal.exigirAtiva(empresaId);
+        return emAndamento.consultar(empresaId, id)
+                .orElseThrow(() -> new CatalogException("analise_nao_encontrada", 404));
     }
 
     /** O PDF da análise abandonada sai do armazenamento. Análise inválida ou de outra empresa não apaga nada. */
