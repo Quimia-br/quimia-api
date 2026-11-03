@@ -7,6 +7,7 @@ import com.api.quimia.domain.catalog.internal.dto.AnaliseEmAndamentoResponse;
 import com.api.quimia.domain.catalog.internal.dto.DescartarAnaliseRequest;
 import com.api.quimia.domain.catalog.internal.usecase.AnalisarFdsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -100,6 +101,10 @@ public class EmpresaFdsController {
                     + "`concluida` (com `analise`, o mesmo corpo da análise síncrona, inclusive o `analiseId` para o "
                     + "cadastro) ou `falhou` (com `codigo` e `detail`, o mesmo status e código que a análise síncrona "
                     + "devolveria). O `id` vale 15 minutos depois de terminar.")
+    @Parameter(
+            name = "id",
+            description = "Identificador devolvido por `POST /produtos/fds/analises/assincronas`.",
+            example = "q7GmX2kT9sVb1nLw4hJ3Zg")
     @ApiResponse(responseCode = "200", description = "Estado da análise.")
     @ApiResponse(responseCode = "403", description = "Empresa desativada: `empresa_inativa`.")
     @ApiResponse(
